@@ -1,0 +1,10 @@
+
+.bsp/
+.idea/
+
+target/
+project/target/
+
+klib-webServer/shared/target/
+klib-webServer/jvm/target/
+klib-webServer/js/target/
