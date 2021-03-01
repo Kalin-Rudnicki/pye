@@ -7,7 +7,7 @@ lazy val `klib-webServer` =
   crossProject(JSPlatform, JVMPlatform)
     .in(file("klib-webServer"))
     .settings(
-      name := "klib-webServer",
+      name := "klib-webserver",
       organization := "kalin-rudnicki",
       version := "0.0.1",
       unmanagedSourceDirectories in Compile +=
