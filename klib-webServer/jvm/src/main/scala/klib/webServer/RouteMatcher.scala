@@ -1,8 +1,7 @@
 package klib.webServer
 
-import io.circe._
-import generic.auto._
-import parser._
+import io.circe._, parser._
+import jakarta.servlet.http.Cookie
 
 import klib.Implicits._
 import klib.fp.types._
@@ -32,41 +31,58 @@ object RouteMatcher {
 
   }
 
-  final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
+  // =====|  |=====
+
+  final class MatchData(
+      val logger: Logger,
+      val connectionFactory: ConnectionFactory,
+      val body: String, // TODO (KR) : Might need ??[_]
+      val params: Map[String, String],
+      val cookies: Array[Cookie],
+  ) {
+
+    def bodyAs[B: Decoder]: ??[B] =
+      (
+        for {
+          json <- parse(body).to_\/.toMaybe
+          b <- implicitly[Decoder[B]].decodeJson(json).to_\/.toMaybe
+        } yield b
+      ) match {
+        case Some(b) =>
+          b.pure[??]
+        case None =>
+          (Dead(Message("Failed to decode body") :: Nil): ?[B]).wrap[IO]
+      }
+
+    // TODO (KR) : more helpers
+
+  }
+
+  object MatchData {}
+
+  // =====|  |=====
 
   final class OneOf private[RouteMatcher] (val children: List[RouteMatcher]) extends RouteMatcher
 
-  final class Complete private[RouteMatcher] (val toResult: (ConnectionFactory, Logger) => ??[MatchResult])
-      extends RouteMatcher
+  final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
+
+  final class Complete private[RouteMatcher] (val toResult: MatchData => ??[MatchResult]) extends RouteMatcher
 
   final class Any private[RouteMatcher] (
-      val toResult: (List[String], Map[String, String]) => (ConnectionFactory, Logger) => ??[MatchResult],
+      val toResult: (List[String], Map[String, String]) => MatchData => ??[MatchResult],
   ) extends RouteMatcher
 
   final class Method private[RouteMatcher] (val method: String, val child: RouteMatcher) extends RouteMatcher
-
-  final class WithBody[B] private[RouteMatcher] (val decoder: Decoder[B], val child: B => RouteMatcher)
-      extends RouteMatcher {
-    type Type = B
-  }
 
   final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeString[A], val child: A => RouteMatcher)
       extends RouteMatcher {
     type Type = A
   }
 
-  final class WithParam[A] private[RouteMatcher] (
-      val decodeString: DecodeString[A],
-      val param: String,
-      val child: A => RouteMatcher,
-  ) extends RouteMatcher {
-    type Type = A
-  }
-
-  def any(toResult: (List[String], Map[String, String]) => (ConnectionFactory, Logger) => ??[MatchResult]): RouteMatcher =
+  def any(toResult: (List[String], Map[String, String]) => MatchData => ??[MatchResult]): RouteMatcher =
     new Any(toResult)
 
-  def complete(toResult: (ConnectionFactory, Logger) => ??[MatchResult]): RouteMatcher =
+  def complete(toResult: MatchData => ??[MatchResult]): RouteMatcher =
     new Complete(toResult)
 
   def const(const: String)(child: RouteMatcher): RouteMatcher =
@@ -78,13 +94,7 @@ object RouteMatcher {
   def method(method: String)(child: RouteMatcher): RouteMatcher =
     new Method(method, child)
 
-  def withBody[B: Decoder](child: B => RouteMatcher): RouteMatcher =
-    new WithBody(implicitly[Decoder[B]], child)
-
   def pathArg[A: DecodeString](child: A => RouteMatcher): RouteMatcher =
     new PathArg(implicitly[DecodeString[A]], child)
-
-  def withParam[A: DecodeString](param: String)(child: A => RouteMatcher): RouteMatcher =
-    new WithParam(implicitly[DecodeString[A]], param, child)
 
 }

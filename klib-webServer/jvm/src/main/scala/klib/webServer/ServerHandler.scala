@@ -83,25 +83,28 @@ final class ServerHandler(
           else
             MatchResult.FailedMatch.pure[??]
         case any: RouteMatcher.Any =>
-          any.toResult(args, params)(connectionFactory, logger)
+          any.toResult(args, params)(
+            new RouteMatcher.MatchData(
+              logger = logger,
+              connectionFactory = connectionFactory,
+              body = body,
+              params = params,
+              cookies = request.getCookies,
+            ),
+          )
         case complete: RouteMatcher.Complete =>
           args match {
             case Nil =>
-              complete.toResult(connectionFactory, logger)
+              complete.toResult(
+                new RouteMatcher.MatchData(
+                  logger = logger,
+                  connectionFactory = connectionFactory,
+                  body = body,
+                  params = params,
+                  cookies = request.getCookies,
+                ),
+              )
             case _ =>
-              MatchResult.FailedMatch.pure[??]
-          }
-        case withBody: RouteMatcher.WithBody[_] =>
-          parse(body) match {
-            case scala.Right(json) =>
-              (withBody.decoder: Decoder[withBody.Type])
-                .decodeJson(json) match {
-                case scala.Right(value) =>
-                  rec(params, args, withBody.child(value))
-                case scala.Left(_) =>
-                  MatchResult.FailedMatch.pure[??]
-              }
-            case scala.Left(_) =>
               MatchResult.FailedMatch.pure[??]
           }
         case pathArg: RouteMatcher.PathArg[_] =>
@@ -114,18 +117,6 @@ final class ServerHandler(
                   MatchResult.FailedMatch.pure[??]
               }
             case Nil =>
-              MatchResult.FailedMatch.pure[??]
-          }
-        case withParam: RouteMatcher.WithParam[_] =>
-          params.get(withParam.param) match {
-            case scala.Some(arg) =>
-              (withParam.decodeString: RouteMatcher.DecodeString[withParam.Type]).decode(arg) match {
-                case Some(arg) =>
-                  rec(params, args, withParam.child(arg))
-                case None =>
-                  MatchResult.FailedMatch.pure[??]
-              }
-            case scala.None =>
               MatchResult.FailedMatch.pure[??]
           }
       }
