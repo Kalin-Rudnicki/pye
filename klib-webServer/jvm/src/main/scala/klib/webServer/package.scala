@@ -2,15 +2,13 @@ package klib
 
 import java.io.File
 
-import jakarta.servlet.http.HttpServletRequest
-import jakarta.servlet.http.HttpServletResponse
-import org.eclipse.jetty.server.Request
-import org.eclipse.jetty.server.handler.AbstractHandler
+import org.eclipse.jetty.server.Server
 import org.rogach.scallop._
 
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
+import klib.webServer.db._
 
 package object webServer {
 
@@ -33,15 +31,23 @@ package object webServer {
 
       override def run(logger: Logger, conf: Conf): ??[Unit] = {
         val port = conf.port()
-        val dbPath = conf.dbPath()
+        val dbFile = new File(conf.dbPath())
 
-        // TODO (KR) :
+        val connectionFactory = ConnectionFactory.fromSqliteFile(dbFile)
+        val handler = new ServerHandler(
+          matcher = routeMatcher,
+          connectionFactory = connectionFactory,
+          logger = logger,
+        )
 
         for {
           _ <- logger() { src =>
             src.info(s"Starting server on port: $port")
-            src.info(s"Database path: $dbPath")
+            src.info(s"Database path: $dbFile")
           }.wrap
+          server <- new Server(port).pure[??]
+          _ <- server.setHandler(handler).pure[??]
+          _ <- server.start.pure[??]
         } yield ()
       }
 
