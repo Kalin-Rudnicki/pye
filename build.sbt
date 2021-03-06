@@ -34,6 +34,7 @@ lazy val `klib-webServer` =
         "org.eclipse.jetty" % "jetty-server" % "11.0.0",
         "org.webjars" % "bootstrap" % "3.2.0",
         "org.squeryl" %% "squeryl" % "0.9.15",
+        "org.xerial" % "sqlite-jdbc" % "3.34.0",
       ),
     )
 

@@ -1,9 +1,8 @@
 package klib.webServer
 
-import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 
-import io.circe._, parser._, generic.auto._
+import io.circe._, parser._
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
@@ -12,8 +11,13 @@ import org.eclipse.jetty.server.handler.AbstractHandler
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
+import klib.webServer.db.ConnectionFactory
 
-final class ServerHandler(matcher: RouteMatcher, logger: Logger) extends AbstractHandler {
+final class ServerHandler(
+    matcher: RouteMatcher,
+    connectionFactory: ConnectionFactory,
+    logger: Logger,
+) extends AbstractHandler {
 
   override def handle(
       target: String,
@@ -72,10 +76,17 @@ final class ServerHandler(matcher: RouteMatcher, logger: Logger) extends Abstrac
             }
 
           inner(of.children)
+        case _method: RouteMatcher.Method =>
+          if (_method.method == method)
+            rec(params, args, _method.child)
+          else
+            MatchResult.FailedMatch.pure[??]
+        case any: RouteMatcher.Any =>
+          any.toResult(args, params)(connectionFactory, logger)
         case complete: RouteMatcher.Complete =>
           args match {
-            case Nil if complete.method == method =>
-              complete.toResult
+            case Nil =>
+              complete.toResult(connectionFactory, logger)
             case _ =>
               MatchResult.FailedMatch.pure[??]
           }
@@ -125,8 +136,14 @@ final class ServerHandler(matcher: RouteMatcher, logger: Logger) extends Abstrac
       } yield res
     ).run match {
       case Alive(result, warnings) =>
-        // TODO (KR) :
-        ???
+        result match {
+          case MatchResult.FailedMatch =>
+            // TODO (KR) :
+            ???
+          case MatchResult.Response(body, code, contentType, headers, cookies) =>
+            // TODO (KR) :
+            ???
+        }
       case Dead(errors, warnings) =>
         // TODO (KR) :
         ???
