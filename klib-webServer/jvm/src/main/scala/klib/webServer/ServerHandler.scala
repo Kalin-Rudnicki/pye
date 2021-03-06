@@ -17,6 +17,7 @@ final class ServerHandler(
     matcher: RouteMatcher,
     connectionFactory: ConnectionFactory,
     logger: Logger,
+    // TODO (KR) : (testEnv: Boolean)
 ) extends AbstractHandler {
 
   override def handle(
@@ -131,23 +132,34 @@ final class ServerHandler(
 
     (
       for {
+        _ <- logger() { src =>
+          src.debug("--- Request ---")
+          src.debug(s"Route: ${routes.mkString("/")}")
+          // TODO (KR) : Other stuff?
+          src.break
+        }.wrap
         params <- paramMap.wrap[IO]
         res <- rec(params, routes, matcher)
       } yield res
     ).run match {
-      case Alive(result, warnings) =>
+      // TODO (KR) : Maybe do something with warnings? (log?)
+      case Alive(result, _) =>
         result match {
           case MatchResult.FailedMatch =>
             // TODO (KR) :
             ???
           case MatchResult.Response(body, code, contentType, headers, cookies) =>
-            // TODO (KR) :
-            ???
+            response.setStatus(code)
+            contentType.forEach(response.setContentType)
+            response.getWriter.write(body)
+            headers.foreach { case (key, value) => response.setHeader(key, value) }
+            cookies.foreach(response.addCookie)
         }
-      case Dead(errors, warnings) =>
+      case Dead(errors, _) =>
         // TODO (KR) :
         ???
     }
+    baseRequest.setHandled(true)
   }
 
 }

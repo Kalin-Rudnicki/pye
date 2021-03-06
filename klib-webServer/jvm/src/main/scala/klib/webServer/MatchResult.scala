@@ -40,28 +40,40 @@ object MatchResult {
         file: File,
         contentType: Maybe[String] = None,
         code: Int = 200,
-    ): ??[MatchResult] = {
-      // TODO (KR) :
-      ???
-    }
+    ): ??[MatchResult] =
+      for {
+        exists <- file.exists.pure[??]
+        result <-
+          if (exists)
+            for {
+              content <- IO.readFile(file).wrap
+            } yield raw(content, contentType, code)
+          else
+            FailedMatch.pure[??] // TODO (KR) : better option?
+      } yield result
 
     def raw(
         body: String,
         contentType: Maybe[String] = None,
         code: Int = 200,
-    ): MatchResult = {
-      // TODO (KR) :
-      ???
-    }
+    ): MatchResult =
+      Response(
+        body = body,
+        code = code,
+        contentType = contentType,
+        headers = Map.empty,
+        cookies = Nil,
+      )
 
     def json[J: Encoder](
-        json: String,
-        contentType: Maybe[String] = None,
+        json: J,
         code: Int = 200,
-    ): ??[MatchResult] = {
-      // TODO (KR) :
-      ???
-    }
+    ): MatchResult =
+      raw(
+        implicitly[Encoder[J]].apply(json).toString, // TODO (KR) : correct?
+        "application/json".some,
+        code,
+      )
 
     def html(
         frag: Frag,
