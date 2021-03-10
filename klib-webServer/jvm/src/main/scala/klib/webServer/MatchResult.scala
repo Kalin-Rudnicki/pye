@@ -49,14 +49,14 @@ object MatchResult {
               content <- IO.readFile(file).wrap
             } yield raw(content, contentType, code)
           else
-            FailedMatch.pure[??] // TODO (KR) : better option?
+            FailedMatch.pure[??] // TODO (KR) : better option? (aka: html(...))
       } yield result
 
     def raw(
         body: String,
         contentType: Maybe[String] = None,
         code: Int = 200,
-    ): MatchResult =
+    ): Response =
       Response(
         body = body,
         code = code,
@@ -68,7 +68,7 @@ object MatchResult {
     def json[J: Encoder](
         json: J,
         code: Int = 200,
-    ): MatchResult =
+    ): Response =
       raw(
         implicitly[Encoder[J]].apply(json).toString, // TODO (KR) : correct?
         "application/json".some,
@@ -78,7 +78,7 @@ object MatchResult {
     def html(
         frag: Frag,
         code: Int = 200,
-    ): MatchResult =
+    ): Response =
       Response(
         body = frag.render, // TODO (KR) : correct?
         code = code,

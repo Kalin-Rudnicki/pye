@@ -4,6 +4,7 @@ import java.io.File
 
 import org.eclipse.jetty.server.Server
 import org.rogach.scallop._
+import org.squeryl.Schema
 
 import klib.Implicits._
 import klib.fp.types._
@@ -13,6 +14,7 @@ import klib.webServer.db._
 package object webServer {
 
   def makeServer(
+      schema: Schema,
       routeMatcher: RouteMatcher,
       defaultPort: Int = 8080,
       defaultDbPath: String = "test-database.db",
@@ -45,6 +47,17 @@ package object webServer {
             src.info(s"Starting server on port: $port")
             src.info(s"Database path: $dbFile")
           }.wrap
+          exists <- dbFile.exists.pure[??]
+          _ <-
+            if (exists)
+              ().pure[??]
+            else
+              for {
+                connection <- connectionFactory.produceConnection
+                _ <- connection.run {
+                  schema.create.pure[Query]
+                }
+              } yield ()
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
           _ <- server.start.pure[??]
