@@ -2,11 +2,11 @@ package klib.webServer
 
 import scala.jdk.CollectionConverters._
 
-import io.circe._, parser._
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.handler.AbstractHandler
+import scalatags.Text.all.{body => htmlBody, _}
 
 import klib.Implicits._
 import klib.fp.types._
@@ -17,8 +17,9 @@ final class ServerHandler(
     matcher: RouteMatcher,
     connectionFactory: ConnectionFactory,
     logger: Logger,
-    // TODO (KR) : (testEnv: Boolean)
 ) extends AbstractHandler {
+  // TODO (KR) : Pass as param instead
+  private val isTestEnv: Boolean = true
 
   override def handle(
       target: String,
@@ -121,36 +122,98 @@ final class ServerHandler(
           }
       }
 
+    def writeResult(r: MatchResult.Response): IO[Unit] =
+      IO {
+        response.setStatus(r.code)
+        r.contentType.forEach(response.setContentType)
+        response.getWriter.write(r.body)
+        r.headers.foreach { case (key, value) => response.setHeader(key, value) }
+        r.cookies.foreach(response.addCookie)
+      }
+
+    def htmlFromBody(bodies: Frag*): Frag =
+      html(
+        head(),
+        htmlBody(
+          bodies,
+        ),
+      )
+
+    def errorHtml(errors: List[Throwable]): Frag =
+      htmlFromBody(
+        div(
+          h1(s"Server Error(s): (${errors.size})"),
+        ),
+        errors.map { error =>
+          div(
+            h3(error.getMessage),
+            div(
+              Logger.IgnoreStackTraceElement.trimmedTrace(error, Logger.StandardIgnore).map { st =>
+                span(
+                  s"> ${st.toString}",
+                  br,
+                  "\n",
+                )
+              },
+            ),
+            br,
+          )
+        },
+      )
+
     (
       for {
-        _ <- logger() { src =>
-          src.debug("--- Request ---")
-          src.debug(s"Route: ${routes.mkString("/")}")
-          // TODO (KR) : Other stuff?
-          src.break
-        }.wrap
-        params <- paramMap.wrap[IO]
-        res <- rec(params, routes, matcher)
-      } yield res
-    ).run match {
-      // TODO (KR) : Maybe do something with warnings? (log?)
-      case Alive(result, _) =>
-        result match {
-          case MatchResult.FailedMatch =>
-            // TODO (KR) :
-            ???
-          case MatchResult.Response(body, code, contentType, headers, cookies) =>
-            response.setStatus(code)
-            contentType.forEach(response.setContentType)
-            response.getWriter.write(body)
-            headers.foreach { case (key, value) => response.setHeader(key, value) }
-            cookies.foreach(response.addCookie)
+        matchResult <- (
+            for {
+              _ <- logger() { src =>
+                src.debug("--- Request ---")
+                src.debug(s"Route: ${routes.mkString("/")}")
+                // TODO (KR) : Other stuff?
+                src.break
+              }.wrap
+              params <- paramMap.wrap[IO]
+              res <- rec(params, routes, matcher)
+            } yield res
+        ).run.pure[??]
+        _ <- matchResult match {
+          // TODO (KR) : Maybe do something with warnings? (log?)
+          case Alive(result, _) =>
+            result match {
+              case MatchResult.FailedMatch =>
+                writeResult(
+                  MatchResult.Response.html(
+                    htmlFromBody(
+                      h1("Couldn't find what you were looking for"),
+                    ),
+                    code = 404,
+                  ),
+                ).wrap
+              case r: MatchResult.Response =>
+                writeResult(r).wrap
+            }
+          case Dead(errors, _) =>
+            for {
+              _ <- logger() { src =>
+                errors.foreach { error =>
+                  src.logThrowable(error)
+                }
+              }.wrap
+              _ <-
+                if (isTestEnv)
+                  writeResult(
+                    MatchResult.Response.html(
+                      errorHtml(errors),
+                      code = 500,
+                    ),
+                  ).wrap
+                else
+                  // TODO (KR) :
+                  ???
+            } yield ()
         }
-      case Dead(errors, _) =>
-        // TODO (KR) :
-        ???
-    }
-    baseRequest.setHandled(true)
+        _ <- baseRequest.setHandled(true).pure[??]
+      } yield ()
+    ).run
   }
 
 }
