@@ -168,6 +168,10 @@ final class ServerHandler(
               _ <- logger() { src =>
                 src.debug("--- Request ---")
                 src.debug(s"Route: ${routes.mkString("/")}")
+                src.debug(s"Cookies (${request.getCookies.length}):")
+                src.indented() { src =>
+                  request.getCookies.foreach(src.debug(_))
+                }
                 // TODO (KR) : Other stuff?
                 src.break
               }.wrap
