@@ -124,7 +124,7 @@ final class ServerHandler(
 
     def writeResult(r: MatchResult.Response): IO[Unit] =
       IO {
-        response.setStatus(r.code)
+        response.setStatus(r.code.code)
         r.contentType.forEach(response.setContentType)
         response.getWriter.write(r.body)
         r.headers.foreach { case (key, value) => response.setHeader(key, value) }
@@ -185,7 +185,7 @@ final class ServerHandler(
                     htmlFromBody(
                       h1("Couldn't find what you were looking for"),
                     ),
-                    code = 404,
+                    code = MatchResult.Response.Code.NotFound,
                   ),
                 ).wrap
               case r: MatchResult.Response =>
@@ -203,7 +203,7 @@ final class ServerHandler(
                   writeResult(
                     MatchResult.Response.html(
                       errorHtml(errors),
-                      code = 500,
+                      code = MatchResult.Response.Code.InternalServerError,
                     ),
                   ).wrap
                 else
