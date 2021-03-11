@@ -1,7 +1,9 @@
 package klib.webServer
 
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
+import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
@@ -29,6 +31,21 @@ final class ServerHandler(
   ): Unit = {
     val method = request.getMethod
     val routes: List[String] = target.split("/").toList.filter(_.nonEmpty)
+    val cookies: Map[String, String] =
+      Maybe(request.getCookies).cata(
+        _.toList.map { c =>
+          (
+            c.getName,
+            c.getValue,
+          )
+        }.toMap,
+        Map.empty,
+      )
+    val headers: Map[String, String] =
+      Maybe(request.getHeaderNames).cata(
+        _.asScala.toList.map(h => (h, request.getHeader(h))).toMap,
+        Map.empty,
+      )
     val paramMap: ?[Map[String, String]] =
       request.getParameterMap.asScala.toList
         .map {
@@ -89,8 +106,9 @@ final class ServerHandler(
               logger = logger,
               connectionFactory = connectionFactory,
               body = body,
+              headers = headers,
               params = params,
-              cookies = request.getCookies,
+              cookies = cookies,
             ),
           )
         case complete: RouteMatcher.Complete =>
@@ -101,8 +119,9 @@ final class ServerHandler(
                   logger = logger,
                   connectionFactory = connectionFactory,
                   body = body,
+                  headers = headers,
                   params = params,
-                  cookies = request.getCookies,
+                  cookies = cookies,
                 ),
               )
             case _ =>
@@ -168,9 +187,13 @@ final class ServerHandler(
               _ <- logger() { src =>
                 src.debug("--- Request ---")
                 src.debug(s"Route: ${routes.mkString("/")}")
-                src.debug(s"Cookies (${request.getCookies.length}):")
+                src.debug(s"Cookies (${cookies.size}):")
                 src.indented() { src =>
-                  request.getCookies.foreach(src.debug(_))
+                  cookies.values.foreach(src.debug(_))
+                }
+                src.debug(s"Headers: (${headers.size}):")
+                src.indented() { src =>
+                  headers.foreach(p => src.debug(s"${p._1} => ${p._2}"))
                 }
                 // TODO (KR) : Other stuff?
                 src.break

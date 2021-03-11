@@ -9,11 +9,11 @@ lazy val `klib-webServer` =
     .settings(
       name := "klib-webserver",
       organization := "kalin-rudnicki",
-      version := "0.0.7",
+      version := "0.0.8",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
-        "kalin-rudnicki" %%% "klib-core" % "0.1.2",
+        "kalin-rudnicki" %%% "klib-core" % "0.1.3",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
         "io.circe" %%% "circe-generic" % CirceVersion,

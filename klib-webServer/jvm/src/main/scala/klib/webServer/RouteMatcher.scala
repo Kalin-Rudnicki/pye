@@ -37,8 +37,9 @@ object RouteMatcher {
       val logger: Logger,
       val connectionFactory: ConnectionFactory,
       val body: String, // TODO (KR) : Might need ??[_]
+      val headers: Map[String, String],
       val params: Map[String, String],
-      val cookies: Array[Cookie],
+      val cookies: Map[String, String],
   ) {
 
     def bodyAs[B: Decoder]: ??[B] =
@@ -51,7 +52,7 @@ object RouteMatcher {
         case Some(b) =>
           b.pure[??]
         case None =>
-          (Dead(Message("Failed to decode body") :: Nil): ?[B]).wrap[IO]
+          ??.dead(Message("Failed to decode body"))
       }
 
     // TODO (KR) : more helpers
