@@ -6,11 +6,23 @@ import klib.fp.types._
 
 // TODO (KR) : DbRead vs DbWrite (?)
 // TODO (KR) : Locking (?)
-final class Query[+T] private (private[db] val execute: ??[T])
+final class Query[+T] private (private[db] val execute: IO[T]) {
+
+  def transaction: Query[T] = {
+    // TODO (KR) :
+    ???
+  }
+
+  def inTransaction: Query[T] = {
+    // TODO (KR) :
+    ???
+  }
+
+}
 
 object Query {
 
-  def apply[T](t: ??[T]): Query[T] =
+  def apply[T](t: IO[T]): Query[T] =
     new Query(t)
 
   implicit val queryMonad: Monad[Query] =
@@ -33,7 +45,7 @@ object Query {
 
       override def pure[A](a: => A): Query[A] =
         Query {
-          a.pure[??]
+          a.pure[IO]
         }
 
       override def flatten[A](t: Query[Query[A]]): Query[A] =

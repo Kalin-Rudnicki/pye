@@ -66,4 +66,15 @@ package object webServer {
 
     }
 
+  implicit class IoOps[A](io: IO[A]) {
+
+    def runIO(f: Throwable => Response): MatchResult2[A] =
+      io.runSync match {
+        case Right(b) =>
+        case Left(a) =>
+          MatchResult2.Done(f(a))
+      }
+
+  }
+
 }

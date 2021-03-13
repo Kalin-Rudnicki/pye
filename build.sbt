@@ -13,7 +13,7 @@ lazy val `klib-webServer` =
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
-        "kalin-rudnicki" %%% "klib-core" % "0.1.3",
+        "kalin-rudnicki" %%% "klib-core" % "0.1.4",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
         "io.circe" %%% "circe-generic" % CirceVersion,

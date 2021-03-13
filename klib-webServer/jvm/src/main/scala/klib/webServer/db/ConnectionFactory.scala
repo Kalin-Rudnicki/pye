@@ -10,7 +10,14 @@ import klib.fp.types._
 
 trait ConnectionFactory {
 
-  def produceConnection: ??[Connection]
+  def produceConnection: IO[Connection]
+
+  def openRunClose[A](query: Query[A]): IO[A] =
+    for {
+      connection <- produceConnection
+      res <- connection.run(query)
+      _ <- connection.close
+    } yield res
 
 }
 
@@ -18,7 +25,7 @@ object ConnectionFactory {
 
   def fromSqliteFile(dbFile: File): ConnectionFactory =
     new ConnectionFactory {
-      override def produceConnection: ??[Connection] =
+      override def produceConnection: IO[Connection] =
         for {
           session <-
             Session
@@ -26,7 +33,7 @@ object ConnectionFactory {
                 java.sql.DriverManager.getConnection(s"jdbc:sqlite:$dbFile"),
                 new SQLiteAdapter,
               )
-              .pure[??]
+              .pure[IO]
         } yield Connection.fromSquerylSession(session)
     }
 

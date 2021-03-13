@@ -18,6 +18,9 @@ package object helpers {
   def insert[T](table: Table[T])(t: T): Query[T] =
     table.insert(t).pure[Query]
 
+  def delete[T <: DbObject](table: Table[T])(t: T): Query[Boolean] =
+    (table.deleteWhere(_.id === t.id) > 0).pure[Query]
+
   // =====|  |=====
 
   def all[T](table: Table[T]): Query[List[T]] =
