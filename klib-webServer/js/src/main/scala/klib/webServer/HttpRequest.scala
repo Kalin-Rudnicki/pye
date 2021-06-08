@@ -18,18 +18,28 @@ object HttpRequest {
     new Stage1(
       method = method,
       url = url,
+      headers = Nil,
     )
 
   final class Stage1 private[HttpRequest] (
       method: String,
       url: String,
+      headers: List[(String, String)],
   ) {
+
+    def header[H](header: String, value: H)(implicit encoder: Encoder[H]): Stage1 =
+      new Stage1(
+        method = method,
+        url = url,
+        headers = (header, encoder.apply(value).toString) :: headers,
+      )
 
     def noBody: Stage2[Nothing] =
       new Stage2(
         method = method,
         url = url,
         body = None,
+        headers = headers,
       )
 
     def jsonBody[Body](body: Body)(implicit encoder: Encoder[Body]): Stage2[Body] =
@@ -37,6 +47,7 @@ object HttpRequest {
         method = method,
         url = url,
         body = (body, encoder).some,
+        headers = headers,
       )
 
   }
@@ -45,6 +56,7 @@ object HttpRequest {
       method: String,
       url: String,
       body: Maybe[(Body, Encoder[Body])],
+      headers: List[(String, String)],
   ) {
 
     private def build[Response](f: (Int, String, Promise[Response]) => Unit): Future[Response] = {
@@ -56,7 +68,8 @@ object HttpRequest {
         url = url,
         async = true,
       )
-      xhr.onload = { (_: Event) => }
+      headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
+      xhr.onload = { (_: Event) => f(xhr.status, xhr.responseText, promise) }
 
       promise.future
     }
