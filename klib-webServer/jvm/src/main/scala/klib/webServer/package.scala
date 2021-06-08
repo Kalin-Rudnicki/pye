@@ -49,15 +49,17 @@ package object webServer {
           }.wrap
           exists <- dbFile.exists.pure[??]
           _ <-
-            if (exists)
-              ().pure[??]
-            else
-              for {
-                connection <- connectionFactory.produceConnection
-                _ <- connection.run {
-                  schema.create.pure[Query]
-                }
-              } yield ()
+            (
+              if (exists)
+                ().pure[IO]
+              else
+                for {
+                  connection <- connectionFactory.produceConnection
+                  _ <- connection.run {
+                    schema.create.pure[Query]
+                  }
+                } yield ()
+            ).wrap: ??[Unit]
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
           _ <- server.start.pure[??]
@@ -65,16 +67,5 @@ package object webServer {
       }
 
     }
-
-  implicit class IoOps[A](io: IO[A]) {
-
-    def runIO(f: Throwable => Response): MatchResult2[A] =
-      io.runSync match {
-        case Right(b) =>
-        case Left(a) =>
-          MatchResult2.Done(f(a))
-      }
-
-  }
 
 }

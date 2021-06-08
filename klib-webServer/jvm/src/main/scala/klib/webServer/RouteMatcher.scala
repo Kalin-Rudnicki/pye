@@ -67,10 +67,10 @@ object RouteMatcher {
 
   final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
 
-  final class Complete private[RouteMatcher] (val toResult: MatchData => ??[MatchResult]) extends RouteMatcher
+  final class Complete private[RouteMatcher] (val toResult: MatchData => ??[MatchResult[Nothing]]) extends RouteMatcher
 
   final class Any private[RouteMatcher] (
-      val toResult: (List[String], Map[String, String]) => MatchData => ??[MatchResult],
+      val toResult: (List[String], Map[String, String]) => MatchData => ??[MatchResult[Nothing]],
   ) extends RouteMatcher
 
   final class Method private[RouteMatcher] (val method: String, val child: RouteMatcher) extends RouteMatcher
@@ -80,10 +80,10 @@ object RouteMatcher {
     type Type = A
   }
 
-  def any(toResult: (List[String], Map[String, String]) => MatchData => ??[MatchResult]): RouteMatcher =
+  def any(toResult: (List[String], Map[String, String]) => MatchData => ??[MatchResult[Nothing]]): RouteMatcher =
     new Any(toResult)
 
-  def complete(toResult: MatchData => ??[MatchResult]): RouteMatcher =
+  def complete(toResult: MatchData => ??[MatchResult[Nothing]]): RouteMatcher =
     new Complete(toResult)
 
   def const(const: String)(child: RouteMatcher): RouteMatcher =

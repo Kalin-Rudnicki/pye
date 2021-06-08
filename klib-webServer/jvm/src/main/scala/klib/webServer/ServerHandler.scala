@@ -68,30 +68,30 @@ final class ServerHandler(
         params: Map[String, String],
         args: List[String],
         matcher: RouteMatcher,
-    ): ??[MatchResult] =
+    ): ??[MatchResult[Unit]] =
       matcher match {
         case const: RouteMatcher.Const =>
           args match {
             case const.const :: tail =>
               rec(params, tail, const.child)
             case _ =>
-              MatchResult.FailedMatch.pure[??]
+              MatchResult.Continue(()).pure[??]
           }
         case of: RouteMatcher.OneOf =>
-          def inner(children: List[RouteMatcher]): ??[MatchResult] =
+          def inner(children: List[RouteMatcher]): ??[MatchResult[Unit]] =
             children match {
               case head :: tail =>
                 for {
                   res <- rec(params, args, head)
                   res2 <- res match {
-                    case MatchResult.FailedMatch =>
+                    case MatchResult.Continue(_) =>
                       inner(tail)
-                    case res =>
+                    case res: MatchResult.Done =>
                       res.pure[??]
                   }
                 } yield res2
               case Nil =>
-                MatchResult.FailedMatch.pure[??]
+                MatchResult.Continue(()).pure[??]
             }
 
           inner(of.children)
@@ -99,7 +99,7 @@ final class ServerHandler(
           if (_method.method == method)
             rec(params, args, _method.child)
           else
-            MatchResult.FailedMatch.pure[??]
+            MatchResult.Continue(()).pure[??]
         case any: RouteMatcher.Any =>
           any.toResult(args, params)(
             new RouteMatcher.MatchData(
@@ -125,7 +125,7 @@ final class ServerHandler(
                 ),
               )
             case _ =>
-              MatchResult.FailedMatch.pure[??]
+              MatchResult.Continue(()).pure[??]
           }
         case pathArg: RouteMatcher.PathArg[_] =>
           args match {
@@ -134,14 +134,14 @@ final class ServerHandler(
                 case Some(arg) =>
                   rec(params, tail, pathArg.child(arg))
                 case None =>
-                  MatchResult.FailedMatch.pure[??]
+                  MatchResult.Continue(()).pure[??]
               }
             case Nil =>
-              MatchResult.FailedMatch.pure[??]
+              MatchResult.Continue(()).pure[??]
           }
       }
 
-    def writeResult(r: MatchResult.Response): IO[Unit] =
+    def writeResult(r: Response): IO[Unit] =
       IO {
         response.setStatus(r.code.code)
         r.contentType.forEach(response.setContentType)
@@ -206,16 +206,16 @@ final class ServerHandler(
           // TODO (KR) : Maybe do something with warnings? (log?)
           case Alive(result, _) =>
             result match {
-              case MatchResult.FailedMatch =>
+              case MatchResult.Continue(_) =>
                 writeResult(
-                  MatchResult.Response.html(
+                  Response.html(
                     htmlFromBody(
                       h1("Couldn't find what you were looking for"),
                     ),
-                    code = MatchResult.Response.Code.NotFound,
+                    code = Response.Code.NotFound,
                   ),
                 ).wrap
-              case r: MatchResult.Response =>
+              case MatchResult.Done(r) =>
                 writeResult(r).wrap
             }
           case Dead(errors, _) =>
@@ -228,9 +228,9 @@ final class ServerHandler(
               _ <-
                 if (isTestEnv)
                   writeResult(
-                    MatchResult.Response.html(
+                    Response.html(
                       errorHtml(errors),
-                      code = MatchResult.Response.Code.InternalServerError,
+                      code = Response.Code.InternalServerError,
                     ),
                   ).wrap
                 else
