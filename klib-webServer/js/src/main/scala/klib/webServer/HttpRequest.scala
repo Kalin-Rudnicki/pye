@@ -47,7 +47,7 @@ object HttpRequest {
       body: Maybe[(Body, Encoder[Body])],
   ) {
 
-    def jsonResponse[Response](implicit decoder: Decoder[Response]): Future[Response] = {
+    private def build[Response](f: (Int, String, Promise[Response]) => Unit): Future[Response] = {
       val promise: Promise[Response] = Promise()
 
       val xhr = new XMLHttpRequest()
@@ -56,11 +56,22 @@ object HttpRequest {
         url = url,
         async = true,
       )
-      xhr.onload = { (_: Event) =>
-        if (xhr.status == 200) {
+      xhr.onload = { (_: Event) => }
+
+      promise.future
+    }
+
+    def raw: Future[(Int, String)] =
+      build[(Int, String)] { (status, responseText, promise) =>
+        promise.success((status, responseText))
+      }
+
+    def jsonResponse[Response](implicit decoder: Decoder[Response]): Future[Response] =
+      build[Response] { (status, responseText, promise) =>
+        if (status == 200) {
           val mResponse =
             for {
-              json <- parse(xhr.responseText)
+              json <- parse(responseText)
               response <- decoder.decodeJson(json)
             } yield response
 
@@ -71,12 +82,9 @@ object HttpRequest {
               promise.success(value)
           }
         } else {
-          promise.failure(new RuntimeException(s"non-200-response (${xhr.status}): ${xhr.responseText}"))
+          promise.failure(new RuntimeException(s"non-200-response (${status}): $responseText"))
         }
       }
-
-      promise.future
-    }
 
   }
 
