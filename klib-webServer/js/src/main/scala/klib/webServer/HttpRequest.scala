@@ -69,7 +69,16 @@ object HttpRequest {
         async = true,
       )
       headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
-      xhr.onload = { (_: Event) => f(xhr.status, xhr.responseText, promise) }
+      xhr.onload = { (_: Event) =>
+        f(xhr.status, xhr.responseText, promise)
+      }
+
+      body match {
+        case Some((body, encoder)) =>
+          xhr.send(encoder.apply(body).toString)
+        case None =>
+          xhr.send()
+      }
 
       promise.future
     }
