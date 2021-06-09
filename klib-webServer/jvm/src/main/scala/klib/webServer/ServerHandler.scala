@@ -12,7 +12,7 @@ import scalatags.Text.all.{body => htmlBody, _}
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils._
+import klib.utils._, Logger.{helpers => L}, L.Implicits._
 import klib.webServer.db.ConnectionFactory
 
 final class ServerHandler(
@@ -144,7 +144,7 @@ final class ServerHandler(
     def writeResult(r: Response): IO[Unit] =
       IO {
         response.setStatus(r.code.code)
-        r.contentType.forEach(response.setContentType)
+        r.contentType.foreach(response.setContentType)
         response.getWriter.write(r.body)
         r.headers.foreach { case (key, value) => response.setHeader(key, value) }
         r.cookies.foreach(response.addCookie)
@@ -167,7 +167,8 @@ final class ServerHandler(
           div(
             h3(error.getMessage),
             div(
-              Logger.IgnoreStackTraceElement.trimmedTrace(error, Logger.StandardIgnore).map { st =>
+              // TODO (KR) :
+              Logger.IgnoreStackTraceElement.trimmedTrace(error, Nil).map { st =>
                 span(
                   s"> ${st.toString}",
                   br,
@@ -184,20 +185,22 @@ final class ServerHandler(
       for {
         matchResult <- (
             for {
-              _ <- logger() { src =>
-                src.debug("--- Request ---")
-                src.debug(s"Route: ${routes.mkString("/")}")
-                src.debug(s"Cookies (${cookies.size}):")
-                src.indented() { src =>
-                  cookies.values.foreach(src.debug(_))
-                }
-                src.debug(s"Headers: (${headers.size}):")
-                src.indented() { src =>
-                  headers.foreach(p => src.debug(s"${p._1} => ${p._2}"))
-                }
-                // TODO (KR) : Other stuff?
-                src.break
-              }.wrap
+              _ <- logger(
+                L(
+                  L.log.debug("--- Request ---"),
+                  L.log.debug(s"Route: ${routes.mkString("/")}"),
+                  L.log.debug(s"Cookies (${cookies.size}):"),
+                  L.indented(
+                    cookies.values.toList.map(L.log.debug),
+                  ),
+                  L.log.debug(s"Headers: (${headers.size}):"),
+                  L.indented(
+                    headers.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
+                  ),
+                  // TODO (KR) : Other stuff?
+                  L.break(),
+                ),
+              ).wrap
               params <- paramMap.wrap[IO]
               res <- rec(params, routes, matcher)
             } yield res
@@ -220,11 +223,7 @@ final class ServerHandler(
             }
           case Dead(errors, _) =>
             for {
-              _ <- logger() { src =>
-                errors.foreach { error =>
-                  src.logThrowable(error)
-                }
-              }.wrap
+              _ <- logger(errors.map(L.log.throwable(_))).wrap
               _ <-
                 if (isTestEnv)
                   writeResult(

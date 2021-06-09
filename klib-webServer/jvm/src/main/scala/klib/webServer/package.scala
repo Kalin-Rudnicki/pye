@@ -8,7 +8,7 @@ import org.squeryl.Schema
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils._
+import klib.utils._, Logger.{helpers => L}, L.Implicits._
 import klib.webServer.db._
 
 package object webServer {
@@ -43,10 +43,12 @@ package object webServer {
         )
 
         for {
-          _ <- logger() { src =>
-            src.info(s"Starting server on port: $port")
-            src.info(s"Database path: $dbFile")
-          }.wrap
+          _ <- logger(
+            L(
+              L.log.info(s"Starting server on port: $port"),
+              L.log.info(s"Database path: $dbFile"),
+            ),
+          ).wrap
           exists <- dbFile.exists.pure[??]
           _ <-
             (
