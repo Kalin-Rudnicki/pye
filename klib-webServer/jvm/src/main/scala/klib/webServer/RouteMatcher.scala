@@ -55,6 +55,13 @@ object RouteMatcher {
           ??.dead(Message("Failed to decode body"))
       }
 
+    def param(p: String): ??[String] =
+      params
+        .get(p)
+        .toMaybe
+        .toEA(Message(s"Missing param '$p'"))
+        .wrap[IO]
+
     // TODO (KR) : more helpers
 
   }

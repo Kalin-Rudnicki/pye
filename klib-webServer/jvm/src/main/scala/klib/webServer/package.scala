@@ -64,7 +64,7 @@ package object webServer {
             ).wrap: ??[Unit]
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
-          _ <- server.start.pure[??]
+          _ <- server.start().pure[??]
         } yield ()
       }
 
