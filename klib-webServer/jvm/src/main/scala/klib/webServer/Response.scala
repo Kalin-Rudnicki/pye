@@ -66,9 +66,10 @@ object Response {
   def json[J: Encoder](
       json: J,
       code: Response.Code = Response.Code.OK,
+      jsonToString: Json => String = _.toString,
   ): Response =
     raw(
-      implicitly[Encoder[J]].apply(json).toString, // TODO (KR) : correct?
+      jsonToString(implicitly[Encoder[J]].apply(json)),
       "application/json".some,
       code,
     )

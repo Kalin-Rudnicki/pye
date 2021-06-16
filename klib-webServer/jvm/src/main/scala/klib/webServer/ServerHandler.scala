@@ -185,23 +185,28 @@ final class ServerHandler(
       for {
         matchResult <- (
             for {
+              params <- paramMap.wrap[IO]
               _ <- logger(
                 L(
                   L.log.debug("--- Request ---"),
+                  L.log.debug(s"Method: ${request.getMethod}"),
                   L.log.debug(s"Route: ${routes.mkString("/")}"),
                   L.log.debug(s"Cookies (${cookies.size}):"),
                   L.indented(
                     cookies.values.toList.map(L.log.debug),
                   ),
-                  L.log.debug(s"Headers: (${headers.size}):"),
+                  L.log.debug(s"Headers (${headers.size}):"),
                   L.indented(
                     headers.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
+                  ),
+                  L.log.debug(s"Params (${params.size}):"),
+                  L.indented(
+                    params.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
                   ),
                   // TODO (KR) : Other stuff?
                   L.break(),
                 ),
               ).wrap
-              params <- paramMap.wrap[IO]
               res <- rec(params, routes, matcher)
             } yield res
         ).run.pure[??]
