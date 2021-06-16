@@ -55,18 +55,78 @@ object RouteMatcher {
           ??.dead(Message("Failed to decode body"))
       }
 
-    def param(p: String): ??[String] =
-      params
-        .get(p)
-        .toMaybe
-        .toEA(Message(s"Missing param '$p'"))
-        .wrap[IO]
+    private def fromMap[R: MatchData.DecodeString](label: String, map: Map[String, String], k: String): ?[R] =
+      map
+        .get(k)
+        .toMaybe match {
+        case Some(value) =>
+          implicitly[MatchData.DecodeString[R]].decode(value)
+        case None =>
+          ?.dead(Message(s"Missing required $label '$k'"))
+      }
 
-    // TODO (KR) : more helpers
+    private def mFromMap[R: MatchData.DecodeString](map: Map[String, String], k: String): ?[Maybe[R]] =
+      map
+        .get(k)
+        .toMaybe match {
+        case Some(value) =>
+          implicitly[MatchData.DecodeString[R]].decode(value).map(_.some)
+        case None =>
+          None.pure[?]
+      }
+
+    def param[P: MatchData.DecodeString](p: String): ?[P] =
+      fromMap[P]("param", params, p)
+
+    def mParam[P: MatchData.DecodeString](p: String): ?[Maybe[P]] =
+      mFromMap[P](params, p)
+
+    def header[H: MatchData.DecodeString](h: String): ?[H] =
+      fromMap[H]("header", headers, h)
+
+    def mHeader[H: MatchData.DecodeString](h: String): ?[Maybe[H]] =
+      mFromMap[H](headers, h)
+
+    def cookie[C: MatchData.DecodeString](c: String): ?[C] =
+      fromMap[C]("cookie", cookies, c)
+
+    def mCookie[C: MatchData.DecodeString](c: String): ?[Maybe[C]] =
+      mFromMap[C](cookies, c)
+
+    def cookieJson[C: Decoder](c: String): ?[C] =
+      fromMap[C]("cookie", cookies, c)(MatchData.DecodeString.fromCirceDecoder[C])
+
+    def mCookieJson[C: Decoder](c: String): ?[Maybe[C]] =
+      mFromMap[C](cookies, c)(MatchData.DecodeString.fromCirceDecoder[C])
 
   }
 
-  object MatchData {}
+  object MatchData {
+
+    trait DecodeString[+T] {
+      def decode(string: String): ?[T]
+    }
+
+    object DecodeString {
+
+      def fromCirceDecoder[R: Decoder]: DecodeString[R] =
+        s =>
+          (
+            for {
+              json <- parse(s)
+              decoded <- implicitly[Decoder[R]].decodeJson(json)
+            } yield decoded
+          ).toErrorAccumulator
+
+      implicit val stringDecodeString: DecodeString[String] =
+        _.pure[?]
+
+      implicit val intDecodeString: DecodeString[Int] =
+        i => i.toIntOption.toMaybe.toEA(Message(s"Malformatted int '$i'"))
+
+    }
+
+  }
 
   // =====|  |=====
 

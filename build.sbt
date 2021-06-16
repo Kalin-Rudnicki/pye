@@ -9,7 +9,7 @@ lazy val `klib-webServer` =
     .settings(
       name := "klib-webserver",
       organization := "kalin-rudnicki",
-      version := "0.1.7",
+      version := "0.1.8",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
