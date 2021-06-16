@@ -1,9 +1,7 @@
 package klib.webServer
 
 import scala.jdk.CollectionConverters._
-import scala.util.Try
 
-import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
@@ -226,16 +224,25 @@ final class ServerHandler(
               case MatchResult.Done(r) =>
                 writeResult(r).wrap
             }
-          case Dead(errors, _) =>
+          case dead @ Dead(errors, _) =>
             for {
               _ <- logger(errors.map(L.log.throwable(_))).wrap
               _ <-
                 if (isTestEnv)
                   writeResult(
-                    Response.html(
-                      errorHtml(errors),
-                      code = Response.Code.InternalServerError,
-                    ),
+                    headers.get("ERROR-TYPE").toMaybe match {
+                      case Some("json") =>
+                        import io.circe.generic.auto._
+                        Response.json(
+                          ErrorResponse.fromDead(dead),
+                          code = Response.Code.InternalServerError,
+                        )
+                      case _ =>
+                        Response.html(
+                          errorHtml(errors),
+                          code = Response.Code.InternalServerError,
+                        )
+                    },
                   ).wrap
                 else
                   // TODO (KR) :
