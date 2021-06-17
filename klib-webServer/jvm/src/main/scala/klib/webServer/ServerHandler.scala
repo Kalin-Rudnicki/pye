@@ -143,7 +143,7 @@ final class ServerHandler(
       IO {
         response.setStatus(r.code.code)
         r.contentType.foreach(response.setContentType)
-        response.getWriter.write(r.body)
+        response.getOutputStream.write(r.body)
         r.headers.foreach { case (key, value) => response.setHeader(key, value) }
         r.cookies.foreach(response.addCookie)
       }

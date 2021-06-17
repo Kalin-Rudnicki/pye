@@ -10,7 +10,7 @@ import klib.Implicits._
 import klib.fp.types._
 
 final case class Response(
-    body: String,
+    body: Array[Byte],
     code: Response.Code,
     contentType: Maybe[String] = None,
     headers: Map[String, String],
@@ -41,7 +41,7 @@ object Response {
       result <-
         if (exists)
           for {
-            content <- IO.readFile(file)
+            content <- IO.readFileBytes(file)
           } yield raw(content, contentType, code)
         else {
           // FailedMatch.pure[??] // TODO (KR) : better option? (aka: html(...))
@@ -51,7 +51,7 @@ object Response {
     } yield result
 
   def raw(
-      body: String,
+      body: Array[Byte],
       contentType: Maybe[String] = None,
       code: Response.Code = Response.Code.OK,
   ): Response =
@@ -63,12 +63,23 @@ object Response {
       cookies = Nil,
     )
 
+  def text(
+      body: String,
+      contentType: Maybe[String] = None,
+      code: Response.Code = Response.Code.OK,
+  ): Response =
+    raw(
+      body = body.getBytes,
+      code = code,
+      contentType = contentType,
+    )
+
   def json[J: Encoder](
       json: J,
       code: Response.Code = Response.Code.OK,
       jsonToString: Json => String = _.toString,
   ): Response =
-    raw(
+    text(
       jsonToString(implicitly[Encoder[J]].apply(json)),
       "application/json".some,
       code,
@@ -78,12 +89,10 @@ object Response {
       frag: Frag,
       code: Response.Code = Response.Code.OK,
   ): Response =
-    Response(
+    text(
       body = frag.render, // TODO (KR) : correct?
       code = code,
       contentType = "text/html".some,
-      headers = Map.empty,
-      cookies = Nil,
     )
 
   // =====|  |=====
