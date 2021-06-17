@@ -1,9 +1,9 @@
 package klib.webServer
 
 import io.circe._, parser._
-import jakarta.servlet.http.Cookie
 
 import klib.Implicits._
+import klib.fp.typeclass.DecodeString
 import klib.fp.types._
 import klib.utils._
 import klib.webServer.db.ConnectionFactory
@@ -16,20 +16,6 @@ sealed trait RouteMatcher {
 }
 
 object RouteMatcher {
-
-  trait DecodeString[T] {
-    def decode(string: String): Maybe[T]
-  }
-
-  object DecodeString {
-
-    implicit val stringDecodeString: DecodeString[String] = _.some
-
-    implicit val intDecodeString: DecodeString[Int] = _.toIntOption.toMaybe
-
-    implicit val longDecodeString: DecodeString[Long] = _.toLongOption.toMaybe
-
-  }
 
   // =====|  |=====
 
@@ -55,93 +41,68 @@ object RouteMatcher {
           ??.dead(Message("Failed to decode body"))
       }
 
-    private def fromMap[R: MatchData.DecodeString](label: String, map: Map[String, String], k: String): ?[R] =
+    implicit private def decodeStringFromCirceDecoder[T](implicit decoder: Decoder[T]): DecodeString[T] =
+      s =>
+        (
+          for {
+            json <- parse(s)
+            decoded <- decoder.decodeJson(json)
+          } yield decoded
+        ).toErrorAccumulator
+
+    private def fromMap[R: DecodeString](label: String, map: Map[String, String], k: String): ?[R] =
       map
         .get(k)
         .toMaybe match {
         case Some(value) =>
-          implicitly[MatchData.DecodeString[R]].decode(value)
+          implicitly[DecodeString[R]].decode(value)
         case None =>
           ?.dead(Message(s"Missing required $label '$k'"))
       }
 
-    private def mFromMap[R: MatchData.DecodeString](map: Map[String, String], k: String): ?[Maybe[R]] =
+    private def mFromMap[R: DecodeString](map: Map[String, String], k: String): ?[Maybe[R]] =
       map
         .get(k)
         .toMaybe match {
         case Some(value) =>
-          implicitly[MatchData.DecodeString[R]].decode(value).map(_.some)
+          implicitly[DecodeString[R]].decode(value).map(_.some)
         case None =>
           None.pure[?]
       }
 
-    def param[P: MatchData.DecodeString](p: String): ?[P] =
+    def param[P: DecodeString](p: String): ?[P] =
       fromMap[P]("param", params, p)
 
-    def mParam[P: MatchData.DecodeString](p: String): ?[Maybe[P]] =
+    def mParam[P: DecodeString](p: String): ?[Maybe[P]] =
       mFromMap[P](params, p)
 
-    def header[H: MatchData.DecodeString](h: String): ?[H] =
+    def header[H: DecodeString](h: String): ?[H] =
       fromMap[H]("header", headers, h)
 
-    def mHeader[H: MatchData.DecodeString](h: String): ?[Maybe[H]] =
+    def mHeader[H: DecodeString](h: String): ?[Maybe[H]] =
       mFromMap[H](headers, h)
 
-    def cookie[C: MatchData.DecodeString](c: String): ?[C] =
+    def headerJson[H: Decoder](h: String): ?[H] =
+      fromMap[H]("header", headers, h)
+
+    def mHeaderJson[H: Decoder](h: String): ?[Maybe[H]] =
+      mFromMap[H](headers, h)
+
+    def cookie[C: DecodeString](c: String): ?[C] =
       fromMap[C]("cookie", cookies, c)
 
-    def mCookie[C: MatchData.DecodeString](c: String): ?[Maybe[C]] =
+    def mCookie[C: DecodeString](c: String): ?[Maybe[C]] =
       mFromMap[C](cookies, c)
 
     def cookieJson[C: Decoder](c: String): ?[C] =
-      fromMap[C]("cookie", cookies, c)(MatchData.DecodeString.fromCirceDecoder[C])
+      fromMap[C]("cookie", cookies, c)
 
     def mCookieJson[C: Decoder](c: String): ?[Maybe[C]] =
-      mFromMap[C](cookies, c)(MatchData.DecodeString.fromCirceDecoder[C])
+      mFromMap[C](cookies, c)
 
   }
 
-  object MatchData {
-
-    trait DecodeString[+T] {
-      def decode(string: String): ?[T]
-    }
-
-    object DecodeString {
-
-      def fromCirceDecoder[R: Decoder]: DecodeString[R] =
-        s =>
-          (
-            for {
-              json <- parse(s)
-              decoded <- implicitly[Decoder[R]].decodeJson(json)
-            } yield decoded
-          ).toErrorAccumulator
-
-      implicit val stringDecodeString: DecodeString[String] =
-        _.pure[?]
-
-      private def makeDecoder[R](name: String, f: String => Option[R]): DecodeString[R] =
-        s => f(s).toMaybe.toEA(Message(s"Malformatted $name '$s'"))
-
-      implicit val intDecodeString: DecodeString[Int] =
-        makeDecoder("int", _.toIntOption)
-
-      implicit val longDecodeString: DecodeString[Long] =
-        makeDecoder("long", _.toLongOption)
-
-      implicit val floatDecodeString: DecodeString[Float] =
-        makeDecoder("float", _.toFloatOption)
-
-      implicit val doubleDecodeString: DecodeString[Double] =
-        makeDecoder("double", _.toDoubleOption)
-
-      implicit def decodeStringList[R: DecodeString]: DecodeString[List[R]] =
-        s => s.split(",").toList.map(implicitly[DecodeString[R]].decode).traverse
-
-    }
-
-  }
+  object MatchData
 
   // =====|  |=====
 

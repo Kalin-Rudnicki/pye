@@ -1,16 +1,17 @@
 package klib.webServer
 
 import scala.jdk.CollectionConverters._
-
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.handler.AbstractHandler
 import scalatags.Text.all.{body => htmlBody, _}
-
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils._, Logger.{helpers => L}, L.Implicits._
+import klib.utils._
+import Logger.{helpers => L}
+import L.Implicits._
+import klib.fp.typeclass.DecodeString
 import klib.webServer.db.ConnectionFactory
 
 final class ServerHandler(
@@ -128,10 +129,10 @@ final class ServerHandler(
         case pathArg: RouteMatcher.PathArg[_] =>
           args match {
             case head :: tail =>
-              (pathArg.decodeString: RouteMatcher.DecodeString[pathArg.Type]).decode(head) match {
-                case Some(arg) =>
+              pathArg.decodeString.decode(head) match {
+                case Alive(arg: pathArg.Type, _) =>
                   rec(params, tail, pathArg.child(arg))
-                case None =>
+                case _ =>
                   MatchResult.Continue(()).pure[??]
               }
             case Nil =>
