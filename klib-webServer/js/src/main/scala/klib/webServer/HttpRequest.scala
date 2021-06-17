@@ -7,6 +7,7 @@ import io.circe._, parser._
 import org.scalajs.dom._
 
 import klib.Implicits._
+import klib.fp.typeclass._
 import klib.fp.types._
 
 object HttpRequest {
@@ -88,6 +89,22 @@ object HttpRequest {
         promise.success((status, responseText))
       }
 
+    def decodeResponse[Response](implicit decoder: DecodeString[Response]): Future[Response] =
+      build[Response] { (status, responseText, promise) =>
+        if (status == 200) {
+          val mResponse = decoder.decode(responseText)
+
+          mResponse match {
+            case Alive(value, _) =>
+              promise.success(value)
+            case Dead(errors, _) =>
+              promise.failure(Compound(errors))
+          }
+        } else {
+          promise.failure(new RuntimeException(s"non-200-response ($status): $responseText"))
+        }
+      }
+
     def jsonResponse[Response](implicit decoder: Decoder[Response]): Future[Response] =
       build[Response] { (status, responseText, promise) =>
         if (status == 200) {
@@ -104,7 +121,7 @@ object HttpRequest {
               promise.success(value)
           }
         } else {
-          promise.failure(new RuntimeException(s"non-200-response (${status}): $responseText"))
+          promise.failure(new RuntimeException(s"non-200-response ($status): $responseText"))
         }
       }
 
