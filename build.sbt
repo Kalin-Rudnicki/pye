@@ -9,10 +9,11 @@ lazy val `klib-webServer` =
     .settings(
       name := "klib-webserver",
       organization := "kalin-rudnicki",
-      version := "0.1.9",
+      version := "0.1.10",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
+        "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
         "kalin-rudnicki" %%% "klib-core" % "0.2.3",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
@@ -29,7 +30,6 @@ lazy val `klib-webServer` =
     )
     .jvmSettings(
       libraryDependencies ++= Seq(
-        "joda-time" % "joda-time" % "2.10.8",
         "org.eclipse.jetty" % "jetty-servlet" % "11.0.0",
         "org.eclipse.jetty" % "jetty-server" % "11.0.0",
         "org.webjars" % "bootstrap" % "3.2.0",
