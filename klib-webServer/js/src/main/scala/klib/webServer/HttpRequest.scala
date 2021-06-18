@@ -28,7 +28,14 @@ object HttpRequest {
       headers: List[(String, String)],
   ) {
 
-    def header[H](header: String, value: H)(implicit encoder: Encoder[H]): Stage1 =
+    def header(header: String, value: String): Stage1 =
+      new Stage1(
+        method = method,
+        url = url,
+        headers = (header, value) :: headers,
+      )
+
+    def headerJson[H](header: String, value: H)(implicit encoder: Encoder[H]): Stage1 =
       new Stage1(
         method = method,
         url = url,
