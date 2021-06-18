@@ -61,7 +61,7 @@ package object webServer {
                 _ <- logger(L.log.info(s"Database already exists at: $dbFile"))
                 _ <- connectionFactory.openRunClose(schema.printDdl(s => if (!s.startsWith("--")) lb.append(s)).pure[Query])
                 list = lb.toList
-                _ <- logger(list.map(L.log.info))
+                _ <- logger(L.requireFlags("schema")(list.map(L.log.info)))
                 _ <- rbFile match {
                   case Some(rbFile) =>
                     for {
@@ -77,7 +77,10 @@ package object webServer {
                 }
               } yield ()
             } else
-              connectionFactory.openRunClose(schema.create.pure[Query])
+              for {
+                _ <- logger(L.log.info(s"Creating database: $dbFile"))
+                _ <- connectionFactory.openRunClose(schema.create.pure[Query])
+              } yield ()
           }.wrap
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
