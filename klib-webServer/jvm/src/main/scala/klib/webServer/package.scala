@@ -50,18 +50,19 @@ package object webServer {
             ),
           ).wrap
           exists <- dbFile.exists.pure[??]
-          _ <-
-            (
-              if (exists)
-                ().pure[IO]
-              else
-                for {
-                  connection <- connectionFactory.produceConnection
-                  _ <- connection.run {
-                    schema.create.pure[Query]
-                  }
-                } yield ()
-            ).wrap: ??[Unit]
+          _ <- {
+            if (exists) {
+              import scala.collection.mutable
+              val lb = mutable.ListBuffer[String]()
+
+              for {
+                _ <- logger(L.log.info(s"Database already exists at: $dbFile"))
+                _ <- connectionFactory.openRunClose(schema.printDdl(lb.append(_)).pure[Query])
+                _ <- logger(lb.toList.map(L.log.info))
+              } yield ()
+            } else
+              connectionFactory.openRunClose(schema.create.pure[Query])
+          }.wrap
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
           _ <- server.start().pure[??]
