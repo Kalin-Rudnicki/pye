@@ -18,6 +18,7 @@ package object webServer {
       routeMatcher: RouteMatcher,
       defaultPort: Int = 8080,
       defaultDbPath: String = "test-database.db",
+      rbFile: Maybe[File] = None,
   ): Executable =
     new Executable.ExecFromConf {
 
@@ -53,12 +54,27 @@ package object webServer {
           _ <- {
             if (exists) {
               import scala.collection.mutable
+              import scala.sys.process._
               val lb = mutable.ListBuffer[String]()
 
               for {
                 _ <- logger(L.log.info(s"Database already exists at: $dbFile"))
-                _ <- connectionFactory.openRunClose(schema.printDdl(lb.append(_)).pure[Query])
-                _ <- logger(lb.toList.map(L.log.info))
+                _ <- connectionFactory.openRunClose(schema.printDdl(s => if (!s.startsWith("--")) lb.append(s)).pure[Query])
+                list = lb.toList
+                _ <- logger(list.map(L.log.info))
+                _ <- rbFile match {
+                  case Some(rbFile) =>
+                    for {
+                      exists <- rbFile.exists.pure[IO]
+                      _ <-
+                        if (exists)
+                          ("ruby" :: rbFile.toString :: dbFile.toString :: list).!.pure[IO]
+                        else
+                          ().pure[IO]
+                    } yield ()
+                  case None =>
+                    ().pure[IO]
+                }
               } yield ()
             } else
               connectionFactory.openRunClose(schema.create.pure[Query])
