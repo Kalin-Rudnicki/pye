@@ -3,6 +3,7 @@ package klib.webServer.db
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
+import klib.fp.utils.ado
 import klib.utils._
 
 // TODO (KR) : DbRead vs DbWrite (?)
@@ -44,10 +45,15 @@ object Query {
 
       override def apply[A, B](t: Query[A], f: Query[A => B]): Query[B] =
         Query {
-          for {
-            resF <- f.execute
-            res <- t.execute
-          } yield resF(res)
+          ado[IO]
+            .join(
+              f.execute,
+              t.execute,
+            )
+            .map {
+              case (f, t) =>
+                f(t)
+            }
         }
 
       override def pure[A](a: => A): Query[A] =
@@ -76,12 +82,16 @@ object Query {
           .wrap[QueryM[B]]
 
       override def apply[A, B](t: QueryM[A], f: QueryM[A => B]): QueryM[B] =
-        (
-          for {
-            uF <- f.unwrap
-            uT <- t.unwrap
-          } yield uT.apply(uF)
-        ).wrap[QueryM[B]]
+        ado[Query]
+          .join(
+            f,
+            t,
+          )
+          .map {
+            case (uF, uT) =>
+              uT.apply(uF)
+          }
+          .wrap[QueryM[B]]
 
       override def pure[A](a: => A): QueryM[A] = a.pure[Maybe].pure[Query].wrap[QueryM[A]]
 
