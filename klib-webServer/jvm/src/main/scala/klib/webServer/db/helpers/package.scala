@@ -112,6 +112,64 @@ package object helpers {
           }
       }
 
+    def query2[P1, P1T, P2, P2T](
+        p1F: T => TypedExpression[P1, P1T],
+        p2F: T => TypedExpression[P2, P2T],
+    )(implicit
+        p1CC: CanCompare[P1T, P1T],
+        p2CC: CanCompare[P2T, P2T],
+    ): Query2[T, P1, P1T, P2, P2T] =
+      new Query2[T, P1, P1T, P2, P2T] {
+        override def find(
+            p1: TypedExpression[P1, P1T],
+            p2: TypedExpression[P2, P2T],
+        ): Query[T] =
+          lookup(table) { t =>
+            p1F(t) === p1 and
+              p2F(t) === p2
+          }
+        override def findM(
+            p1: TypedExpression[P1, P1T],
+            p2: TypedExpression[P2, P2T],
+        ): Query[Maybe[T]] =
+          lookupMaybe(table) { t =>
+            p1F(t) === p1 and
+              p2F(t) === p2
+          }
+      }
+
+    def query3[P1, P1T, P2, P2T, P3, P3T](
+        p1F: T => TypedExpression[P1, P1T],
+        p2F: T => TypedExpression[P2, P2T],
+        p3F: T => TypedExpression[P3, P3T],
+    )(implicit
+        p1CC: CanCompare[P1T, P1T],
+        p2CC: CanCompare[P2T, P2T],
+        p3CC: CanCompare[P3T, P3T],
+    ): Query3[T, P1, P1T, P2, P2T, P3, P3T] =
+      new Query3[T, P1, P1T, P2, P2T, P3, P3T] {
+        override def find(
+            p1: TypedExpression[P1, P1T],
+            p2: TypedExpression[P2, P2T],
+            p3: TypedExpression[P3, P3T],
+        ): Query[T] =
+          lookup(table) { t =>
+            p1F(t) === p1 and
+              p2F(t) === p2 and
+              p3F(t) === p3
+          }
+        override def findM(
+            p1: TypedExpression[P1, P1T],
+            p2: TypedExpression[P2, P2T],
+            p3: TypedExpression[P3, P3T],
+        ): Query[Maybe[T]] =
+          lookupMaybe(table) { t =>
+            p1F(t) === p1 and
+              p2F(t) === p2 and
+              p3F(t) === p3
+          }
+      }
+
   }
 
   sealed trait Query1[T, P1, P1T] {
@@ -120,6 +178,28 @@ package object helpers {
     ): Query[T]
     def findM(
         p1: TypedExpression[P1, P1T],
+    ): Query[Maybe[T]]
+  }
+  sealed trait Query2[T, P1, P1T, P2, P2T] {
+    def find(
+        p1: TypedExpression[P1, P1T],
+        p2: TypedExpression[P2, P2T],
+    ): Query[T]
+    def findM(
+        p1: TypedExpression[P1, P1T],
+        p2: TypedExpression[P2, P2T],
+    ): Query[Maybe[T]]
+  }
+  sealed trait Query3[T, P1, P1T, P2, P2T, P3, P3T] {
+    def find(
+        p1: TypedExpression[P1, P1T],
+        p2: TypedExpression[P2, P2T],
+        p3: TypedExpression[P3, P3T],
+    ): Query[T]
+    def findM(
+        p1: TypedExpression[P1, P1T],
+        p2: TypedExpression[P2, P2T],
+        p3: TypedExpression[P3, P3T],
     ): Query[Maybe[T]]
   }
 
