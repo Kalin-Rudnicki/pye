@@ -10,7 +10,7 @@ import klib.fp.types._
 
 trait ConnectionFactory {
 
-  def produceConnection: IO[Connection]
+  protected def produceConnection: IO[Connection]
 
   def openRunClose[A](query: Query[A]): IO[A] =
     for {
@@ -19,13 +19,20 @@ trait ConnectionFactory {
       _ <- connection.close
     } yield res
 
+  def withConnection[R](f: Connection => ??[R]): ??[R] =
+    for {
+      connection <- produceConnection.wrap
+      res <- f(connection)
+      _ <- connection.close.wrap
+    } yield res
+
 }
 
 object ConnectionFactory {
 
   def fromSqliteFile(dbFile: File): ConnectionFactory =
     new ConnectionFactory {
-      override def produceConnection: IO[Connection] =
+      override protected def produceConnection: IO[Connection] =
         for {
           session <-
             Session
