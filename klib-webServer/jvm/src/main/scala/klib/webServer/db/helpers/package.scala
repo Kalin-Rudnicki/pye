@@ -3,9 +3,9 @@ package klib.webServer.db
 import org.squeryl.{Query => SquerylQuery, _}
 import org.squeryl.PrimitiveTypeMode._
 import org.squeryl.dsl.ast.LogicalBoolean
-
 import klib.Implicits._
 import klib.fp.types._
+import org.squeryl.dsl.{CanCompare, TypedExpression}
 
 package object helpers {
 
@@ -87,5 +87,40 @@ package object helpers {
         .select((extras(t1), t2))
     }.toList
       .pure[Query]
+
+  // =====|  |=====
+
+  implicit class TableOps[T](table: Table[T]) {
+
+    def query1[P1, P1T](
+        p1F: T => TypedExpression[P1, P1T],
+    )(implicit
+        p1CC: CanCompare[P1T, P1T],
+    ): Query1[T, P1, P1T] =
+      new Query1[T, P1, P1T] {
+        override def find(
+            p1: TypedExpression[P1, P1T],
+        ): Query[T] =
+          lookup(table) { t =>
+            p1F(t) === p1
+          }
+        override def findM(
+            p1: TypedExpression[P1, P1T],
+        ): Query[Maybe[T]] =
+          lookupMaybe(table) { t =>
+            p1F(t) === p1
+          }
+      }
+
+  }
+
+  sealed trait Query1[T, P1, P1T] {
+    def find(
+        p1: TypedExpression[P1, P1T],
+    ): Query[T]
+    def findM(
+        p1: TypedExpression[P1, P1T],
+    ): Query[Maybe[T]]
+  }
 
 }
