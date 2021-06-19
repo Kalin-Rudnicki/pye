@@ -110,6 +110,12 @@ package object helpers {
           lookupMaybe(table) { t =>
             p1F(t) === p1
           }
+        override def findL(
+            p1: TypedExpression[P1, P1T],
+        ): Query[List[T]] =
+          lookupList(table) { t =>
+            p1F(t) === p1
+          }
       }
 
     def query2[P1, P1T, P2, P2T](
@@ -133,6 +139,14 @@ package object helpers {
             p2: TypedExpression[P2, P2T],
         ): Query[Maybe[T]] =
           lookupMaybe(table) { t =>
+            p1F(t) === p1 and
+              p2F(t) === p2
+          }
+        override def findL(
+            p1: TypedExpression[P1, P1T],
+            p2: TypedExpression[P2, P2T],
+        ): Query[List[T]] =
+          lookupList(table) { t =>
             p1F(t) === p1 and
               p2F(t) === p2
           }
@@ -168,6 +182,16 @@ package object helpers {
               p2F(t) === p2 and
               p3F(t) === p3
           }
+        override def findL(
+            p1: TypedExpression[P1, P1T],
+            p2: TypedExpression[P2, P2T],
+            p3: TypedExpression[P3, P3T],
+        ): Query[List[T]] =
+          lookupList(table) { t =>
+            p1F(t) === p1 and
+              p2F(t) === p2 and
+              p3F(t) === p3
+          }
       }
 
   }
@@ -179,6 +203,9 @@ package object helpers {
     def findM(
         p1: TypedExpression[P1, P1T],
     ): Query[Maybe[T]]
+    def findL(
+        p1: TypedExpression[P1, P1T],
+    ): Query[List[T]]
   }
   sealed trait Query2[T, P1, P1T, P2, P2T] {
     def find(
@@ -189,6 +216,10 @@ package object helpers {
         p1: TypedExpression[P1, P1T],
         p2: TypedExpression[P2, P2T],
     ): Query[Maybe[T]]
+    def findL(
+        p1: TypedExpression[P1, P1T],
+        p2: TypedExpression[P2, P2T],
+    ): Query[List[T]]
   }
   sealed trait Query3[T, P1, P1T, P2, P2T, P3, P3T] {
     def find(
@@ -201,6 +232,11 @@ package object helpers {
         p2: TypedExpression[P2, P2T],
         p3: TypedExpression[P3, P3T],
     ): Query[Maybe[T]]
+    def findL(
+        p1: TypedExpression[P1, P1T],
+        p2: TypedExpression[P2, P2T],
+        p3: TypedExpression[P3, P3T],
+    ): Query[List[T]]
   }
 
 }
