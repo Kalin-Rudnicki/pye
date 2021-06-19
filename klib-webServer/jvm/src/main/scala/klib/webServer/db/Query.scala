@@ -9,6 +9,12 @@ import klib.utils._
 // TODO (KR) : Locking (?)
 final class Query[+T] private (private[db] val execute: IO[T]) {
 
+  def runIO(implicit c: Connection): IO[T] =
+    c.run(this)
+
+  def run(implicit c: Connection): ??[T] =
+    c.run(this).wrap
+
   def transaction: Query[T] = {
     // TODO (KR) :
     ???
