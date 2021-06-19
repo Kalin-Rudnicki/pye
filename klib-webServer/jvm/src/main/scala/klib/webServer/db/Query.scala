@@ -3,6 +3,7 @@ package klib.webServer.db
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
+import klib.utils._
 
 // TODO (KR) : DbRead vs DbWrite (?)
 // TODO (KR) : Locking (?)
@@ -38,8 +39,8 @@ object Query {
       override def apply[A, B](t: Query[A], f: Query[A => B]): Query[B] =
         Query {
           for {
-            res <- t.execute
             resF <- f.execute
+            res <- t.execute
           } yield resF(res)
         }
 
@@ -56,6 +57,35 @@ object Query {
           } yield inner
         }
 
+    }
+
+  sealed trait QueryMT
+  type QueryM[+T] = Query[Maybe[T]] @@ QueryMT
+
+  implicit val queryMMonad: Monad[QueryM] =
+    new Monad[QueryM] {
+      override def map[A, B](t: QueryM[A], f: A => B): QueryM[B] =
+        t.unwrap
+          .map(_.map(f))
+          .wrap[QueryM[B]]
+
+      override def apply[A, B](t: QueryM[A], f: QueryM[A => B]): QueryM[B] =
+        (
+          for {
+            uF <- f.unwrap
+            uT <- t.unwrap
+          } yield uT.apply(uF)
+        ).wrap[QueryM[B]]
+
+      override def pure[A](a: => A): QueryM[A] = a.pure[Maybe].pure[Query].wrap[QueryM[A]]
+
+      override def flatten[A](t: QueryM[QueryM[A]]): QueryM[A] =
+        (
+          for {
+            outer <- t.unwrap
+            inner <- outer.map(_.unwrap).traverse
+          } yield inner.flatten
+        ).wrap[QueryM[A]]
     }
 
 }
