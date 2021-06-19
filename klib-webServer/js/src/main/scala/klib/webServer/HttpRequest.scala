@@ -102,9 +102,9 @@ object HttpRequest {
           val mResponse = decoder.decode(responseText)
 
           mResponse match {
-            case Alive(value, _) =>
+            case Alive(value) =>
               promise.success(value)
-            case Dead(errors, _) =>
+            case Dead(errors) =>
               promise.failure(Compound(errors))
           }
         } else {

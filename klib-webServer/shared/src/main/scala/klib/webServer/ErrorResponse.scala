@@ -4,7 +4,6 @@ import klib.fp.types._
 
 final case class ErrorResponse(
     errors: Array[ErrorResponse.Error],
-    warnings: Array[ErrorResponse.Error],
 )
 object ErrorResponse {
 
@@ -42,10 +41,9 @@ object ErrorResponse {
 
   }
 
-  def fromDead(dead: Dead[Throwable, Throwable]): ErrorResponse =
+  def fromDead(dead: Dead[Throwable]): ErrorResponse =
     ErrorResponse(
       errors = dead.errors.toArray.map(Error.fromThrowable),
-      warnings = dead.warnings.toArray.map(Error.fromThrowable),
     )
 
 }

@@ -49,7 +49,7 @@ package object webServer {
               L.log.info(s"Starting server on port: $port"),
               L.log.info(s"Database path: $dbFile"),
             ),
-          ).wrap
+          ).to_??
           exists <- dbFile.exists.pure[??]
           _ <- {
             if (exists) {
@@ -81,7 +81,7 @@ package object webServer {
                 _ <- logger(L.log.info(s"Creating database: $dbFile"))
                 _ <- connectionFactory.openRunClose(schema.create.pure[Query])
               } yield ()
-          }.wrap
+          }.to_??
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
           _ <- server.start().pure[??]

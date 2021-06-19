@@ -47,11 +47,11 @@ object Query {
         Query {
           ado[IO]
             .join(
-              f.execute,
               t.execute,
+              f.execute,
             )
             .map {
-              case (f, t) =>
+              case (t, f) =>
                 f(t)
             }
         }
@@ -84,11 +84,11 @@ object Query {
       override def apply[A, B](t: QueryM[A], f: QueryM[A => B]): QueryM[B] =
         ado[Query]
           .join(
-            f,
             t,
+            f,
           )
           .map {
-            case (uF, uT) =>
+            case (uT, uF) =>
               uT.apply(uF)
           }
           .wrap[QueryM[B]]

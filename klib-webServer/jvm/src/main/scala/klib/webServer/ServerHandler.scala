@@ -130,7 +130,7 @@ final class ServerHandler(
           args match {
             case head :: tail =>
               pathArg.decodeString.decode(head) match {
-                case Alive(arg: pathArg.Type, _) =>
+                case Alive(arg: pathArg.Type) =>
                   rec(params, tail, pathArg.child(arg))
                 case _ =>
                   MatchResult.Continue(()).pure[??]
@@ -184,7 +184,7 @@ final class ServerHandler(
       for {
         matchResult <- (
             for {
-              params <- paramMap.wrap[IO]
+              params <- paramMap.to_??
               _ <- logger(
                 L(
                   L.log.debug("--- Request ---"),
@@ -205,13 +205,12 @@ final class ServerHandler(
                   // TODO (KR) : Other stuff?
                   L.break(),
                 ),
-              ).wrap
+              ).to_??
               res <- rec(params, routes, matcher)
             } yield res
-        ).run.pure[??]
+        ).runSync.pure[??]
         _ <- matchResult match {
-          // TODO (KR) : Maybe do something with warnings? (log?)
-          case Alive(result, _) =>
+          case Alive(result) =>
             result match {
               case MatchResult.Continue(_) =>
                 writeResult(
@@ -225,9 +224,9 @@ final class ServerHandler(
               case MatchResult.Done(r) =>
                 writeResult(r).wrap
             }
-          case dead @ Dead(errors, _) =>
+          case dead @ Dead(errors) =>
             for {
-              _ <- logger(errors.map(L.log.throwable(_))).wrap
+              _ <- logger(errors.map(L.log.throwable(_))).to_??
               _ <-
                 if (isTestEnv)
                   writeResult(
@@ -244,7 +243,7 @@ final class ServerHandler(
                           code = Response.Code.InternalServerError,
                         )
                     },
-                  ).wrap
+                  ).to_??
                 else
                   // TODO (KR) :
                   ???
@@ -252,7 +251,7 @@ final class ServerHandler(
         }
         _ <- baseRequest.setHandled(true).pure[??]
       } yield ()
-    ).run
+    ).runSync
   }
 
 }
