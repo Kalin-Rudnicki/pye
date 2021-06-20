@@ -254,9 +254,7 @@ final class ServerHandler(
             L.break(),
           ),
         ).to_??
-        _ = println("1.1")
         res <- rec(params, routes, matcher)
-        _ = println("1.2")
       } yield res
     }.runSync
 
