@@ -15,7 +15,6 @@ object ErrorResponse {
 
     final case class StackTrace(
         fileName: String,
-        moduleName: String,
         className: String,
         methodName: String,
         lineNumber: Int,
@@ -25,7 +24,6 @@ object ErrorResponse {
       def fromStackTraceElement(ste: StackTraceElement): StackTrace =
         StackTrace(
           fileName = ste.getFileName,
-          moduleName = ste.getModuleName,
           className = ste.getClassName,
           methodName = ste.getMethodName,
           lineNumber = ste.getLineNumber,

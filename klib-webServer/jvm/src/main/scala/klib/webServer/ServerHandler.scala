@@ -30,6 +30,8 @@ final class ServerHandler(
       request: HttpServletRequest,
       response: HttpServletResponse,
   ): Unit = {
+
+    // =====| Helpers and Setup |=====
     val method = request.getMethod
     val routes: List[String] = target.split("/").toList.filter(_.nonEmpty)
     val cookies: Map[String, String] =
@@ -144,6 +146,7 @@ final class ServerHandler(
 
     def writeResult(r: Response): IO[Unit] =
       IO {
+        baseRequest.setHandled(true)
         response.setStatus(r.code.code)
         r.contentType.foreach(response.setContentType)
         response.getOutputStream.write(r.body)
@@ -159,108 +162,106 @@ final class ServerHandler(
         ),
       )
 
-    def errorHtml(errors: List[Throwable]): Frag =
-      htmlFromBody(
-        div(
-          h1(s"Server Error(s): (${errors.size})"),
-        ),
-        errors.map { error =>
+    def errorHtml(errors: List[Throwable], code: Response.Code = Response.Code.InternalServerError): Response =
+      Response.html(
+        htmlFromBody(
           div(
-            h3(error.getMessage),
+            h1(s"Server Error(s): (${errors.size})"),
+          ),
+          errors.map { error =>
             div(
-              // TODO (KR) :
-              Logger.IgnoreStackTraceElement.trimmedTrace(error, Nil).map { st =>
-                span(
-                  s"> ${st.toString}",
-                  br,
-                  "\n",
-                )
-              },
-            ),
-            br,
-          )
-        },
+              h3(error.getMessage),
+              div(
+                // TODO (KR) :
+                Logger.IgnoreStackTraceElement.trimmedTrace(error, Nil).map { st =>
+                  span(
+                    s"> ${st.toString}",
+                    br,
+                    "\n",
+                  )
+                },
+              ),
+              br,
+            )
+          },
+        ),
+        code = code,
       )
 
-    (
-      for {
-        matchResult <- (
-            for {
-              params <- paramMap.to_??
-              _ <- logger(
-                L(
-                  L.log.debug("--- Request ---"),
-                  L.log.debug(s"Method: ${request.getMethod}"),
-                  L.log.debug(s"Route: ${routes.mkString("/")}"),
-                  L.log.debug(s"Cookies (${cookies.size}):"),
-                  L.indented(
-                    cookies.values.toList.map(L.log.debug),
-                  ),
-                  L.log.debug(s"Headers (${headers.size}):"),
-                  L.indented(
-                    headers.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
-                  ),
-                  L.log.debug(s"Params (${params.size}):"),
-                  L.indented(
-                    params.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
-                  ),
-                  // TODO (KR) : Other stuff?
-                  L.break(),
-                ),
-              ).to_??
-              _ = println("1.1")
-              res <- rec(params, routes, matcher)
-              _ = println("1.2")
-            } yield res
-        ).runSync.pure[??]
-        _ = println("2.1")
-        _ <- matchResult match {
-          case Alive(result) =>
-            result match {
+    def errorJson(errors: List[Throwable], code: Response.Code = Response.Code.InternalServerError): Response = {
+      import io.circe.generic.auto._
+      Response.json(
+        ErrorResponse.fromDead(Dead(errors)),
+        code = code,
+      )
+    }
+
+    def handleResult(jsonErrors: Boolean, res: ?[Maybe[Response]]): ??[Unit] = {
+      val forceResult: (List[Throwable], Response) =
+        res match {
+          case Alive(r) =>
+            r match {
               case Some(r) =>
-                writeResult(r).to_??
+                (Nil, r)
               case None =>
-                writeResult(
-                  Response.html(
-                    htmlFromBody(
-                      h1("Couldn't find what you were looking for (klib-webserver)"),
-                    ),
-                    code = Response.Code.NotFound,
-                  ),
-                ).to_??
+                val errors = Message("404 - Not Found") :: Nil
+                (
+                  errors,
+                  if (jsonErrors)
+                    errorJson(errors)
+                  else
+                    errorHtml(errors),
+                )
             }
-          case dead @ Dead(errors) =>
-            for {
-              _ <- logger(errors.map(L.log.throwable(_))).to_??
-              _ <-
-                if (isTestEnv)
-                  writeResult(
-                    headers.get("ERROR-TYPE").toMaybe match {
-                      case Some("json") =>
-                        import io.circe.generic.auto._
-                        println("3.1.1")
-                        Response.json(
-                          ErrorResponse.fromDead(dead),
-                          code = Response.Code.InternalServerError,
-                        )
-                      case _ =>
-                        println("3.1.2")
-                        Response.html(
-                          errorHtml(errors),
-                          code = Response.Code.InternalServerError,
-                        )
-                    },
-                  ).to_??
-                else
-                  // TODO (KR) :
-                  ???
-            } yield ()
+          case Dead(errors) =>
+            (
+              errors,
+              if (jsonErrors)
+                errorJson(errors)
+              else
+                errorHtml(errors),
+            )
         }
-        _ = println("Setting Handled")
-        _ <- baseRequest.setHandled(true).pure[??]
-        _ = println(s"Set to handled: ${baseRequest.isHandled}")
+
+      for {
+        _ <- logger(forceResult._1.map(L.log.throwable(_))).to_??
+        _ <- writeResult(forceResult._2).to_??
       } yield ()
-    ).runSync
+    }
+
+    // =====| Usage |=====
+    val matchResult: ?[Maybe[Response]] = {
+      for {
+        params <- paramMap.to_??
+        _ <- logger(
+          L(
+            L.log.debug("--- Request ---"),
+            L.log.debug(s"Method: ${request.getMethod}"),
+            L.log.debug(s"Route: ${routes.mkString("/")}"),
+            L.log.debug(s"Cookies (${cookies.size}):"),
+            L.indented(
+              cookies.values.toList.map(L.log.debug),
+            ),
+            L.log.debug(s"Headers (${headers.size}):"),
+            L.indented(
+              headers.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
+            ),
+            L.log.debug(s"Params (${params.size}):"),
+            L.indented(
+              params.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
+            ),
+            // TODO (KR) : Other stuff?
+            L.break(),
+          ),
+        ).to_??
+        _ = println("1.1")
+        res <- rec(params, routes, matcher)
+        _ = println("1.2")
+      } yield res
+    }.runSync
+
+    val jsonErrors = headers.get("ERROR-TYPE").toMaybe.cata(_ == "json", false)
+    handleResult(jsonErrors, matchResult).runAndDumpMessages()
   }
 
 }
