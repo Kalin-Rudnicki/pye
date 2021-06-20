@@ -1,16 +1,18 @@
 package klib.webServer
 
 import scala.jdk.CollectionConverters._
+
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.handler.AbstractHandler
 import scalatags.Text.all.{body => htmlBody, _}
+
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
-import Logger.{helpers => L}
-import L.Implicits._
+import klib.utils.Logger.{helpers => L}
+import klib.utils.Logger.helpers.Implicits._
 import klib.fp.typeclass.DecodeString
 import klib.webServer.db.ConnectionFactory
 
@@ -67,30 +69,30 @@ final class ServerHandler(
         params: Map[String, String],
         args: List[String],
         matcher: RouteMatcher,
-    ): ??[MatchResult[Unit]] =
+    ): ??[Maybe[Response]] =
       matcher match {
         case const: RouteMatcher.Const =>
           args match {
             case const.const :: tail =>
               rec(params, tail, const.child)
             case _ =>
-              MatchResult.Continue(()).pure[??]
+              None.pure[??]
           }
         case of: RouteMatcher.OneOf =>
-          def inner(children: List[RouteMatcher]): ??[MatchResult[Unit]] =
+          def inner(children: List[RouteMatcher]): ??[Maybe[Response]] =
             children match {
               case head :: tail =>
                 for {
                   res <- rec(params, args, head)
                   res2 <- res match {
-                    case MatchResult.Continue(_) =>
+                    case some @ Some(_) =>
+                      some.pure[??]
+                    case None =>
                       inner(tail)
-                    case res: MatchResult.Done =>
-                      res.pure[??]
                   }
                 } yield res2
               case Nil =>
-                MatchResult.Continue(()).pure[??]
+                None.pure[??]
             }
 
           inner(of.children)
@@ -98,7 +100,7 @@ final class ServerHandler(
           if (_method.method == method)
             rec(params, args, _method.child)
           else
-            MatchResult.Continue(()).pure[??]
+            None.pure[??]
         case any: RouteMatcher.Any =>
           any.toResult(args, params)(
             new RouteMatcher.MatchData(
@@ -124,7 +126,7 @@ final class ServerHandler(
                 ),
               )
             case _ =>
-              MatchResult.Continue(()).pure[??]
+              None.pure[??]
           }
         case pathArg: RouteMatcher.PathArg[_] =>
           args match {
@@ -133,10 +135,10 @@ final class ServerHandler(
                 case Alive(arg: pathArg.Type) =>
                   rec(params, tail, pathArg.child(arg))
                 case _ =>
-                  MatchResult.Continue(()).pure[??]
+                  None.pure[??]
               }
             case Nil =>
-              MatchResult.Continue(()).pure[??]
+              None.pure[??]
           }
       }
 
@@ -206,23 +208,26 @@ final class ServerHandler(
                   L.break(),
                 ),
               ).to_??
+              _ = println("1.1")
               res <- rec(params, routes, matcher)
+              _ = println("1.2")
             } yield res
         ).runSync.pure[??]
+        _ = println("2.1")
         _ <- matchResult match {
           case Alive(result) =>
             result match {
-              case MatchResult.Continue(_) =>
+              case Some(r) =>
+                writeResult(r).to_??
+              case None =>
                 writeResult(
                   Response.html(
                     htmlFromBody(
-                      h1("Couldn't find what you were looking for"),
+                      h1("Couldn't find what you were looking for (klib-webserver)"),
                     ),
                     code = Response.Code.NotFound,
                   ),
-                ).wrap
-              case MatchResult.Done(r) =>
-                writeResult(r).wrap
+                ).to_??
             }
           case dead @ Dead(errors) =>
             for {
@@ -233,11 +238,13 @@ final class ServerHandler(
                     headers.get("ERROR-TYPE").toMaybe match {
                       case Some("json") =>
                         import io.circe.generic.auto._
+                        println("3.1.1")
                         Response.json(
                           ErrorResponse.fromDead(dead),
                           code = Response.Code.InternalServerError,
                         )
                       case _ =>
+                        println("3.1.2")
                         Response.html(
                           errorHtml(errors),
                           code = Response.Code.InternalServerError,
@@ -249,7 +256,9 @@ final class ServerHandler(
                   ???
             } yield ()
         }
+        _ = println("Setting Handled")
         _ <- baseRequest.setHandled(true).pure[??]
+        _ = println(s"Set to handled: ${baseRequest.isHandled}")
       } yield ()
     ).runSync
   }

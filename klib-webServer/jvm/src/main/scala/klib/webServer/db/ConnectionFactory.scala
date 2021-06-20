@@ -20,7 +20,7 @@ trait ConnectionFactory {
     } yield res
 
   def withConnection[R](f: Connection => ??[R]): ??[R] =
-    produceConnection.to_??.bracket(f)(_.close.wrap)
+    produceConnection.to_??.bracket(f)(_.close.to_??)
 
 }
 

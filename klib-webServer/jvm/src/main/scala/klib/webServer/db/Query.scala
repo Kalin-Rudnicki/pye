@@ -14,7 +14,7 @@ final class Query[+T] private (private[db] val execute: IO[T]) {
     c.run(this)
 
   def run(implicit c: Connection): ??[T] =
-    c.run(this).wrap
+    c.run(this).to_??
 
   def transaction: Query[T] = {
     // TODO (KR) :

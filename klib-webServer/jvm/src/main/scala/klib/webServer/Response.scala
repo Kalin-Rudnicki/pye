@@ -43,11 +43,8 @@ object Response {
           for {
             content <- IO.readFileBytes(file)
           } yield raw(content, contentType, code)
-        else {
-          // FailedMatch.pure[??] // TODO (KR) : better option? (aka: html(...))
-
-          ??? // TODO (KR) :
-        }
+        else
+          IO.error(Message(s"File does not exist: $file"))
     } yield result
 
   def raw(
