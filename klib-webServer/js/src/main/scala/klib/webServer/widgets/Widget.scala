@@ -1,24 +1,28 @@
-package klib.webServer
+package klib.webServer.widgets
 
 import scalatags.JsDom.all.Frag
 
 import klib.Implicits._
 import klib.fp.types._
 
-trait Widget[Value] {
+trait GWidget[Value, S <: Widget.State[Value]] {
   val node: Frag
-  def valueF: ?[Value]
+  val state: S
 }
 
 object Widget {
 
+  trait State[Value] {
+    def to_? : ?[Value]
+  }
+
   def apply[Value](
       _node: Frag,
-      _valueF: => ?[Value],
+      _state: State[Value],
   ): Widget[Value] =
     new Widget[Value] {
       override val node: Frag = _node
-      override def valueF: ?[Value] = _valueF
+      override val state: State[Value] = _state
     }
 
   // =====| Sort of TypeClass stuff |=====
@@ -26,13 +30,13 @@ object Widget {
   def map[A, B](widget: Widget[A])(f: A => B): Widget[B] =
     Widget(
       widget.node,
-      widget.valueF.map(f),
+      new State[B] { override def to_? : ?[B] = widget.state.to_?.map(f) },
     )
 
   def flatMap[A, B](widget: Widget[A])(f: A => ?[B]): Widget[B] =
     Widget(
       widget.node,
-      widget.valueF.flatMap(f),
+      new State[B] { override def to_? : ?[B] = widget.state.to_?.flatMap(f) },
     )
 
 }
