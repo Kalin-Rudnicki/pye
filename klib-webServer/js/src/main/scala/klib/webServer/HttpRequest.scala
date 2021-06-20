@@ -67,7 +67,7 @@ object HttpRequest {
       headers: List[(String, String)],
   ) {
 
-    private def build[Response](f: (Int, String, Promise[Response]) => Unit): Future[Response] = {
+    private def build[Response](f: (Int, String) => (Throwable \/ Response)): Future[Response] = {
       val promise: Promise[Response] = Promise()
 
       val xhr = new XMLHttpRequest()
@@ -78,7 +78,12 @@ object HttpRequest {
       )
       headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
       xhr.onload = { (_: Event) =>
-        f(xhr.status, xhr.responseText, promise)
+        f(xhr.status, xhr.responseText) match {
+          case Right(b) =>
+            promise.success(b)
+          case Left(a) =>
+            promise.failure(a)
+        }
       }
 
       body match {
@@ -92,44 +97,34 @@ object HttpRequest {
     }
 
     def raw: Future[(Int, String)] =
-      build[(Int, String)] { (status, responseText, promise) =>
-        promise.success((status, responseText))
+      build[(Int, String)] { (status, responseText) =>
+        (status, responseText).right
       }
 
     def decodeResponse[Response](implicit decoder: DecodeString[Response]): Future[Response] =
-      build[Response] { (status, responseText, promise) =>
-        if (status == 200) {
-          val mResponse = decoder.decode(responseText)
-
-          mResponse match {
+      build[Response] { (status, responseText) =>
+        if (status == 200)
+          decoder.decode(responseText) match {
             case Alive(value) =>
-              promise.success(value)
+              value.right
             case Dead(errors) =>
-              promise.failure(Compound(errors))
+              Compound(errors).left
           }
-        } else {
-          promise.failure(new RuntimeException(s"non-200-response ($status): $responseText"))
-        }
+        else
+          Message(s"non-200-response ($status): $responseText").left
       }
 
     def jsonResponse[Response](implicit decoder: Decoder[Response]): Future[Response] =
-      build[Response] { (status, responseText, promise) =>
-        if (status == 200) {
-          val mResponse =
+      build[Response] { (status, responseText) =>
+        if (status == 200)
+          (
             for {
               json <- parse(responseText)
               response <- decoder.decodeJson(json)
             } yield response
-
-          mResponse match {
-            case util.Left(value) =>
-              promise.failure(value)
-            case util.Right(value) =>
-              promise.success(value)
-          }
-        } else {
-          promise.failure(new RuntimeException(s"non-200-response ($status): $responseText"))
-        }
+          ).to_\/
+        else
+          Message(s"non-200-response ($status): $responseText").left
       }
 
   }
