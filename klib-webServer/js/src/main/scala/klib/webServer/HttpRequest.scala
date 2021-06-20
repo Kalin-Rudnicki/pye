@@ -3,7 +3,9 @@ package klib.webServer
 import scala.concurrent.Future
 import scala.concurrent.Promise
 
-import io.circe._, parser._
+import io.circe._
+import io.circe.generic.auto._
+import io.circe.parser._
 import org.scalajs.dom._
 
 import klib.Implicits._
@@ -15,12 +17,20 @@ object HttpRequest {
   def apply(
       method: String,
       url: String,
-  ): Stage1 =
-    new Stage1(
-      method = method,
-      url = url,
-      headers = Nil,
-    )
+      requestErrorsAsJson: Boolean = true,
+  ): Stage1 = {
+    val r =
+      new Stage1(
+        method = method,
+        url = url,
+        headers = Nil,
+      )
+
+    if (requestErrorsAsJson)
+      r.header("ERROR-TYPE", "json")
+    else
+      r
+  }
 
   final class Stage1 private[HttpRequest] (
       method: String,
@@ -67,8 +77,8 @@ object HttpRequest {
       headers: List[(String, String)],
   ) {
 
-    private def build[Response](f: (Int, String) => (Throwable \/ Response)): Future[Response] = {
-      val promise: Promise[Response] = Promise()
+    private def build[Response](f: (Int, String) => ?[Response]): HttpResponse[Response] = {
+      val promise: Promise[?[Response]] = Promise()
 
       val xhr = new XMLHttpRequest()
       xhr.open(
@@ -78,12 +88,7 @@ object HttpRequest {
       )
       headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
       xhr.onload = { (_: Event) =>
-        f(xhr.status, xhr.responseText) match {
-          case Right(b) =>
-            promise.success(b)
-          case Left(a) =>
-            promise.failure(a)
-        }
+        promise.success(f(xhr.status, xhr.responseText))
       }
 
       body match {
@@ -93,38 +98,45 @@ object HttpRequest {
           xhr.send()
       }
 
-      promise.future
+      HttpResponse(promise.future)
     }
 
-    def raw: Future[(Int, String)] =
+    def raw: HttpResponse[(Int, String)] =
       build[(Int, String)] { (status, responseText) =>
-        (status, responseText).right
+        (status, responseText).pure[?]
       }
 
-    def decodeResponse[Response](implicit decoder: DecodeString[Response]): Future[Response] =
-      build[Response] { (status, responseText) =>
-        if (status == 200)
-          decoder.decode(responseText) match {
-            case Alive(value) =>
-              value.right
+    def decodeResponse[Response](implicit decoder: DecodeString[Response]): HttpResponse[Response] =
+      build[Response] { (_, responseText) =>
+        decoder.decode(responseText) match {
+          case alive: Alive[Response] =>
+            alive
+          case Dead(errors) =>
+            decode[ErrorResponse](responseText).to_\/ match {
+              case Right(r) =>
+                r.to_?
+              case Left(error) =>
+                Dead(errors.appended(error))
+            }
+        }
+      }
+
+    def jsonResponse[Response](implicit decoder: Decoder[Response]): HttpResponse[Response] =
+      build[Response] { (_, responseText) =>
+        for {
+          json <- parse(responseText).toErrorAccumulator: ?[Json]
+          response <- decoder.decodeJson(json).toErrorAccumulator match {
+            case alive @ Alive(_) =>
+              alive
             case Dead(errors) =>
-              Compound(errors).left
+              implicitly[Decoder[ErrorResponse]].decodeJson(json).to_\/ match {
+                case Right(b) =>
+                  b.to_?
+                case Left(error) =>
+                  Dead(errors.appended(error))
+              }
           }
-        else
-          Message(s"non-200-response ($status): $responseText").left
-      }
-
-    def jsonResponse[Response](implicit decoder: Decoder[Response]): Future[Response] =
-      build[Response] { (status, responseText) =>
-        if (status == 200)
-          (
-            for {
-              json <- parse(responseText)
-              response <- decoder.decodeJson(json)
-            } yield response
-          ).to_\/
-        else
-          Message(s"non-200-response ($status): $responseText").left
+        } yield response
       }
 
   }
