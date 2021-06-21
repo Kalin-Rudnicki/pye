@@ -52,7 +52,7 @@ object HttpRequest {
         headers = (header, encoder.apply(value).toString) :: headers,
       )
 
-    def noBody: Stage2[Nothing] =
+    def noBody: Stage2 =
       new Stage2(
         method = method,
         url = url,
@@ -60,20 +60,28 @@ object HttpRequest {
         headers = headers,
       )
 
-    def jsonBody[Body](body: Body)(implicit encoder: Encoder[Body]): Stage2[Body] =
+    def rawBody(body: String): Stage2 =
       new Stage2(
         method = method,
         url = url,
-        body = (body, encoder).some,
+        body = body.some,
+        headers = headers,
+      )
+
+    def jsonBody[Body](body: Body, jsonToString: Json => String = _.toString)(implicit encoder: Encoder[Body]): Stage2 =
+      new Stage2(
+        method = method,
+        url = url,
+        body = jsonToString(encoder.apply(body)).some,
         headers = headers,
       )
 
   }
 
-  final class Stage2[Body] private[HttpRequest] (
+  final class Stage2 private[HttpRequest] (
       method: String,
       url: String,
-      body: Maybe[(Body, Encoder[Body])],
+      body: Maybe[String],
       headers: List[(String, String)],
   ) {
 
@@ -92,8 +100,8 @@ object HttpRequest {
       }
 
       body match {
-        case Some((body, encoder)) =>
-          xhr.send(encoder.apply(body).toString)
+        case Some(body) =>
+          xhr.send(body)
         case None =>
           xhr.send()
       }
