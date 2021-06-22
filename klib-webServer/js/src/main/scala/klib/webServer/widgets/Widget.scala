@@ -2,11 +2,11 @@ package klib.webServer.widgets
 
 import klib.Implicits._
 import klib.fp.types._
-import scalatags.JsDom.Frag
+import org.scalajs.dom.raw.HTMLElement
 
 final class Widget[Value, S] private (
     val state: S,
-    val node: Frag,
+    val node: HTMLElement,
     _value: => ?[Value],
 ) {
   def value: ?[Value] = _value
@@ -16,7 +16,7 @@ object Widget {
 
   final class Builder[Value, S] private[Widget] (
       val stateToValue: S => ?[Value],
-      val stateToNode: S => Frag,
+      val stateToNode: S => HTMLElement,
   ) {
 
     def apply(s: S): Widget[Value, S] =
@@ -26,10 +26,10 @@ object Widget {
         _value = stateToValue(s),
       )
 
-    def wrap(in: Frag => Frag): Builder[Value, S] =
+    def mapNode(nodeF: HTMLElement => HTMLElement): Builder[Value, S] =
       new Builder[Value, S](
         stateToValue = stateToValue,
-        stateToNode = s => in(stateToNode(s)),
+        stateToNode = s => nodeF(stateToNode(s)),
       )
 
     // NOTE : If using this, it is important that anything that is actually looking for changes in S2's state,
@@ -98,7 +98,7 @@ object Widget {
 
   }
 
-  def apply[Value, S](stateToValue: S => ?[Value])(stateToNode: S => Frag): Builder[Value, S] =
+  def apply[Value, S](stateToValue: S => ?[Value])(stateToNode: S => HTMLElement): Builder[Value, S] =
     new Builder[Value, S](
       stateToValue = stateToValue,
       stateToNode = stateToNode,

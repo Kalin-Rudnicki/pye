@@ -69,7 +69,7 @@ trait inputs {
         _label,
         _input,
         _errors,
-      )(s.containerModifiers)
+      )(s.containerModifiers).render
     }
 
   // --- text area ---
@@ -111,7 +111,7 @@ trait inputs {
         _label,
         _input,
         _errors,
-      )(s.containerModifiers)
+      )(s.containerModifiers).render
     }
 
   // =====|  |=====
@@ -189,7 +189,7 @@ trait inputs {
         _label,
         _input,
         _errors,
-      )(s.containerModifiers)
+      )(s.containerModifiers).render
     }
 
 }
