@@ -2,11 +2,11 @@ package klib.webServer.widgets
 
 import klib.Implicits._
 import klib.fp.types._
-import org.scalajs.dom.raw.HTMLElement
+import org.scalajs.dom.Node
 
 final class Widget[Value, S] private (
     val state: S,
-    val node: HTMLElement,
+    val node: Node,
     _value: => ?[Value],
 ) {
   def value: ?[Value] = _value
@@ -16,7 +16,7 @@ object Widget {
 
   final class Builder[Value, S] private[Widget] (
       val stateToValue: S => ?[Value],
-      val stateToNode: S => HTMLElement,
+      val stateToNode: S => Node,
   ) {
 
     def apply(s: S): Widget[Value, S] =
@@ -26,7 +26,7 @@ object Widget {
         _value = stateToValue(s),
       )
 
-    def mapNode(nodeF: HTMLElement => HTMLElement): Builder[Value, S] =
+    def mapNode(nodeF: Node => Node): Builder[Value, S] =
       new Builder[Value, S](
         stateToValue = stateToValue,
         stateToNode = s => nodeF(stateToNode(s)),
@@ -98,7 +98,7 @@ object Widget {
 
   }
 
-  def apply[Value, S](stateToValue: S => ?[Value])(stateToNode: S => HTMLElement): Builder[Value, S] =
+  def apply[Value, S](stateToValue: S => ?[Value])(stateToNode: S => Node): Builder[Value, S] =
     new Builder[Value, S](
       stateToValue = stateToValue,
       stateToNode = stateToNode,
