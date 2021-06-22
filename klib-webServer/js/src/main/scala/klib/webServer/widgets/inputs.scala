@@ -45,7 +45,8 @@ trait inputs {
 
       val prevOnKeyPress = _input.onkeypress
       _input.onkeypress = { e =>
-        prevOnKeyPress(e)
+        if (prevOnKeyPress != null)
+          prevOnKeyPress(e)
         if (!e.defaultPrevented) {
           if (e.key == "Enter") {
             e.preventDefault()
@@ -57,7 +58,8 @@ trait inputs {
 
       val prevOnBlur = _input.onblur
       _input.onblur = { e =>
-        prevOnBlur(e)
+        if (prevOnBlur != null)
+          prevOnBlur(e)
         if (!e.defaultPrevented) {
           s.state.value = _input.value
         }
@@ -85,7 +87,8 @@ trait inputs {
 
       val prevOnKeyPress = _input.onkeypress
       _input.onkeypress = { e =>
-        prevOnKeyPress(e)
+        if (prevOnKeyPress != null)
+          prevOnKeyPress(e)
         if (!e.defaultPrevented) {
           if (e.key == "Enter") {
             e.preventDefault()
@@ -97,7 +100,8 @@ trait inputs {
 
       val prevOnBlur = _input.onblur
       _input.onblur = { e =>
-        prevOnBlur(e)
+        if (prevOnBlur != null)
+          prevOnBlur(e)
         if (!e.defaultPrevented) {
           s.state.value = _input.value
         }

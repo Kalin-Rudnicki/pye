@@ -1,5 +1,7 @@
 package klib.webServer.widgets
 
+import scalatags.JsDom.all._
+
 import klib.Implicits._
 import klib.fp.typeclass.DecodeString
 import klib.fp.types._
@@ -43,6 +45,31 @@ trait Implicits {
 
     def autoLabelErrors: Widget.Builder[T, S] =
       widget.mapErrorsWithState((t, s) => new Throwable(s"${s.label}${t.getMessage}", t))
+
+  }
+
+  implicit class InputStateWidgetBuilderOps[T](widget: Widget.Builder[T, inputs.InputState]) {
+
+    def reduceToVar(
+        label: String,
+        id: String,
+        labelModifiers: Seq[Modifier] = Seq.empty,
+        inputModifiers: Seq[Modifier] = Seq.empty,
+        errorsModifiers: Seq[Modifier] = Seq.empty,
+        containerModifiers: Seq[Modifier] = Seq.empty,
+    ): Widget.Builder[T, Var[String]] =
+      widget
+        .rMapState[Var[String]] { s =>
+          inputs.InputState(
+            label = label,
+            id = id,
+            state = s,
+            labelModifiers = labelModifiers,
+            inputModifiers = inputModifiers,
+            errorsModifiers = errorsModifiers,
+            containerModifiers = containerModifiers,
+          )
+        }
 
   }
 
