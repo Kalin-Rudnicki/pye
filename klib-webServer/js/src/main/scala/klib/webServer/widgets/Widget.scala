@@ -32,6 +32,30 @@ object Widget {
         stateToNode = s => in(stateToNode(s)),
       )
 
+    // NOTE : If using this, it is important that anything that is actually looking for changes in S2's state,
+    //      : then S & S2 need to have the same reference to that.
+    //      :
+    //      : Ex: S1(var value: String)
+    //      :     S2(var value: String)
+    //      :     val s1 = S1("1")
+    //      :     val s2 = S2(s1.value)
+    //      :     s2.value = "2"
+    //      ;     s1.value // => "1"
+    //      ;     [BAD]
+    //      :
+    //      : Ex: S3(state: Var[String])
+    //      :     S4(state: Var[String])
+    //      :     val s3 = S3(Var("3"))
+    //      :     val s4 = S4(s3.state)
+    //      :     s4.state.value = "4"
+    //      ;     s3.value // => "4"
+    //      ;     [GOOD]
+    def rMapState[S2](sF: S2 => S): Builder[Value, S2] =
+      new Builder[Value, S2](
+        stateToValue = s => stateToValue(sF(s)),
+        stateToNode = s => stateToNode(sF(s)),
+      )
+
     // ---  ---
 
     def mapErrors(f: Throwable => Throwable): Builder[Value, S] =

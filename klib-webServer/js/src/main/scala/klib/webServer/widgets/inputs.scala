@@ -17,7 +17,7 @@ trait inputs {
   final case class InputState(
       label: String,
       id: String,
-      var value: String,
+      state: Var[String],
       labelModifiers: Seq[Modifier] = Seq.empty,
       inputModifiers: Seq[Modifier] = Seq.empty,
       errorsModifiers: Seq[Modifier] = Seq.empty,
@@ -35,11 +35,11 @@ trait inputs {
   // --- input ---
 
   val input: Widget.Builder[Maybe[String], InputState] =
-    Widget[Maybe[String], InputState](_.value.ensure(_.nonEmpty).pure[?]) { s =>
+    Widget[Maybe[String], InputState](_.state.value.ensure(_.nonEmpty).pure[?]) { s =>
       val _label =
         label(id := s"${s.id}-label", `for` := s.id, `class` := "kws:input-label kws:field-label", s.label)(s.labelModifiers)
       val _input =
-        JD.input(id := s.id, `class` := "kws:input", value := s.value)(s.inputModifiers).render
+        JD.input(id := s.id, `class` := "kws:input", value := s.state.value)(s.inputModifiers).render
       val _errors =
         span(id := s"${s.id}-errors", `class` := "kws:text-area-errors kws:field-errors")(s.errorsModifiers)
 
@@ -49,7 +49,7 @@ trait inputs {
         if (!e.defaultPrevented) {
           if (e.key == "Enter") {
             e.preventDefault()
-            s.value = _input.value
+            s.state.value = _input.value
             _input.dispatchEvent(submitEvent)
           }
         }
@@ -59,7 +59,7 @@ trait inputs {
       _input.onblur = { e =>
         prevOnBlur(e)
         if (!e.defaultPrevented) {
-          s.value = _input.value
+          s.state.value = _input.value
         }
       }
 
@@ -73,13 +73,13 @@ trait inputs {
   // --- text area ---
 
   val textArea: Widget.Builder[Maybe[String], InputState] =
-    Widget[Maybe[String], InputState](_.value.ensure(_.nonEmpty).pure[?]) { s =>
+    Widget[Maybe[String], InputState](_.state.value.ensure(_.nonEmpty).pure[?]) { s =>
       val _label =
         label(id := s"${s.id}-label", `for` := s.id, `class` := "kws:text-area-label kws:field-label", s.label)(
           s.labelModifiers,
         )
       val _input =
-        JD.textarea(id := s.id, `class` := "kws:text-area", value := s.value)(s.inputModifiers).render
+        JD.textarea(id := s.id, `class` := "kws:text-area", value := s.state.value)(s.inputModifiers).render
       val _errors =
         span(id := s"${s.id}-errors", `class` := "kws:text-area-errors kws:field-errors")(s.errorsModifiers)
 
@@ -89,7 +89,7 @@ trait inputs {
         if (!e.defaultPrevented) {
           if (e.key == "Enter") {
             e.preventDefault()
-            s.value = _input.value
+            s.state.value = _input.value
             _input.dispatchEvent(submitEvent)
           }
         }
@@ -99,7 +99,7 @@ trait inputs {
       _input.onblur = { e =>
         prevOnBlur(e)
         if (!e.defaultPrevented) {
-          s.value = _input.value
+          s.state.value = _input.value
         }
       }
 
@@ -116,7 +116,7 @@ trait inputs {
       label: String,
       id: String,
       options: Array[(String, T)],
-      var value: Maybe[T],
+      state: Var[Maybe[T]],
       onChange: Maybe[T => Unit] = None,
       labelModifiers: Seq[Modifier] = Seq.empty,
       inputModifiers: Seq[Modifier] = Seq.empty,
@@ -125,13 +125,13 @@ trait inputs {
   )
 
   def radioGroup[T]: Widget.Builder[Maybe[T], RadioGroupState[T]] =
-    Widget[Maybe[T], RadioGroupState[T]](_.value.pure[?]) { s =>
+    Widget[Maybe[T], RadioGroupState[T]](_.state.value.pure[?]) { s =>
       object selected {
         private var _value: Maybe[(T, dom.html.Span)] = None
 
         def value: Maybe[(T, dom.html.Span)] = _value
         def value_=(v: Maybe[(T, dom.html.Span)]): Unit = {
-          s.value = v.map(_._1)
+          s.state.value = v.map(_._1)
 
           _value.foreach(_._2.classList.remove("kws:radio-group__button--selected"))
           v.foreach(_._2.classList.add("kws:radio-group__button--selected"))
@@ -162,7 +162,7 @@ trait inputs {
               }
             }
 
-            s.value.foreach { s =>
+            s.state.value.foreach { s =>
               if (s == t) {
                 println(s"s: $s, t: $t, s == t: ${s == t}")
                 selected.value = (t, n).some
