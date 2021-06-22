@@ -90,7 +90,7 @@ trait inputs {
         if (prevOnKeyPress != null)
           prevOnKeyPress(e)
         if (!e.defaultPrevented) {
-          if (e.key == "Enter") {
+          if (e.key == "Enter" && e.ctrlKey) {
             e.preventDefault()
             s.state.value = _input.value
             _input.dispatchEvent(submitEvent)
