@@ -39,9 +39,11 @@ trait inputs {
       val _label =
         label(id := s"${s.id}-label", `for` := s.id, `class` := "kws:input-label kws:field-label", s.label)(s.labelModifiers)
       val _input =
-        JD.input(id := s.id, `class` := "kws:input", value := s.state.value)(s.inputModifiers).render
+        JD.input(id := s.id, `class` := "kws:input")(s.inputModifiers).render
       val _errors =
         span(id := s"${s.id}-errors", `class` := "kws:text-area-errors kws:field-errors")(s.errorsModifiers)
+
+      _input.value = s.state.value
 
       val prevOnKeyPress = _input.onkeypress
       _input.onkeypress = { e =>
@@ -81,9 +83,11 @@ trait inputs {
           s.labelModifiers,
         )
       val _input =
-        JD.textarea(id := s.id, `class` := "kws:text-area", value := s.state.value)(s.inputModifiers).render
+        JD.textarea(id := s.id, `class` := "kws:text-area")(s.inputModifiers).render
       val _errors =
         span(id := s"${s.id}-errors", `class` := "kws:text-area-errors kws:field-errors")(s.errorsModifiers)
+
+      _input.value = s.state.value
 
       val prevOnKeyPress = _input.onkeypress
       _input.onkeypress = { e =>
