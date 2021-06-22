@@ -104,4 +104,12 @@ object Query {
         ).wrap[QueryM[A]]
     }
 
+  implicit val queryTraverseList: Traverse[List, Query] =
+    new Traverse[List, Query] {
+
+      override def traverse[T](t: List[Query[T]]): Query[List[T]] =
+        Query(t.map(_.execute).traverse)
+
+    }
+
 }

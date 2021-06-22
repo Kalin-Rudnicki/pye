@@ -235,6 +235,7 @@ final class ServerHandler(
         params <- paramMap.to_??
         _ <- logger(
           L(
+            L.break(),
             L.log.debug("--- Request ---"),
             L.log.debug(s"Method: ${request.getMethod}"),
             L.log.debug(s"Route: ${routes.mkString("/")}"),
@@ -251,7 +252,6 @@ final class ServerHandler(
               params.toList.map(p => L.log.debug(s"${p._1} => ${p._2}")),
             ),
             // TODO (KR) : Other stuff?
-            L.break(),
           ),
         ).to_??
         res <- rec(params, routes, matcher)
