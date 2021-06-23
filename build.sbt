@@ -9,7 +9,7 @@ lazy val `klib-webServer` =
     .settings(
       name := "klib-webserver",
       organization := "kalin-rudnicki",
-      version := "0.6.1",
+      version := "0.6.3",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
@@ -26,6 +26,7 @@ lazy val `klib-webServer` =
     .jsSettings(
       libraryDependencies ++= Seq(
         "org.scala-js" %%% "scalajs-dom" % "1.1.0",
+        "com.github.japgolly.scalacss" %%% "ext-scalatags" % "0.7.0",
       ),
     )
     .jvmSettings(

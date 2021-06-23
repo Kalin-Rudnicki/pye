@@ -75,7 +75,7 @@ object Page {
       val pageBottom = this.pageBottom(env)
 
       val pageLeft = this.pageLeft(env)
-      val pageRight = this.pageLeft(env)
+      val pageRight = this.pageRight(env)
 
       val pageCenterTop = this.pageCenterTop(env)
       val pageCenterMiddle = this.pageCenterMiddle(env)
@@ -98,23 +98,25 @@ object Page {
 
       // TODO (KR) : Maybe do something like document.findById("klib-webserver-styles") [!= null] .replaceWith(this)
       //           : Need to look into priority would work
-      val _style: org.scalajs.dom.html.Style = tags2.style.render
-      _style.innerText = s"""
-          | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
-          | body { margin: 0; padding: 0; }
-          | #${N.Page} { height: 100vh; }
-          | #${N.PageTop} { height: var(--page-top-height); }
-          | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
-          | #${N.PageBottom} { height: var(--page-bottom-height); }
-          | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
-          | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
-          | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
-          | #${N.PageErrors} { flex-shrink: 0; }
-          | #${N.PageCenterTop} { flex-shrink: 0; }
-          | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
-          | #${N.PageCenterBottom} { flex-shrink: 0; }
-          |""".stripMargin
-      _style
+      val _style =
+        tags2
+          .style(
+            s"""
+           | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
+           | body { margin: 0; padding: 0; }
+           | #${N.Page} { height: 100vh; }
+           | #${N.PageTop} { height: var(--page-top-height); }
+           | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
+           | #${N.PageBottom} { height: var(--page-bottom-height); }
+           | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
+           | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
+           | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
+           | #${N.PageErrors} { flex-shrink: 0; }
+           | #${N.PageCenterTop} { flex-shrink: 0; }
+           | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
+           | #${N.PageCenterBottom} { flex-shrink: 0; }
+           |""".stripMargin,
+          )
 
       // --- Body ---
       body(
@@ -124,10 +126,14 @@ object Page {
         div(id := N.Page)(
           pageTop.map(_._2).toOption,
           div(id := N.PageMiddle)(
-            div(id := N.PageErrors),
-            pageCenterTop.toOption,
-            pageCenterMiddle,
-            pageCenterBottom.toOption,
+            pageLeft.toOption,
+            div(id := N.PageCenter)(
+              div(id := N.PageErrors),
+              pageCenterTop.toOption,
+              pageCenterMiddle,
+              pageCenterBottom.toOption,
+            ),
+            pageRight.toOption,
           ),
           pageBottom.map(_._2).toOption,
         ),
