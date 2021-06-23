@@ -93,8 +93,8 @@ object Page {
       pageCenterBottom.foreach { n => n.id = N.PageCenterBottom; n.classList.add(N.PageBar) }
 
       // --- Style ---
-      val pageTopHeight = pageTop.cata(_._1, 0.toString)
-      val pageBottomHeight = pageBottom.cata(_._1, 0.toString)
+      val pageTopHeight = pageTop.cata(_._1, "0px")
+      val pageBottomHeight = pageBottom.cata(_._1, "0px")
 
       // TODO (KR) : Maybe do something like document.findById("klib-webserver-styles") [!= null] .replaceWith(this)
       //           : Need to look into priority would work
