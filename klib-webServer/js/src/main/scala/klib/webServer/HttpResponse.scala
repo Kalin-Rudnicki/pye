@@ -5,7 +5,19 @@ import klib.Implicits._
 import klib.fp.typeclass.Monad
 import klib.fp.types._
 
-final class HttpResponse[+T] private (val future: Future[?[T]])
+final class HttpResponse[+T] private (val future: Future[?[T]]) {
+
+  def onComplete(errorHandler: Throwable => Unit)(f: T => Unit)(implicit ec: ExecutionContext): Unit =
+    future.onComplete {
+      _.to_?.flatten match {
+        case Alive(r) =>
+          f(r)
+        case Dead(errors) =>
+          errors.foreach(errorHandler)
+      }
+    }
+
+}
 object HttpResponse {
 
   def apply[T](future: Future[?[T]]): HttpResponse[T] =
