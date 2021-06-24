@@ -123,6 +123,16 @@ object Widget {
     def labelErrors(label: String): Builder[V, S] =
       mapErrors(t => new Throwable(s"$label${t.getMessage}", t))
 
+    def mapValue[V2](f: V => V2): Builder[V2, S] =
+      new Builder[V2, S](s => {
+        val w = build(s)
+        new Widget[V2](
+          w.node,
+          w.rawValue.map(f),
+          w.errorMappings,
+        )
+      })
+
     def flatMapValue[V2](f: V => ?[V2]): Builder[V2, S] =
       new Builder[V2, S](s => {
         val w = build(s)
