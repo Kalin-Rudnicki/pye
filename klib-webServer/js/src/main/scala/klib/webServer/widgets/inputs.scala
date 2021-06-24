@@ -19,14 +19,6 @@ trait inputs {
 
   // =====|  |=====
 
-  private def submitEvent: Event =
-    new Event(
-      "submit",
-      new org.scalajs.dom.raw.EventInit {
-        bubbles = true
-      },
-    )
-
   // --- input ---
 
   private def textWidget(
@@ -57,7 +49,7 @@ trait inputs {
             if (filterSubmit(e)) {
               e.preventDefault()
               s.value = _input.value
-              _input.dispatchEvent(submitEvent)
+              _input.dispatchEvent(events.submitEvent)
             }
           }
         }

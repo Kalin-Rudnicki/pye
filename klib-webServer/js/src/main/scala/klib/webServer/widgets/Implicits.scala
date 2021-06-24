@@ -1,7 +1,7 @@
 package klib.webServer.widgets
 
 import klib.Implicits._
-import klib.fp.typeclass.DecodeString
+import klib.fp.typeclass.{Applicative, DecodeString}
 import klib.fp.types._
 
 trait Implicits {
@@ -31,6 +31,9 @@ trait Implicits {
       widget.flatMapValue(_.toEA(Message(errorMsg)))
 
   }
+
+  implicit def builderApplicative[S]: Applicative[Widget.Builder.Projection[S]#P] =
+    Widget.Builder.builderApplicative
 
 }
 object Implicits extends Implicits

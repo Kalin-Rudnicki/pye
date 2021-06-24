@@ -2,10 +2,12 @@ package klib.webServer.widgets
 
 import org.scalajs.dom.Node
 import scalatags.JsDom.all._
-
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
+import klib.webServer.HttpResponse
+
+import scala.concurrent.ExecutionContext
 
 final class Widget[+V] private (
     val node: Node,
@@ -130,6 +132,22 @@ object Widget {
           w.errorMappings,
         )
       })
+
+    def wrapInForm[R](
+        endpoint: V => HttpResponse[R],
+        errorHandler: Throwable => Unit,
+        submitButtonLabel: String = "Submit",
+        decorators: containers.FormDecorators = containers.FormDecorators(),
+    )(
+        onSuccess: R => Unit,
+    )(implicit ec: ExecutionContext): Builder[V, S] =
+      containers.form(
+        this,
+        endpoint,
+        errorHandler,
+        submitButtonLabel,
+        decorators,
+      )(onSuccess)
 
   }
   object Builder {
