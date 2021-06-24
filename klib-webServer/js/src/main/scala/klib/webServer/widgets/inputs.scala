@@ -33,7 +33,7 @@ trait inputs {
     Widget
       .Builder[Maybe[String], Var[String]] { s =>
         val _label =
-          JD.label(JD.id := s"$id-label", `for` := id, `class` := s"kws:${_type} kws:field-label", label)(
+          JD.label(JD.id := s"$id-label", `for` := id, `class` := s"kws:${_type}-label kws:field-label", label)(
             decorators.labelModifiers,
           )
         val _input = __input(JD.id := id, `class` := s"kws:${_type}")(decorators.inputModifiers).render
@@ -99,9 +99,9 @@ trait inputs {
       decorators: Decorators = Decorators(),
   ): Widget.Builder[Maybe[String], Var[String]] =
     textWidget(
-      "input",
+      "text-area",
       JD.textarea.asInstanceOf[TypedTag[Input]],
-      _.key == "Enter",
+      e => e.key == "Enter" && e.ctrlKey,
     )(
       label,
       id,
