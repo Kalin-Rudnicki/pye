@@ -48,7 +48,7 @@ trait containers {
         },
       )
 
-      Widget(w.node, w.value)
+      Widget(container, w.value)
     }
 
 }
