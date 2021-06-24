@@ -2,27 +2,22 @@ package klib.webServer.widgets
 
 import org.scalajs.dom
 import org.scalajs.dom._
-import scalatags.JsDom
-import scalatags.JsDom.{all => JD}
+import scalatags.JsDom.{TypedTag, all => JD}
 import scalatags.JsDom.all._
-
 import klib.Implicits._
 import klib.fp.types._
-import klib.webServer._
+import org.scalajs.dom.html.Input
 
 trait inputs {
 
-  // =====|  |=====
-
-  final case class InputState(
-      label: String,
-      id: String,
-      state: Var[String],
+  final case class Decorators(
       labelModifiers: Seq[Modifier] = Seq.empty,
       inputModifiers: Seq[Modifier] = Seq.empty,
       errorsModifiers: Seq[Modifier] = Seq.empty,
       containerModifiers: Seq[Modifier] = Seq.empty,
   )
+
+  // =====|  |=====
 
   private def submitEvent: Event =
     new Event(
@@ -34,25 +29,33 @@ trait inputs {
 
   // --- input ---
 
-  val input: Widget.Builder[Maybe[String], InputState] =
-    Widget[Maybe[String], InputState](_.state.value.ensure(_.nonEmpty).pure[?]) { s =>
+  private def textWidget(
+      _type: String,
+      __input: TypedTag[Input],
+      filterSubmit: KeyboardEvent => Boolean,
+  )(
+      label: String,
+      id: String,
+      decorators: Decorators,
+  ): Widget.Builder[Maybe[String], Var[String]] =
+    Widget.Builder[Maybe[String], Var[String]] { s =>
       val _label =
-        label(id := s"${s.id}-label", `for` := s.id, `class` := "kws:input-label kws:field-label", s.label)(s.labelModifiers)
-      val _input =
-        JD.input(id := s.id, `class` := "kws:input")(s.inputModifiers).render
-      val _errors =
-        span(id := s"${s.id}-errors", `class` := "kws:text-area-errors kws:field-errors")(s.errorsModifiers)
+        JD.label(JD.id := s"$id-label", `for` := id, `class` := s"kws:${_type} kws:field-label", label)(
+          decorators.labelModifiers,
+        )
+      val _input = __input(JD.id := id, `class` := s"kws:${_type}")(decorators.inputModifiers).render
 
-      _input.value = s.state.value
+      val _errors =
+        span(JD.id := s"$id-errors", `class` := s"kws:${_type}-errors kws:field-errors")(decorators.errorsModifiers)
 
       val prevOnKeyPress = _input.onkeypress
       _input.onkeypress = { e =>
         if (prevOnKeyPress != null)
           prevOnKeyPress(e)
         if (!e.defaultPrevented) {
-          if (e.key == "Enter") {
+          if (filterSubmit(e)) {
             e.preventDefault()
-            s.state.value = _input.value
+            s.value = _input.value
             _input.dispatchEvent(submitEvent)
           }
         }
@@ -63,83 +66,70 @@ trait inputs {
         if (prevOnBlur != null)
           prevOnBlur(e)
         if (!e.defaultPrevented) {
-          s.state.value = _input.value
+          s.value = _input.value
         }
       }
 
-      span(id := s"${s.id}-container", `class` := "kws:input-container kws:field-container")(
-        _label,
-        _input,
-        _errors,
-      )(s.containerModifiers).render
+      _input.value = s.value
+
+      Widget(
+        span(JD.id := s"$id-container", `class` := s"kws:${_type}-container kws:field-container")(
+          _label,
+          _input,
+          _errors,
+        )(decorators.containerModifiers).render,
+        s.value.ensure(_.nonEmpty).pure[?],
+      )
     }
+
+  def input(
+      label: String,
+      id: String,
+      decorators: Decorators = Decorators(),
+  ): Widget.Builder[Maybe[String], Var[String]] =
+    textWidget(
+      "input",
+      JD.input,
+      _.key == "Enter",
+    )(
+      label,
+      id,
+      decorators,
+    )
 
   // --- text area ---
 
-  val textArea: Widget.Builder[Maybe[String], InputState] =
-    Widget[Maybe[String], InputState](_.state.value.ensure(_.nonEmpty).pure[?]) { s =>
-      val _label =
-        label(id := s"${s.id}-label", `for` := s.id, `class` := "kws:text-area-label kws:field-label", s.label)(
-          s.labelModifiers,
-        )
-      val _input =
-        JD.textarea(id := s.id, `class` := "kws:text-area")(s.inputModifiers).render
-      val _errors =
-        span(id := s"${s.id}-errors", `class` := "kws:text-area-errors kws:field-errors")(s.errorsModifiers)
-
-      _input.value = s.state.value
-
-      val prevOnKeyPress = _input.onkeypress
-      _input.onkeypress = { e =>
-        if (prevOnKeyPress != null)
-          prevOnKeyPress(e)
-        if (!e.defaultPrevented) {
-          if (e.key == "Enter" && e.ctrlKey) {
-            e.preventDefault()
-            s.state.value = _input.value
-            _input.dispatchEvent(submitEvent)
-          }
-        }
-      }
-
-      val prevOnBlur = _input.onblur
-      _input.onblur = { e =>
-        if (prevOnBlur != null)
-          prevOnBlur(e)
-        if (!e.defaultPrevented) {
-          s.state.value = _input.value
-        }
-      }
-
-      span(id := s"${s.id}-container", `class` := "kws:text-area-container kws:field-container")(
-        _label,
-        _input,
-        _errors,
-      )(s.containerModifiers).render
-    }
+  def textArea(
+      label: String,
+      id: String,
+      decorators: Decorators = Decorators(),
+  ): Widget.Builder[Maybe[String], Var[String]] =
+    textWidget(
+      "input",
+      JD.textarea.asInstanceOf[TypedTag[Input]],
+      _.key == "Enter",
+    )(
+      label,
+      id,
+      decorators,
+    )
 
   // =====|  |=====
 
-  final case class RadioGroupState[T](
+  def radioGroup[T](
       label: String,
       id: String,
       options: Array[(String, T)],
-      state: Var[Maybe[T]],
       onChange: Maybe[T => Unit] = None,
-      labelModifiers: Seq[Modifier] = Seq.empty,
-      inputModifiers: Seq[Modifier] = Seq.empty,
-      errorsModifiers: Seq[Modifier] = Seq.empty,
-      containerModifiers: Seq[Modifier] = Seq.empty,
-  )
-
-  def radioGroup[T]: Widget.Builder[Maybe[T], RadioGroupState[T]] =
-    Widget[Maybe[T], RadioGroupState[T]](_.state.value.pure[?]) { s =>
+      decorators: Decorators = Decorators(),
+  ): Widget.Builder[Maybe[T], Var[Maybe[T]]] =
+    Widget.Builder[Maybe[T], Var[Maybe[T]]] { s =>
       object selected {
         private var _value: Maybe[(T, dom.html.Span)] = None
 
         def value: Maybe[(T, dom.html.Span)] = _value
         def value_=(v: Maybe[(T, dom.html.Span)]): Unit = {
-          s.state.value = v.map(_._1)
+          s.value = v.map(_._1)
 
           _value.foreach(_._2.classList.remove("kws:radio-group__button--selected"))
           v.foreach(_._2.classList.add("kws:radio-group__button--selected"))
@@ -148,7 +138,7 @@ trait inputs {
       }
 
       val optionNodes: Array[dom.html.Span] =
-        s.options.zipWithIndex.map {
+        options.zipWithIndex.map {
           case ((label, t), i) =>
             val n =
               span(
@@ -158,7 +148,7 @@ trait inputs {
                     "kws:radio-group__button",
                   ),
                   (i == 0).maybe("kws:radio-group__button--first").toList,
-                  (i == s.options.length - 1).maybe("kws:radio-group__button--last").toList,
+                  (i == options.length - 1).maybe("kws:radio-group__button--last").toList,
                 ).flatten.mkString(" "),
               )(label).render
 
@@ -166,13 +156,12 @@ trait inputs {
               val newVal = (t, n).some
               if (newVal != selected.value) {
                 selected.value = (t, n).some
-                s.onChange.foreach(_(t))
+                onChange.foreach(_(t))
               }
             }
 
-            s.state.value.foreach { s =>
+            s.value.foreach { s =>
               if (s == t) {
-                println(s"s: $s, t: $t, s == t: ${s == t}")
                 selected.value = (t, n).some
               }
             }
@@ -181,19 +170,22 @@ trait inputs {
         }
 
       val _label =
-        label(id := s"${s.id}-label", `for` := s.id, `class` := "kws:radio-group-label kws:field-label", s.label)(
-          s.labelModifiers,
+        JD.label(JD.id := s"$id-label", `for` := id, `class` := "kws:radio-group-label kws:field-label", label)(
+          decorators.labelModifiers,
         )
       val _input =
-        span(`class` := "kws:radio-group", optionNodes)(s.inputModifiers).render
+        span(`class` := "kws:radio-group", optionNodes)(decorators.inputModifiers).render
       val _errors =
-        span(id := s"${s.id}-errors", `class` := "kws:radio-group-errors kws:field-errors")(s.errorsModifiers)
+        span(JD.id := s"$id-errors", `class` := "kws:radio-group-errors kws:field-errors")(decorators.errorsModifiers)
 
-      span(id := s"${s.id}-container", `class` := "kws:radio-group-container kws:field-container")(
-        _label,
-        _input,
-        _errors,
-      )(s.containerModifiers).render
+      Widget[Maybe[T]](
+        node = span(JD.id := s"$id-container", `class` := "kws:radio-group-container kws:field-container")(
+          _label,
+          _input,
+          _errors,
+        )(decorators.containerModifiers).render,
+        s.value.pure[?],
+      )
     }
 
 }
