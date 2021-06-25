@@ -1,7 +1,5 @@
 package klib.webServer
 
-import scalatags.JsDom.all._
-
 import klib.Implicits._
 import klib.fp.types._
 
@@ -9,28 +7,13 @@ object CSS {
 
   // =====|  |=====
 
-  implicit def blockToB[B <: Block](block: B): CSS.B[B] =
-    new CSS.B(false, block)
-
-  implicit def blockToModifier(b: Block): Modifier =
-    `class` := b.classes
-
-  implicit def bToModifier(b: B[_]): Modifier =
-    `class` := b.classes
-
-  implicit def bmToModifier(b: BM[_]): Modifier =
-    `class` := b.classes
-
-  implicit def bemToModifier(b: BEM[_, _]): Modifier =
-    `class` := b.classes
-
   private def combine(modifiersOnly: Boolean, block: String, modifiers: List[String]): String =
     List(
       (!modifiersOnly).maybe(block).toList,
       modifiers.map(m => s"$block--$m"),
     ).flatten.mkString(" ")
 
-  final class B[B <: Block] private[CSS] (
+  final class B[B <: Block] private[webServer] (
       modifiersOnly: Boolean,
       block: B,
   ) {
@@ -60,7 +43,7 @@ object CSS {
       classes
 
   }
-  final class BM[B <: Block] private[CSS] (
+  final class BM[B <: Block] private[webServer] (
       modifiersOnly: Boolean,
       block: B,
       modifiers: List[B#Modifier],
@@ -82,7 +65,7 @@ object CSS {
       classes
 
   }
-  final class BEM[B <: Block, E <: B#Element] private[CSS] (
+  final class BEM[B <: Block, E <: B#Element] private[webServer] (
       modifiersOnly: Boolean,
       block: B,
       element: E,
