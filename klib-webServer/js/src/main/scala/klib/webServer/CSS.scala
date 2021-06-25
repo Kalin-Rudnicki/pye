@@ -11,10 +11,10 @@ object CSS {
 
   object Implicits {
 
-    implicit def blockToB[B <: CSS.Block](block: B): CSS.B[B] =
+    implicit def blockToB[B <: StyleSheet#Block](block: B): CSS.B[B] =
       new CSS.B(false, block)
 
-    implicit def blockToModifier(b: CSS.Block): Modifier =
+    implicit def blockToModifier(b: StyleSheet#Block): Modifier =
       `class` := b.classes
 
     implicit def bToModifier(b: CSS.B[_]): Modifier =
@@ -36,7 +36,7 @@ object CSS {
       modifiers.map(m => s"$block--$m"),
     ).flatten.mkString(" ")
 
-  final class B[B <: Block] private[webServer] (
+  final class B[B <: StyleSheet#Block] private[webServer] (
       modifiersOnly: Boolean,
       block: B,
   ) {
@@ -66,7 +66,7 @@ object CSS {
       classes
 
   }
-  final class BM[B <: Block] private[webServer] (
+  final class BM[B <: StyleSheet#Block] private[webServer] (
       modifiersOnly: Boolean,
       block: B,
       modifiers: List[B#Modifier],
@@ -88,7 +88,7 @@ object CSS {
       classes
 
   }
-  final class BEM[B <: Block, E <: B#Element] private[webServer] (
+  final class BEM[B <: StyleSheet#Block, E <: B#Element] private[webServer] (
       modifiersOnly: Boolean,
       block: B,
       element: E,
@@ -114,43 +114,48 @@ object CSS {
 
   // =====|  |=====
 
-  private def calcName(`class`: Class[_]): String =
-    `class`.getSimpleName
+  private def calcName(`class`: Class[_], enclosingClass: Class[_]): String =
+    `class`.getName
+      .substring(enclosingClass.getName.length)
       .stripPrefix("$")
       .stripSuffix("$")
       .replaceAll("\\$minus", "-")
 
-  abstract class Block private (_name: Maybe[String]) { block =>
-    def this() = this(None)
-    def this(name: String) = this(name.some)
+  abstract class StyleSheet { styleSheet =>
 
-    private[CSS] val name: String =
-      _name.getOrElse(calcName(block.getClass))
-
-    abstract class Element private (_name: Maybe[String]) { element =>
+    abstract class Block private (_name: Maybe[String]) { block =>
       def this() = this(None)
       def this(name: String) = this(name.some)
 
       private[CSS] val name: String =
-        _name.getOrElse(calcName(element.getClass))
+        _name.getOrElse(calcName(block.getClass, styleSheet.getClass))
 
-      abstract class Modifier private (_name: Maybe[String]) { element =>
+      abstract class Element private (_name: Maybe[String]) { element =>
         def this() = this(None)
         def this(name: String) = this(name.some)
 
         private[CSS] val name: String =
-          _name.getOrElse(calcName(element.getClass))
+          _name.getOrElse(calcName(element.getClass, block.getClass))
+
+        abstract class Modifier private (_name: Maybe[String]) { modifier =>
+          def this() = this(None)
+          def this(name: String) = this(name.some)
+
+          private[CSS] val name: String =
+            _name.getOrElse(calcName(modifier.getClass, element.getClass))
+
+        }
 
       }
 
-    }
+      abstract class Modifier private (_name: Maybe[String]) { modifier =>
+        def this() = this(None)
+        def this(name: String) = this(name.some)
 
-    abstract class Modifier private (_name: Maybe[String]) { element =>
-      def this() = this(None)
-      def this(name: String) = this(name.some)
+        private[CSS] val name: String =
+          _name.getOrElse(calcName(modifier.getClass, block.getClass))
 
-      private[CSS] val name: String =
-        _name.getOrElse(calcName(element.getClass))
+      }
 
     }
 
