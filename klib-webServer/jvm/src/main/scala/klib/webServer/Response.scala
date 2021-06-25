@@ -74,7 +74,7 @@ object Response {
   def json[J: Encoder](
       json: J,
       code: Response.Code = Response.Code.OK,
-      jsonToString: Json => String = _.toString,
+      jsonToString: Json => String = _.noSpaces,
   ): Response =
     text(
       jsonToString(implicitly[Encoder[J]].apply(json)),

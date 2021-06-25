@@ -68,7 +68,7 @@ object HttpRequest {
         headers = headers,
       )
 
-    def jsonBody[Body](body: Body, jsonToString: Json => String = _.toString)(implicit encoder: Encoder[Body]): Stage2 =
+    def jsonBody[Body](body: Body, jsonToString: Json => String = _.noSpaces)(implicit encoder: Encoder[Body]): Stage2 =
       new Stage2(
         method = method,
         url = url,
