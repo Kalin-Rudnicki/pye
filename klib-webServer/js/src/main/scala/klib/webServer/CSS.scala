@@ -1,9 +1,32 @@
 package klib.webServer
 
+import scala.language.implicitConversions
+
+import scalatags.JsDom.all._
+
 import klib.Implicits._
 import klib.fp.types._
 
 object CSS {
+
+  object Implicits {
+
+    implicit def blockToB[B <: CSS.Block](block: B): CSS.B[B] =
+      new CSS.B(false, block)
+
+    implicit def blockToModifier(b: CSS.Block): Modifier =
+      `class` := b.classes
+
+    implicit def bToModifier(b: CSS.B[_]): Modifier =
+      `class` := b.classes
+
+    implicit def bmToModifier(b: CSS.BM[_]): Modifier =
+      `class` := b.classes
+
+    implicit def bemToModifier(b: CSS.BEM[_, _]): Modifier =
+      `class` := b.classes
+
+  }
 
   // =====|  |=====
 
