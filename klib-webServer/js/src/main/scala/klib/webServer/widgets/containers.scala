@@ -25,30 +25,31 @@ trait containers {
   )(implicit ec: ExecutionContext): Widget.Builder[V, S] =
     Widget.Builder[V, S] { s =>
       val w = wb(s)
+      Widget(w.value) {
+        val container =
+          div(`class` := "kws:form-container")(
+            w.render(),
+            br, {
+              val btn = button(submitButtonLabel, `class` := "kws:form-button")(decorators.saveButtonModifiers).render
+              btn.onclick = _ => btn.dispatchEvent(events.submitEvent)
+              btn
+            },
+          ).render
 
-      val container =
-        div(`class` := "kws:form-container")(
-          w.node,
-          br, {
-            val btn = button(submitButtonLabel, `class` := "kws:form-button")(decorators.saveButtonModifiers).render
-            btn.onclick = _ => btn.dispatchEvent(events.submitEvent)
-            btn
+        container.addEventListener(
+          "submit",
+          { (_: Event) =>
+            w.value match {
+              case Alive(v) =>
+                endpoint(v).onComplete(errorHandler)(onSuccess)
+              case Dead(errors) =>
+                errors.foreach(errorHandler)
+            }
           },
-        ).render
+        )
 
-      container.addEventListener(
-        "submit",
-        { (_: Event) =>
-          w.value match {
-            case Alive(v) =>
-              endpoint(v).onComplete(errorHandler)(onSuccess)
-            case Dead(errors) =>
-              errors.foreach(errorHandler)
-          }
-        },
-      )
-
-      Widget(container, w.value)
+        container
+      }
     }
 
 }

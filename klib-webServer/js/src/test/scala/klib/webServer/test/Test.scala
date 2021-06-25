@@ -8,7 +8,7 @@ import klib.webServer.CSS._
 
 object Test {
 
-  object S {
+  object S extends StyleSheet {
 
     object `primary-button` extends Block
 

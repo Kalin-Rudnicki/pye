@@ -1,5 +1,7 @@
 package klib.webServer.widgets
 
+import scala.annotation.unchecked.uncheckedVariance
+
 import org.scalajs.dom.Node
 import scalatags.JsDom.all._
 import klib.Implicits._
@@ -10,10 +12,12 @@ import klib.webServer.HttpResponse
 import scala.concurrent.ExecutionContext
 
 final class Widget[+V] private (
-    val node: Node,
+    val render: () => Node,
     _value: => ?[V],
     private val errorMappings: List[Throwable => Throwable],
 ) {
+  private var _node: Node = render()
+  def node: Node = _node
 
   private def rawValue: ?[V] = _value
 
@@ -23,32 +27,39 @@ final class Widget[+V] private (
   def value: ?[V] =
     rawValue.mapErrors(mapError)
 
+  def reRender(): Unit = {
+    val newNode = render()
+    _node.parentNode.replaceChild(newNode, _node)
+    _node = newNode
+  }
+
 }
+
 object Widget {
 
-  def apply[V](node: Node, value: => ?[V], errorMappings: List[Throwable => Throwable] = Nil): Widget[V] =
-    new Widget[V](node, value, errorMappings)
+  def apply[V](value: => ?[V], errorMappings: List[Throwable => Throwable] = Nil)(node: => Node): Widget[V] =
+    new Widget[V](() => node, value, errorMappings)
 
   implicit val widgetApplicative: Applicative[Widget] =
     new Applicative[Widget] {
 
       override def map[A, B](t: Widget[A], f: A => B): Widget[B] =
         new Widget[B](
-          node = t.node,
+          render = t.render,
           _value = t.rawValue.map(f),
           t.errorMappings,
         )
 
       override def apply[A, B](t: Widget[A], f: Widget[A => B]): Widget[B] =
         new Widget[B](
-          node = List(t.node, f.node).render, // TODO (KR) : Maybe switch?
+          render = () => List(t.render(), f.render()).render,
           _value = t.value.apply(f.value),
           errorMappings = Nil,
         )
 
       override def pure[A](a: => A): Widget[A] =
         new Widget[A](
-          node = List.empty[Node].render,
+          render = () => List.empty[Node].render,
           _value = a.pure[?],
           errorMappings = Nil,
         )
@@ -59,8 +70,8 @@ object Widget {
     new Traverse[List, Widget] {
 
       override def traverse[T](t: List[Widget[T]]): Widget[List[T]] =
-        Widget(
-          t.map(_.node).render,
+        new Widget(
+          () => t.map(_.render()).render,
           t.map(_.value).traverse,
           Nil,
         )
@@ -70,8 +81,8 @@ object Widget {
     new Traverse[NonEmptyList, Widget] {
 
       override def traverse[T](t: NonEmptyList[Widget[T]]): Widget[NonEmptyList[T]] =
-        Widget(
-          t.map(_.node).toList.render,
+        new Widget(
+          () => t.map(_.reRender()).toList.render,
           t.map(_.value).traverse,
           Nil,
         )
@@ -86,7 +97,7 @@ object Widget {
     def mapNode(f: Node => Node): Builder[V, S] =
       new Builder[V, S](s => {
         val w = build(s)
-        new Widget[V](f(w.node), w.rawValue, w.errorMappings)
+        new Widget[V](() => f(w.render()), w.rawValue, w.errorMappings)
       })
 
     // NOTE : If using this, it is important that anything that is actually looking for changes in S2's state,
@@ -114,7 +125,7 @@ object Widget {
       new Builder[V, S](s => {
         val w = build(s)
         new Widget[V](
-          w.node,
+          w.render,
           w.rawValue,
           f :: w.errorMappings,
         )
@@ -127,7 +138,7 @@ object Widget {
       new Builder[V2, S](s => {
         val w = build(s)
         new Widget[V2](
-          w.node,
+          w.render,
           w.rawValue.map(f),
           w.errorMappings,
         )
@@ -137,7 +148,7 @@ object Widget {
       new Builder[V2, S](s => {
         val w = build(s)
         new Widget[V2](
-          w.node,
+          w.render,
           w.rawValue.flatMap(f),
           w.errorMappings,
         )
@@ -166,7 +177,7 @@ object Widget {
       new Builder[V, S](build)
 
     def node(n: => Node): Builder[Unit, Any] =
-      new Builder[Unit, Any](_ => new Widget[Unit](n, ().pure[?], Nil))
+      new Builder[Unit, Any](_ => new Widget[Unit](() => n, ().pure[?], Nil))
 
     // =====|  |=====
 
