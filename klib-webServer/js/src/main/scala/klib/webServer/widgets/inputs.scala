@@ -113,7 +113,8 @@ trait inputs {
       label: String,
       id: String,
       options: Array[(String, T)],
-      onChange: Maybe[T => Unit] = None,
+      onChange: Maybe[Maybe[T] => Unit] = None,
+      allowUnset: Boolean = false,
       decorators: Decorators = Decorators(),
   ): Widget.Builder[Maybe[T], Var[Maybe[T]]] =
     Widget
@@ -150,11 +151,14 @@ trait inputs {
                     ).flatten.mkString(" "),
                   )(label).render
 
-                n.onclick = { _ =>
+                n.onclick = { e =>
                   val newVal = (t, n).some
                   if (newVal != selected.value) {
                     selected.value = (t, n).some
-                    onChange.foreach(_(t))
+                    onChange.foreach(_(t.some))
+                  } else if (allowUnset && e.ctrlKey) {
+                    selected.value = None
+                    onChange.foreach(_(None))
                   }
                 }
 

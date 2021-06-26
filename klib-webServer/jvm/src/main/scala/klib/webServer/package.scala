@@ -13,12 +13,18 @@ import klib.webServer.db._
 
 package object webServer {
 
+  final case class ServerRes(
+      dbFile: File,
+      connectionFactory: ConnectionFactory,
+  )
+
   def makeServer(
       schema: Schema,
       routeMatcher: RouteMatcher,
       defaultPort: Int = 8080,
       defaultDbPath: String = "test-database.db",
-      rbFile: Maybe[File] = None,
+      rbFile: Maybe[File] = None, // TODO (KR) : Make this work off of withRes, or include the rb file somehow
+      withRes: ServerRes => Unit = _ => (),
   ): Executable =
     new Executable.ExecFromConf {
 
@@ -85,6 +91,12 @@ package object webServer {
           server <- new Server(port).pure[??]
           _ <- server.setHandler(handler).pure[??]
           _ <- server.start().pure[??]
+
+          serverRes = ServerRes(
+            dbFile = dbFile,
+            connectionFactory = connectionFactory,
+          )
+          _ = withRes(serverRes)
         } yield ()
       }
 
