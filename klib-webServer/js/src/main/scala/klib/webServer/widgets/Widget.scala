@@ -1,15 +1,14 @@
 package klib.webServer.widgets
 
-import scala.annotation.unchecked.uncheckedVariance
+import scala.concurrent.ExecutionContext
 
-import org.scalajs.dom.Node
+import org.scalajs.dom._
 import scalatags.JsDom.all._
+
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
 import klib.webServer.HttpResponse
-
-import scala.concurrent.ExecutionContext
 
 final class Widget[+V] private (
     val render: () => Node,
@@ -28,6 +27,7 @@ final class Widget[+V] private (
     rawValue.mapErrors(mapError)
 
   def reRender(): Unit = {
+    console.log("reRender()")
     val newNode = render()
     _node.parentNode.replaceChild(newNode, _node)
     _node = newNode
