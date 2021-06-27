@@ -218,9 +218,11 @@ object Page {
         def loop(keys: List[KeyMap.Key]): Unit =
           keys match {
             case head :: tail =>
-              if (head.matches(e))
+              if (head.matches(e)) {
+                if (head.preventsDefault)
+                  e.preventDefault()
                 head.action(e)
-              else
+              } else
                 loop(tail)
             case Nil =>
           }
@@ -252,6 +254,7 @@ object Page {
         name: String,
         ctrl: Maybe[Boolean] = false.some,
         shift: Maybe[Boolean] = false.some,
+        preventsDefault: Boolean = true,
     )(action: KeyboardEvent => Unit): this.type =
       on(
         KeyMap.Key(
@@ -261,6 +264,7 @@ object Page {
           ctrl = ctrl,
           shift = shift,
           on = On.KeyDown,
+          preventsDefault = preventsDefault,
         ),
       )
 
@@ -269,6 +273,7 @@ object Page {
         name: String,
         ctrl: Maybe[Boolean] = false.some,
         shift: Maybe[Boolean] = false.some,
+        preventsDefault: Boolean = true,
     )(action: KeyboardEvent => Unit): this.type =
       on(
         KeyMap.Key(
@@ -278,6 +283,7 @@ object Page {
           ctrl = ctrl,
           shift = shift,
           on = On.KeyPress,
+          preventsDefault = preventsDefault,
         ),
       )
 
@@ -286,6 +292,7 @@ object Page {
         name: String,
         ctrl: Maybe[Boolean] = false.some,
         shift: Maybe[Boolean] = false.some,
+        preventsDefault: Boolean = true,
     )(action: KeyboardEvent => Unit): this.type =
       on(
         KeyMap.Key(
@@ -295,6 +302,7 @@ object Page {
           ctrl = ctrl,
           shift = shift,
           on = On.KeyUp,
+          preventsDefault = preventsDefault,
         ),
       )
 
@@ -307,6 +315,7 @@ object Page {
         action: KeyboardEvent => Unit,
         ctrl: Maybe[Boolean],
         shift: Maybe[Boolean],
+        preventsDefault: Boolean,
         on: On,
     ) {
 
