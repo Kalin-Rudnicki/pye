@@ -16,6 +16,7 @@ package object webServer {
   final case class ServerRes(
       dbFile: File,
       connectionFactory: ConnectionFactory,
+      logger: Logger,
   )
 
   def makeServer(
@@ -95,6 +96,7 @@ package object webServer {
           serverRes = ServerRes(
             dbFile = dbFile,
             connectionFactory = connectionFactory,
+            logger = logger,
           )
           _ = withRes(serverRes)
         } yield ()

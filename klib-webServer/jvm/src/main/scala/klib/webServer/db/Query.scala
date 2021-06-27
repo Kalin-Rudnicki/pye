@@ -1,5 +1,7 @@
 package klib.webServer.db
 
+import org.squeryl.PrimitiveTypeMode
+
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
@@ -16,15 +18,19 @@ final class Query[+T] private (private[db] val execute: IO[T]) {
   def run(implicit c: Connection): ??[T] =
     c.run(this).to_??
 
-  def transaction: Query[T] = {
-    // TODO (KR) :
-    ???
-  }
+  def timed(label: String): Query[T] =
+    for {
+      startTime <- System.currentTimeMillis.pure[Query]
+      _ <- println(s"Starting: $label").pure[Query]
+      res <- this
+      _ <- println(s"Finished: $label [${Timer.formatFlex(System.currentTimeMillis - startTime)}]").pure[Query]
+    } yield res
 
-  def inTransaction: Query[T] = {
-    // TODO (KR) :
-    ???
-  }
+  def transaction: Query[T] =
+    Query(IO.wrapTry(PrimitiveTypeMode.transaction(execute.execute())))
+
+  def inTransaction: Query[T] =
+    Query(IO.wrapTry(PrimitiveTypeMode.inTransaction(execute.execute())))
 
 }
 
