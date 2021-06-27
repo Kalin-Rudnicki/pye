@@ -1,21 +1,19 @@
 package klib.webServer
 
 import scala.concurrent.ExecutionContext.Implicits.global
+
 import org.scalajs.dom._
-import org.scalajs.dom.html.Body
-import org.scalajs.dom.html.Div
+import org.scalajs.dom.html._
 import scalatags.JsDom.all._
 import scalatags.JsDom.tags2
+
 import klib.Implicits._
 import klib.fp.types._
-import klib.webServer.Page.KeyMap.On
-
-import scala.annotation.tailrec
 
 trait Page[Env] {
 
-  protected val keyMap: Page.KeyMap =
-    new Page.KeyMap
+  protected val keyMap: KeyMap =
+    new KeyMap
 
   // =====| ... |=====
 
@@ -101,32 +99,37 @@ object Page {
       val pageTopHeight = pageTop.cata(_._1, "0px")
       val pageBottomHeight = pageBottom.cata(_._1, "0px")
 
-      // TODO (KR) : Maybe do something like document.findById("klib-webserver-styles") [!= null] .replaceWith(this)
-      //           : Need to look into priority would work
-      val _style =
+      val currentStyles = document.head.getElementsByClassName(N.KWSStandardStyle)
+      0.until(currentStyles.length).foreach { i =>
+        document.head.removeChild(currentStyles(i))
+      }
+      document.head.appendChild(
         tags2
-          .style(
+          .style(`class` := N.KWSStandardStyle)(
             s"""
-           | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
-           | body { margin: 0; padding: 0; }
-           | #${N.Page} { height: 100vh; }
-           | #${N.PageTop} { height: var(--page-top-height); }
-           | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
-           | #${N.PageBottom} { height: var(--page-bottom-height); }
-           | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
-           | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
-           | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
-           | #${N.PageErrors} { flex-shrink: 0; }
-           | #${N.PageCenterTop} { flex-shrink: 0; }
-           | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
-           | #${N.PageCenterBottom} { flex-shrink: 0; }
-           |""".stripMargin,
+               | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
+               | body { margin: 0; padding: 0; }
+               | 
+               | #${N.Page} { height: 100vh; }
+               | #${N.PageTop} { height: var(--page-top-height); }
+               | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
+               | #${N.PageBottom} { height: var(--page-bottom-height); }
+               | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
+               | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
+               | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
+               | #${N.PageErrors} { flex-shrink: 0; }
+               | #${N.PageCenterTop} { flex-shrink: 0; }
+               | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
+               | #${N.PageCenterBottom} { flex-shrink: 0; }
+               | 
+               | .${N.Modal} { display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0.75); }
+               |""".stripMargin,
           )
+          .render,
+      )
 
       // --- Body ---
       body(
-        // Style
-        _style,
         // Page
         div(id := N.Page)(
           pageTop.map(_._2).toOption,
@@ -180,6 +183,8 @@ object Page {
 
     object names {
 
+      val KWSStandardStyle = "klib-webserver-standard-style"
+
       val PageTopHeight = "--page-top-height"
       val PageBottomHeight = "--page-bottom-height"
 
@@ -200,137 +205,8 @@ object Page {
       val PageCenterMiddle = "page-center-middle"
       val PageCenterBottom = "page-center-bottom"
 
-    }
+      val Modal = "modal"
 
-  }
-
-  final class KeyMap {
-    import scala.collection.mutable
-
-    // TODO (KR) : Add a binding for displaying keymap, or at least logging it...
-    private val onDownKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
-    private val onPressKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
-    private val onUpKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
-
-    private[webServer] def bindToWindow(): Unit = {
-      def buildListener(lb: mutable.ListBuffer[KeyMap.Key])(e: KeyboardEvent): Unit = {
-        @tailrec
-        def loop(keys: List[KeyMap.Key]): Unit =
-          keys match {
-            case head :: tail =>
-              if (head.matches(e)) {
-                if (head.preventsDefault)
-                  e.preventDefault()
-                head.action(e)
-              } else
-                loop(tail)
-            case Nil =>
-          }
-
-        loop(lb.toList)
-      }
-
-      window.onkeydown = buildListener(onDownKeys)(_)
-      window.onkeypress = buildListener(onPressKeys)(_)
-      window.onkeyup = buildListener(onUpKeys)(_)
-    }
-
-    // =====|  |=====
-
-    def on(key: KeyMap.Key): this.type = {
-      {
-        key.on match {
-          case On.KeyDown  => onDownKeys
-          case On.KeyPress => onPressKeys
-          case On.KeyUp    => onUpKeys
-        }
-      }.append(key)
-
-      this
-    }
-
-    def onDown(
-        key: String,
-        name: String,
-        ctrl: Maybe[Boolean] = false.some,
-        shift: Maybe[Boolean] = false.some,
-        preventsDefault: Boolean = true,
-    )(action: KeyboardEvent => Unit): this.type =
-      on(
-        KeyMap.Key(
-          keys = Set(key),
-          name = name,
-          action = action,
-          ctrl = ctrl,
-          shift = shift,
-          on = On.KeyDown,
-          preventsDefault = preventsDefault,
-        ),
-      )
-
-    def onPress(
-        key: String,
-        name: String,
-        ctrl: Maybe[Boolean] = false.some,
-        shift: Maybe[Boolean] = false.some,
-        preventsDefault: Boolean = true,
-    )(action: KeyboardEvent => Unit): this.type =
-      on(
-        KeyMap.Key(
-          keys = Set(key),
-          name = name,
-          action = action,
-          ctrl = ctrl,
-          shift = shift,
-          on = On.KeyPress,
-          preventsDefault = preventsDefault,
-        ),
-      )
-
-    def onUp(
-        key: String,
-        name: String,
-        ctrl: Maybe[Boolean] = false.some,
-        shift: Maybe[Boolean] = false.some,
-        preventsDefault: Boolean = true,
-    )(action: KeyboardEvent => Unit): this.type =
-      on(
-        KeyMap.Key(
-          keys = Set(key),
-          name = name,
-          action = action,
-          ctrl = ctrl,
-          shift = shift,
-          on = On.KeyUp,
-          preventsDefault = preventsDefault,
-        ),
-      )
-
-  }
-  object KeyMap {
-
-    final case class Key(
-        keys: Set[String],
-        name: String,
-        action: KeyboardEvent => Unit,
-        ctrl: Maybe[Boolean],
-        shift: Maybe[Boolean],
-        preventsDefault: Boolean,
-        on: On,
-    ) {
-
-      def matches(e: KeyboardEvent): Boolean =
-        keys.contains(e.key) &&
-          ctrl.cata(_ == e.ctrlKey, true) &&
-          shift.cata(_ == e.shiftKey, true)
-
-    }
-
-    sealed trait On
-    object On {
-      case object KeyDown extends On
-      case object KeyPress extends On
-      case object KeyUp extends On
     }
 
   }

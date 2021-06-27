@@ -12,5 +12,13 @@ trait events {
       },
     )
 
+  def closeModalEvent: Event =
+    new Event(
+      "close-modal",
+      new org.scalajs.dom.raw.EventInit {
+        bubbles = true
+      },
+    )
+
 }
 object events extends events

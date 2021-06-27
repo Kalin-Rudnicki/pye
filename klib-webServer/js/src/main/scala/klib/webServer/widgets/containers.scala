@@ -2,9 +2,11 @@ package klib.webServer.widgets
 
 import scala.concurrent.ExecutionContext
 
-import klib.fp.types.{Alive, Dead}
-import org.scalajs.dom.Event
+import org.scalajs.dom._
+import org.scalajs.dom.raw.HTMLElement
 import scalatags.JsDom.all._
+
+import klib.fp.types._
 import klib.webServer._
 
 trait containers {
@@ -38,7 +40,8 @@ trait containers {
 
         container.addEventListener(
           "submit",
-          { (_: Event) =>
+          { (e: Event) =>
+            e.stopPropagation()
             w.value match {
               case Alive(v) =>
                 endpoint(v).onComplete(errorHandler)(onSuccess)
@@ -51,6 +54,33 @@ trait containers {
         container
       }
     }
+
+  def displayModal(
+      vw: Int,
+      vh: Int,
+      z: Int = 1,
+      // TODO (KR) : Option for clicking off modal to close it
+  )(node: HTMLElement): Unit = {
+    node.style.width = s"${vw}vw"
+    node.style.height = s"${vh}vh"
+    node.style.margin = s"${vh.toFloat / 2}vh ${vw.toFloat / 2}vw"
+
+    val modal =
+      div(
+        `class` := Page.Standard.names.Modal,
+        zIndex := z,
+      )(node).render
+
+    modal.addEventListener(
+      "close-modal",
+      { (e: Event) =>
+        e.stopPropagation()
+        document.body.removeChild(modal)
+      },
+    )
+
+    document.body.appendChild(modal)
+  }
 
 }
 object containers extends containers
