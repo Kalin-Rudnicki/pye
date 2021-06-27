@@ -63,7 +63,7 @@ trait containers {
   )(node: HTMLElement): Unit = {
     node.style.width = s"${vw}vw"
     node.style.height = s"${vh}vh"
-    node.style.margin = s"${vh.toFloat / 2}vh ${vw.toFloat / 2}vw"
+    node.style.margin = s"${(100 - vh).toFloat / 2}vh ${(100 - vw).toFloat / 2}vw"
 
     val modal =
       div(

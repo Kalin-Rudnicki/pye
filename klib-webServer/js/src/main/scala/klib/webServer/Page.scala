@@ -103,7 +103,7 @@ object Page {
       0.until(currentStyles.length).foreach { i =>
         document.head.removeChild(currentStyles(i))
       }
-      document.head.appendChild(
+      document.head.insertBefore(
         tags2
           .style(`class` := N.KWSStandardStyle)(
             s"""
@@ -126,6 +126,7 @@ object Page {
                |""".stripMargin,
           )
           .render,
+        document.head.children(0),
       )
 
       // --- Body ---
