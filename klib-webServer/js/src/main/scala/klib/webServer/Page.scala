@@ -1,17 +1,21 @@
 package klib.webServer
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
 import org.scalajs.dom._
 import org.scalajs.dom.html.Body
 import org.scalajs.dom.html.Div
 import scalatags.JsDom.all._
 import scalatags.JsDom.tags2
-
 import klib.Implicits._
 import klib.fp.types._
+import klib.webServer.Page.KeyMap.On
+
+import scala.annotation.tailrec
 
 trait Page[Env] {
+
+  protected val keyMap: Page.KeyMap =
+    new Page.KeyMap
 
   // =====| ... |=====
 
@@ -21,6 +25,7 @@ trait Page[Env] {
         case Alive(env) =>
           document.title = this.pageTitle(env)
           document.body = this.pageBody(env)
+          keyMap.bindToWindow()
         case Dead(errors) =>
           errors.foreach(handleError)
       }
@@ -195,6 +200,128 @@ object Page {
       val PageCenterMiddle = "page-center-middle"
       val PageCenterBottom = "page-center-bottom"
 
+    }
+
+  }
+
+  final class KeyMap {
+    import scala.collection.mutable
+
+    // TODO (KR) : Add a binding for displaying keymap, or at least logging it...
+    private val onDownKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
+    private val onPressKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
+    private val onUpKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
+
+    private[webServer] def bindToWindow(): Unit = {
+      def buildListener(lb: mutable.ListBuffer[KeyMap.Key])(e: KeyboardEvent): Unit = {
+        @tailrec
+        def loop(keys: List[KeyMap.Key]): Unit =
+          keys match {
+            case head :: tail =>
+              if (head.matches(e))
+                head.action(e)
+              else
+                loop(tail)
+            case Nil =>
+          }
+
+        loop(lb.toList)
+      }
+
+      window.onkeydown = buildListener(onDownKeys)(_)
+      window.onkeypress = buildListener(onPressKeys)(_)
+      window.onkeyup = buildListener(onUpKeys)(_)
+    }
+
+    // =====|  |=====
+
+    def on(key: KeyMap.Key): this.type = {
+      {
+        key.on match {
+          case On.KeyDown  => onDownKeys
+          case On.KeyPress => onPressKeys
+          case On.KeyUp    => onUpKeys
+        }
+      }.append(key)
+
+      this
+    }
+
+    def onDown(
+        key: String,
+        name: String,
+        ctrl: Maybe[Boolean] = false.some,
+        shift: Maybe[Boolean] = false.some,
+    )(action: KeyboardEvent => Unit): this.type =
+      on(
+        KeyMap.Key(
+          keys = Set(key),
+          name = name,
+          action = action,
+          ctrl = ctrl,
+          shift = shift,
+          on = On.KeyDown,
+        ),
+      )
+
+    def onPress(
+        key: String,
+        name: String,
+        ctrl: Maybe[Boolean] = false.some,
+        shift: Maybe[Boolean] = false.some,
+    )(action: KeyboardEvent => Unit): this.type =
+      on(
+        KeyMap.Key(
+          keys = Set(key),
+          name = name,
+          action = action,
+          ctrl = ctrl,
+          shift = shift,
+          on = On.KeyPress,
+        ),
+      )
+
+    def onUp(
+        key: String,
+        name: String,
+        ctrl: Maybe[Boolean] = false.some,
+        shift: Maybe[Boolean] = false.some,
+    )(action: KeyboardEvent => Unit): this.type =
+      on(
+        KeyMap.Key(
+          keys = Set(key),
+          name = name,
+          action = action,
+          ctrl = ctrl,
+          shift = shift,
+          on = On.KeyUp,
+        ),
+      )
+
+  }
+  object KeyMap {
+
+    final case class Key(
+        keys: Set[String],
+        name: String,
+        action: KeyboardEvent => Unit,
+        ctrl: Maybe[Boolean],
+        shift: Maybe[Boolean],
+        on: On,
+    ) {
+
+      def matches(e: KeyboardEvent): Boolean =
+        keys.contains(e.key) &&
+          ctrl.cata(_ == e.ctrlKey, true) &&
+          shift.cata(_ == e.shiftKey, true)
+
+    }
+
+    sealed trait On
+    object On {
+      case object KeyDown extends On
+      case object KeyPress extends On
+      case object KeyUp extends On
     }
 
   }
