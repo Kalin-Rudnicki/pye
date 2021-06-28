@@ -39,6 +39,13 @@ final class KeyMap {
     window.onkeyup = buildListener(onUpKeys)(_)
   }
 
+  def report: KeyMap.Report =
+    KeyMap.Report(
+      onKeyDown = onDownKeys.toList,
+      onKeyPress = onPressKeys.toList,
+      onKeyUp = onUpKeys.toList,
+    )
+
   // =====|  |=====
 
   def on(key: KeyMap.Key): this.type = {
@@ -112,6 +119,12 @@ final class KeyMap {
 
 }
 object KeyMap {
+
+  final case class Report(
+      onKeyDown: List[Key],
+      onKeyPress: List[Key],
+      onKeyUp: List[Key],
+  )
 
   final case class Key(
       keys: InfiniteSet[KeyCode],

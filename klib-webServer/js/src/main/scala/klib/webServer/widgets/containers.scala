@@ -59,17 +59,28 @@ trait containers {
       vw: Int,
       vh: Int,
       z: Int = 1,
-      // TODO (KR) : Option for clicking off modal to close it
+      clickOffModalToClose: Boolean = false,
   )(node: HTMLElement): Unit = {
     node.style.width = s"${vw}vw"
     node.style.height = s"${vh}vh"
     node.style.margin = s"${(100 - vh).toFloat / 2}vh ${(100 - vw).toFloat / 2}vw"
+
+    if (clickOffModalToClose) {
+      val prevOnClick = node.onclick
+      node.onclick = e => {
+        if (prevOnClick != null)
+          prevOnClick(e)
+        e.stopPropagation()
+      }
+    }
 
     val modal =
       div(
         `class` := Page.Standard.names.Modal,
         zIndex := z,
       )(node).render
+
+    modal.onclick = _ => modal.dispatchEvent(events.closeModalEvent)
 
     modal.addEventListener(
       "close-modal",
