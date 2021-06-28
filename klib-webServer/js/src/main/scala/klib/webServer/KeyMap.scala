@@ -92,7 +92,7 @@ final class KeyMap {
     )
 
   def onUp(
-      key: String,
+      keyCode: KeyMap.KeyCode,
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
@@ -100,7 +100,7 @@ final class KeyMap {
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = InfiniteSet.Inclusive(key),
+        keys = InfiniteSet.Inclusive(keyCode),
         name = name,
         action = action,
         ctrl = ctrl,
