@@ -27,7 +27,9 @@ final class Widget[+V] private (
     rawValue.mapErrors(mapError)
 
   def reRender(): Unit = {
-    console.log("reRender()")
+    // REMOVE : ...
+    // console.log("reRender()")
+
     val newNode = render()
     _node.parentNode.replaceChild(newNode, _node)
     _node = newNode
@@ -37,7 +39,12 @@ final class Widget[+V] private (
 
 object Widget {
 
-  def apply[V](value: => ?[V], errorMappings: List[Throwable => Throwable] = Nil)(node: => Node): Widget[V] =
+  def apply[V](
+      value: => ?[V],
+      errorMappings: List[Throwable => Throwable] = Nil,
+  )(
+      node: => Node,
+  ): Widget[V] =
     new Widget[V](() => node, value, errorMappings)
 
   implicit val widgetApplicative: Applicative[Widget] =
@@ -91,8 +98,13 @@ object Widget {
 
   final class Builder[+V, -S] private[Widget] (private val build: S => Widget[V]) {
 
-    def apply(s: S): Widget[V] =
-      build(s)
+    def apply(s: S): Widget[V] = {
+      val w = build(s)
+      // console.log("build")
+      // console.log(w.node)
+
+      w
+    }
 
     def mapNode(f: Node => Node): Builder[V, S] =
       new Builder[V, S](s => {

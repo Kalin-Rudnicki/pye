@@ -6,6 +6,7 @@ import org.scalajs.dom._
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils.InfiniteSet
 
 final class KeyMap {
   import scala.collection.mutable
@@ -61,7 +62,7 @@ final class KeyMap {
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = Set(key),
+        keys = InfiniteSet.Inclusive(key),
         name = name,
         action = action,
         ctrl = ctrl,
@@ -80,7 +81,7 @@ final class KeyMap {
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = Set(key),
+        keys = InfiniteSet.Inclusive(key),
         name = name,
         action = action,
         ctrl = ctrl,
@@ -99,7 +100,7 @@ final class KeyMap {
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = Set(key),
+        keys = InfiniteSet.Inclusive(key),
         name = name,
         action = action,
         ctrl = ctrl,
@@ -113,7 +114,7 @@ final class KeyMap {
 object KeyMap {
 
   final case class Key(
-      keys: Set[String],
+      keys: InfiniteSet[String],
       name: String,
       action: KeyboardEvent => Unit,
       ctrl: Maybe[Boolean],
