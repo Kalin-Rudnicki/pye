@@ -23,7 +23,7 @@ trait Page[Env] {
         case Alive(env) =>
           document.title = this.pageTitle(env)
           document.body = this.pageBody(env)
-          keyMap.bindTo(window)
+          keyMap.bindToWindow()
         case Dead(errors) =>
           errors.foreach(handleError)
       }

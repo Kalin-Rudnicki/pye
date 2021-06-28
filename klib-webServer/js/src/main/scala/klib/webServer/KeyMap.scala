@@ -5,6 +5,7 @@ import org.scalajs.dom._
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils.InfiniteSet
+import org.scalajs.dom.raw.HTMLElement
 
 import scala.scalajs.js
 
@@ -16,27 +17,35 @@ final class KeyMap {
   private val onPressKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
   private val onUpKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
 
-  private[webServer] def bindTo(target: KeyMap.Bindable): Unit = {
-    def buildListener(lb: mutable.ListBuffer[KeyMap.Key])(e: KeyboardEvent): Unit = {
-      @tailrec
-      def loop(keys: List[KeyMap.Key]): Unit =
-        keys match {
-          case head :: tail =>
-            if (head.matches(e)) {
-              if (head.preventsDefault)
-                e.preventDefault()
-              head.action(e)
-            } else
-              loop(tail)
-          case Nil =>
-        }
+  private def buildListener(lb: mutable.ListBuffer[KeyMap.Key]): js.Function1[KeyboardEvent, _] = { e =>
+    @tailrec
+    def loop(keys: List[KeyMap.Key]): Unit =
+      keys match {
+        case head :: tail =>
+          if (head.matches(e)) {
+            if (head.preventsDefault)
+              e.preventDefault()
+            if (head.stopsPropagation)
+              e.stopPropagation()
+            head.action(e)
+          } else
+            loop(tail)
+        case Nil =>
+      }
 
-      loop(lb.toList)
-    }
+    loop(lb.toList)
+  }
 
-    target.onkeydown = buildListener(onDownKeys)(_)
-    target.onkeypress = buildListener(onPressKeys)(_)
-    target.onkeyup = buildListener(onUpKeys)(_)
+  private[webServer] def bindToWindow(): Unit = {
+    window.onkeydown = buildListener(onDownKeys)
+    window.onkeypress = buildListener(onPressKeys)
+    window.onkeyup = buildListener(onUpKeys)
+  }
+
+  def bindToElement(element: HTMLElement): Unit = {
+    element.onkeydown = buildListener(onDownKeys)
+    element.onkeypress = buildListener(onPressKeys)
+    element.onkeyup = buildListener(onUpKeys)
   }
 
   def report: KeyMap.Report =
@@ -60,71 +69,68 @@ final class KeyMap {
     this
   }
 
-  def onDown(
-      keyCode: KeyMap.KeyCode,
+  def onDown(keyCodes: KeyMap.KeyCode*)(
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
+      stopsPropagation: Boolean = true,
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = InfiniteSet.Inclusive(keyCode),
+        keys = InfiniteSet.Inclusive(keyCodes.toSet),
         name = name,
         action = action,
         ctrl = ctrl,
         shift = shift,
         on = KeyMap.On.KeyDown,
         preventsDefault = preventsDefault,
+        stopsPropagation = stopsPropagation,
       ),
     )
 
-  def onPress(
-      keyCode: KeyMap.KeyCode,
+  def onPress(keyCodes: KeyMap.KeyCode*)(
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
+      stopsPropagation: Boolean = true,
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = InfiniteSet.Inclusive(keyCode),
+        keys = InfiniteSet.Inclusive(keyCodes.toSet),
         name = name,
         action = action,
         ctrl = ctrl,
         shift = shift,
         on = KeyMap.On.KeyPress,
         preventsDefault = preventsDefault,
+        stopsPropagation = stopsPropagation,
       ),
     )
 
-  def onUp(
-      keyCode: KeyMap.KeyCode,
+  def onUp(keyCodes: KeyMap.KeyCode*)(
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
+      stopsPropagation: Boolean = true,
   )(action: KeyboardEvent => Unit): this.type =
     on(
       KeyMap.Key(
-        keys = InfiniteSet.Inclusive(keyCode),
+        keys = InfiniteSet.Inclusive(keyCodes.toSet),
         name = name,
         action = action,
         ctrl = ctrl,
         shift = shift,
         on = KeyMap.On.KeyUp,
         preventsDefault = preventsDefault,
+        stopsPropagation = stopsPropagation,
       ),
     )
 
 }
 object KeyMap {
-
-  type Bindable = {
-    var onkeydown: js.Function1[KeyboardEvent, _]
-    var onkeypress: js.Function1[KeyboardEvent, _]
-    var onkeyup: js.Function1[KeyboardEvent, _]
-  }
 
   final case class Report(
       onKeyDown: List[Key],
@@ -139,6 +145,7 @@ object KeyMap {
       ctrl: Maybe[Boolean],
       shift: Maybe[Boolean],
       preventsDefault: Boolean,
+      stopsPropagation: Boolean,
       on: On,
   ) {
 
