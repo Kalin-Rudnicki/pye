@@ -1,12 +1,12 @@
 package klib.webServer
 
 import scala.annotation.tailrec
-
 import org.scalajs.dom._
-
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils.InfiniteSet
+
+import scala.scalajs.js
 
 final class KeyMap {
   import scala.collection.mutable
@@ -16,7 +16,7 @@ final class KeyMap {
   private val onPressKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
   private val onUpKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
 
-  private[webServer] def bindToWindow(): Unit = {
+  private[webServer] def bindTo(target: KeyMap.Bindable): Unit = {
     def buildListener(lb: mutable.ListBuffer[KeyMap.Key])(e: KeyboardEvent): Unit = {
       @tailrec
       def loop(keys: List[KeyMap.Key]): Unit =
@@ -34,9 +34,9 @@ final class KeyMap {
       loop(lb.toList)
     }
 
-    window.onkeydown = buildListener(onDownKeys)(_)
-    window.onkeypress = buildListener(onPressKeys)(_)
-    window.onkeyup = buildListener(onUpKeys)(_)
+    target.onkeydown = buildListener(onDownKeys)(_)
+    target.onkeypress = buildListener(onPressKeys)(_)
+    target.onkeyup = buildListener(onUpKeys)(_)
   }
 
   def report: KeyMap.Report =
@@ -119,6 +119,12 @@ final class KeyMap {
 
 }
 object KeyMap {
+
+  type Bindable = {
+    var onkeydown: js.Function1[KeyboardEvent, _]
+    var onkeypress: js.Function1[KeyboardEvent, _]
+    var onkeyup: js.Function1[KeyboardEvent, _]
+  }
 
   final case class Report(
       onKeyDown: List[Key],

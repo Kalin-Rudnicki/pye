@@ -1,13 +1,12 @@
 package klib.webServer.widgets
 
 import scala.concurrent.ExecutionContext
-
 import org.scalajs.dom._
 import org.scalajs.dom.raw.HTMLElement
 import scalatags.JsDom.all._
-
 import klib.fp.types._
 import klib.webServer._
+import org.scalajs.dom.html.Div
 
 trait containers {
 
@@ -73,6 +72,8 @@ trait containers {
         e.stopPropagation()
       }
     }
+
+    val t: Div = div().render
 
     val modal =
       div(
