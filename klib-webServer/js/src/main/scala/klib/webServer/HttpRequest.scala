@@ -2,27 +2,28 @@ package klib.webServer
 
 import scala.concurrent.Future
 import scala.concurrent.Promise
-
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import org.scalajs.dom._
-
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
+
+import scala.scalajs.js.URIUtils.encodeURIComponent
 
 object HttpRequest {
 
   def apply(
       method: String,
-      url: String,
+      baseUrl: String,
       requestErrorsAsJson: Boolean = true,
   ): Stage1 = {
     val r =
       new Stage1(
         method = method,
-        url = url,
+        baseUrl = baseUrl,
+        params = Nil,
         headers = Nil,
       )
 
@@ -34,45 +35,59 @@ object HttpRequest {
 
   final class Stage1 private[HttpRequest] (
       method: String,
-      url: String,
+      baseUrl: String,
+      params: List[(String, String)],
       headers: List[(String, String)],
   ) {
+
+    def param(p: String, v: String): Stage1 =
+      new Stage1(
+        method = method,
+        baseUrl = baseUrl,
+        params = (p, v) :: params,
+        headers = headers,
+      )
 
     def header(header: String, value: String): Stage1 =
       new Stage1(
         method = method,
-        url = url,
+        baseUrl = baseUrl,
+        params = params,
         headers = (header, value) :: headers,
       )
 
     def headerJson[H](header: String, value: H)(implicit encoder: Encoder[H]): Stage1 =
       new Stage1(
         method = method,
-        url = url,
+        baseUrl = baseUrl,
+        params = params,
         headers = (header, encoder.apply(value).toString) :: headers,
       )
 
     def noBody: Stage2 =
       new Stage2(
         method = method,
-        url = url,
+        baseUrl = baseUrl,
         body = None,
+        params = params,
         headers = headers,
       )
 
     def rawBody(body: String): Stage2 =
       new Stage2(
         method = method,
-        url = url,
+        baseUrl = baseUrl,
         body = body.some,
+        params = params,
         headers = headers,
       )
 
     def jsonBody[Body](body: Body, jsonToString: Json => String = _.noSpaces)(implicit encoder: Encoder[Body]): Stage2 =
       new Stage2(
         method = method,
-        url = url,
+        baseUrl = baseUrl,
         body = jsonToString(encoder.apply(body)).some,
+        params = params,
         headers = headers,
       )
 
@@ -80,18 +95,22 @@ object HttpRequest {
 
   final class Stage2 private[HttpRequest] (
       method: String,
-      url: String,
+      baseUrl: String,
       body: Maybe[String],
+      params: List[(String, String)],
       headers: List[(String, String)],
   ) {
 
     private def build[Response](f: (Int, String) => ?[Response]): HttpResponse[Response] = {
       val promise: Promise[?[Response]] = Promise()
 
+      def encodeParam(p: (String, String)): String =
+        s"${encodeURIComponent(p._1)}=${encodeURIComponent(p._2)}"
+
       val xhr = new XMLHttpRequest()
       xhr.open(
         method = method,
-        url = url,
+        url = s"$baseUrl${params.isEmpty ? "" | s"?${params.reverse.map(encodeParam).mkString("&")}"}",
         async = true,
       )
       headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
