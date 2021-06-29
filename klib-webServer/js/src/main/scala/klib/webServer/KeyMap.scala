@@ -27,6 +27,7 @@ final class KeyMap {
               e.preventDefault()
             if (head.stopsPropagation)
               e.stopPropagation()
+
             head.action(e)
           } else
             loop(tail)

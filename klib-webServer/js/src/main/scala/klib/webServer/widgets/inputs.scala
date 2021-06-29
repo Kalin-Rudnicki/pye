@@ -42,6 +42,8 @@ trait inputs {
           val _errors =
             span(JD.id := s"$id-errors", `class` := s"kws:${_type}-errors kws:field-errors")(decorators.errorsModifiers)
 
+          _input.onkeydown = _.stopPropagation()
+
           val prevOnKeyPress = _input.onkeypress
           _input.onkeypress = { e =>
             if (prevOnKeyPress != null)
@@ -53,6 +55,7 @@ trait inputs {
                 _input.dispatchEvent(events.submitEvent)
               }
             }
+            e.stopPropagation()
           }
 
           val prevOnBlur = _input.onblur
