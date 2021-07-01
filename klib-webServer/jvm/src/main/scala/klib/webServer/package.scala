@@ -39,7 +39,7 @@ package object webServer {
       override def buildConf(args: Seq[String]): Conf =
         new Conf(args)
 
-      override def run(logger: Logger, conf: Conf): ??[Unit] = {
+      override def run(logger: Logger, conf: Conf): IO[Unit] = {
         val port = conf.port()
         val dbFile = new File(conf.dbPath())
 
@@ -56,8 +56,8 @@ package object webServer {
               L.log.info(s"Starting server on port: $port"),
               L.log.info(s"Database path: $dbFile"),
             ),
-          ).to_??
-          exists <- dbFile.exists.pure[??]
+          )
+          exists <- dbFile.exists.pure[IO]
           _ <- {
             if (exists) {
               import scala.collection.mutable
@@ -88,10 +88,10 @@ package object webServer {
                 _ <- logger(L.log.info(s"Creating database: $dbFile"))
                 _ <- connectionFactory.openRunClose(schema.create.pure[Query])
               } yield ()
-          }.to_??
-          server <- new Server(port).pure[??]
-          _ <- server.setHandler(handler).pure[??]
-          _ <- server.start().pure[??]
+          }
+          server <- new Server(port).pure[IO]
+          _ <- server.setHandler(handler).pure[IO]
+          _ <- server.start().pure[IO]
 
           serverRes = ServerRes(
             dbFile = dbFile,

@@ -12,11 +12,8 @@ import klib.utils._
 // TODO (KR) : Locking (?)
 final class Query[+T] private (private[db] val execute: IO[T]) {
 
-  def runIO(implicit c: Connection): IO[T] =
+  def run(implicit c: Connection): IO[T] =
     c.run(this)
-
-  def run(implicit c: Connection): ??[T] =
-    c.run(this).to_??
 
   def timed(label: String): Query[T] =
     for {
@@ -27,10 +24,10 @@ final class Query[+T] private (private[db] val execute: IO[T]) {
     } yield res
 
   def transaction: Query[T] =
-    Query(IO.wrapTry(PrimitiveTypeMode.transaction(execute.execute())))
+    Query(IO.wrapEffect { PrimitiveTypeMode.transaction(execute.execute()) })
 
   def inTransaction: Query[T] =
-    Query(IO.wrapTry(PrimitiveTypeMode.inTransaction(execute.execute())))
+    Query(IO.wrapEffect { PrimitiveTypeMode.inTransaction(execute.execute()) })
 
 }
 
@@ -43,37 +40,16 @@ object Query {
     new Monad[Query] {
 
       override def map[A, B](t: Query[A], f: A => B): Query[B] =
-        Query {
-          for {
-            res <- t.execute
-          } yield f(res)
-        }
+        Query(t.execute.map(f))
 
       override def apply[A, B](t: Query[A], f: Query[A => B]): Query[B] =
-        Query {
-          ado[IO]
-            .join(
-              t.execute,
-              f.execute,
-            )
-            .map {
-              case (t, f) =>
-                f(t)
-            }
-        }
+        Query(t.execute.apply(f.execute))
 
       override def pure[A](a: => A): Query[A] =
-        Query {
-          a.pure[IO]
-        }
+        Query(a.pure[IO])
 
       override def flatten[A](t: Query[Query[A]]): Query[A] =
-        Query {
-          for {
-            outer <- t.execute
-            inner <- outer.execute
-          } yield inner
-        }
+        Query(t.execute.flatMap(_.execute))
 
     }
 

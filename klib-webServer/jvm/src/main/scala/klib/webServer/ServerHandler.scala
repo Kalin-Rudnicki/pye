@@ -71,30 +71,30 @@ final class ServerHandler(
         params: Map[String, String],
         args: List[String],
         matcher: RouteMatcher,
-    ): ??[Maybe[Response]] =
+    ): IO[Maybe[Response]] =
       matcher match {
         case const: RouteMatcher.Const =>
           args match {
             case const.const :: tail =>
               rec(params, tail, const.child)
             case _ =>
-              None.pure[??]
+              None.pure[IO]
           }
         case of: RouteMatcher.OneOf =>
-          def inner(children: List[RouteMatcher]): ??[Maybe[Response]] =
+          def inner(children: List[RouteMatcher]): IO[Maybe[Response]] =
             children match {
               case head :: tail =>
                 for {
                   res <- rec(params, args, head)
                   res2 <- res match {
                     case some @ Some(_) =>
-                      some.pure[??]
+                      some.pure[IO]
                     case None =>
                       inner(tail)
                   }
                 } yield res2
               case Nil =>
-                None.pure[??]
+                None.pure[IO]
             }
 
           inner(of.children)
@@ -102,7 +102,7 @@ final class ServerHandler(
           if (_method.method == method)
             rec(params, args, _method.child)
           else
-            None.pure[??]
+            None.pure[IO]
         case any: RouteMatcher.Any =>
           any.toResult(args, params)(
             new RouteMatcher.MatchData(
@@ -128,7 +128,7 @@ final class ServerHandler(
                 ),
               )
             case _ =>
-              None.pure[??]
+              None.pure[IO]
           }
         case pathArg: RouteMatcher.PathArg[_] =>
           args match {
@@ -137,10 +137,10 @@ final class ServerHandler(
                 case Alive(arg: pathArg.Type) =>
                   rec(params, tail, pathArg.child(arg))
                 case _ =>
-                  None.pure[??]
+                  None.pure[IO]
               }
             case Nil =>
-              None.pure[??]
+              None.pure[IO]
           }
       }
 
@@ -196,7 +196,7 @@ final class ServerHandler(
       )
     }
 
-    def handleResult(jsonErrors: Boolean, res: ?[Maybe[Response]]): ??[Unit] = {
+    def handleResult(jsonErrors: Boolean, res: ?[Maybe[Response]]): IO[Unit] = {
       val forceResult: (List[Throwable], Response) =
         res match {
           case Alive(r) =>
@@ -224,15 +224,15 @@ final class ServerHandler(
         }
 
       for {
-        _ <- logger(forceResult._1.map(L.log.throwable(_))).to_??
-        _ <- writeResult(forceResult._2).to_??
+        _ <- logger(forceResult._1.map(L.log.throwable(_)))
+        _ <- writeResult(forceResult._2)
       } yield ()
     }
 
     // =====| Usage |=====
     val matchResult: ?[Maybe[Response]] = {
       for {
-        params <- paramMap.to_??
+        params <- paramMap.toIO
         _ <- logger(
           L(
             L.break(),
@@ -253,13 +253,14 @@ final class ServerHandler(
             ),
             // TODO (KR) : Other stuff?
           ),
-        ).to_??
+        )
         res <- rec(params, routes, matcher)
       } yield res
     }.runSync
 
     val jsonErrors = headers.get("ERROR-TYPE").toMaybe.cata(_ == "json", false)
-    handleResult(jsonErrors, matchResult).runAndDumpMessages()
+    handleResult(jsonErrors, matchResult)
+      .runSyncOrDump(logger.some)
   }
 
 }

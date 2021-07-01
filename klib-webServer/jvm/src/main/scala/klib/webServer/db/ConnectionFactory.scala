@@ -19,8 +19,8 @@ trait ConnectionFactory {
       _ <- connection.close
     } yield res
 
-  def withConnection[R](f: Connection => ??[R]): ??[R] =
-    produceConnection.to_??.bracket(f)(_.close.to_??)
+  def withConnection[R](f: Connection => IO[R]): IO[R] =
+    produceConnection.bracket(f)(_.close)
 
 }
 

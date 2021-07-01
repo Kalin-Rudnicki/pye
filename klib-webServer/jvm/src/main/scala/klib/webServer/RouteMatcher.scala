@@ -28,7 +28,7 @@ object RouteMatcher {
       val cookies: Map[String, String],
   ) {
 
-    def bodyAs[B: Decoder]: ??[B] =
+    def bodyAs[B: Decoder]: IO[B] =
       (
         for {
           json <- parse(body).to_\/.toMaybe
@@ -36,9 +36,9 @@ object RouteMatcher {
         } yield b
       ) match {
         case Some(b) =>
-          b.pure[??]
+          b.pure[IO]
         case None =>
-          ??.dead(Message("Failed to decode body"))
+          IO.error(Message("Failed to decode body"))
       }
 
     implicit private def decodeStringFromCirceDecoder[T](implicit decoder: Decoder[T]): DecodeString[T] =
@@ -110,10 +110,10 @@ object RouteMatcher {
 
   final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
 
-  final class Complete private[RouteMatcher] (val toResult: MatchData => ??[Maybe[Response]]) extends RouteMatcher
+  final class Complete private[RouteMatcher] (val toResult: MatchData => IO[Maybe[Response]]) extends RouteMatcher
 
   final class Any private[RouteMatcher] (
-      val toResult: (List[String], Map[String, String]) => MatchData => ??[Maybe[Response]],
+      val toResult: (List[String], Map[String, String]) => MatchData => IO[Maybe[Response]],
   ) extends RouteMatcher
 
   final class Method private[RouteMatcher] (val method: String, val child: RouteMatcher) extends RouteMatcher
@@ -123,10 +123,10 @@ object RouteMatcher {
     type Type = A
   }
 
-  def any(toResult: (List[String], Map[String, String]) => MatchData => ??[Maybe[Response]]): RouteMatcher =
+  def any(toResult: (List[String], Map[String, String]) => MatchData => IO[Maybe[Response]]): RouteMatcher =
     new Any(toResult)
 
-  def complete(toResult: MatchData => ??[Maybe[Response]]): RouteMatcher =
+  def complete(toResult: MatchData => IO[Maybe[Response]]): RouteMatcher =
     new Complete(toResult)
 
   def const(const: String)(child: RouteMatcher): RouteMatcher =
