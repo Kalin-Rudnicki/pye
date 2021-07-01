@@ -48,6 +48,14 @@ object HttpRequest {
         headers = headers,
       )
 
+    def mParam(p: String, v: Maybe[String]): Stage1 =
+      v match {
+        case Some(v) =>
+          param(p, v)
+        case None =>
+          this
+      }
+
     def header(header: String, value: String): Stage1 =
       new Stage1(
         method = method,
