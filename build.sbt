@@ -39,3 +39,14 @@ lazy val `klib-webServer` =
 
 lazy val `klib-webServer-js` = `klib-webServer`.js
 lazy val `klib-webServer-jvm` = `klib-webServer`.jvm
+
+lazy val `klib-webserver-plugin` =
+  project
+    .in(file("klib-webserver-plugin"))
+    .enablePlugins(SbtPlugin)
+    .settings(
+      name := "klib-webserver-plugin",
+      organization := "kalin-rudnicki",
+      version := "0.0.1",
+      resolvers += Resolver.mavenLocal,
+    )
