@@ -1,27 +1,37 @@
 //
 
+val MyOrg = "io.github.kalin-rudnicki"
+
 val MyScalaVersion = "2.13.4"
 val CirceVersion = "0.14.0-M4"
+
+val SharedSettings =
+  Seq(
+    organization := MyOrg,
+    resolvers ++= Seq(
+      Resolver.mavenLocal,
+      Resolver.sonatypeRepo("public"),
+    ),
+  )
 
 lazy val `klib-webServer` =
   crossProject(JSPlatform, JVMPlatform)
     .in(file("klib-webServer"))
     .settings(
       name := "klib-webserver",
-      organization := "kalin-rudnicki",
       version := "0.10.0",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
+        MyOrg %%% "klib-core" % "1.2.4", // klib
         "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
-        "kalin-rudnicki" %%% "klib-core" % "0.4.0", // klib
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
         "io.circe" %%% "circe-generic" % CirceVersion,
         "io.circe" %%% "circe-parser" % CirceVersion,
       ),
       scalaVersion := MyScalaVersion,
-      resolvers += Resolver.mavenLocal,
+      SharedSettings,
     )
     .jsSettings(
       libraryDependencies ++= Seq(
@@ -46,7 +56,12 @@ lazy val `klib-webserver-plugin` =
     .enablePlugins(SbtPlugin)
     .settings(
       name := "klib-webserver-plugin",
-      organization := "kalin-rudnicki",
+      scalaVersion := "2.12.10",
       version := "0.0.1",
-      resolvers += Resolver.mavenLocal,
+      addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.5.0"),
+      SharedSettings,
     )
+
+lazy val `klib-webserver-root` =
+  project
+    .in(file("."))
