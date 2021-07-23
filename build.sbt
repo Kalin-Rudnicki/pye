@@ -47,9 +47,6 @@ lazy val `klib-webServer` =
       ),
     )
 
-lazy val `klib-webServer-js` = `klib-webServer`.js
-lazy val `klib-webServer-jvm` = `klib-webServer`.jvm
-
 lazy val `klib-webserver-plugin` =
   project
     .in(file("klib-webserver-plugin"))
@@ -65,3 +62,11 @@ lazy val `klib-webserver-plugin` =
 lazy val `klib-webserver-root` =
   project
     .in(file("."))
+    .settings(
+      publish / skip := true,
+    )
+    .aggregate(
+      `klib-webServer`.js,
+      `klib-webServer`.jvm,
+      `klib-webserver-plugin`,
+    )
