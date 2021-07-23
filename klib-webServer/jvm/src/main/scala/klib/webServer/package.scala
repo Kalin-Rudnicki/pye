@@ -1,6 +1,7 @@
 package klib
 
 import java.io.File
+import java.util.UUID
 
 import org.eclipse.jetty.server.Server
 import org.rogach.scallop._
@@ -8,7 +9,9 @@ import org.squeryl.Schema
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils._, Logger.{helpers => L}, L.Implicits._
+import klib.utils._
+import klib.utils.Logger.{helpers => L}
+import klib.utils.Logger.helpers.Implicits._
 import klib.webServer.db._
 
 package object webServer {
@@ -21,11 +24,9 @@ package object webServer {
 
   def makeServer(
       schema: Schema,
-      routeMatcher: RouteMatcher,
       defaultPort: Int = 8080,
       defaultDbPath: String = "test-database.db",
-      rbFile: Maybe[File] = None, // TODO (KR) : Make this work off of withRes, or include the rb file somehow
-      withRes: ServerRes => Unit = _ => (),
+      routeMatcher: ServerRes => RouteMatcher,
   ): Executable = {
     final class Conf(args: Seq[String]) extends Executable.Conf(args) {
       val port: ScallopOption[Int] = opt[Int](default = defaultPort.someOpt)
@@ -40,8 +41,13 @@ package object webServer {
       val dbFile = new File(conf.dbPath())
 
       val connectionFactory = ConnectionFactory.fromSqliteFile(dbFile)
+      val serverRes = ServerRes(
+        dbFile = dbFile,
+        connectionFactory = connectionFactory,
+        logger = logger,
+      )
       val handler = new ServerHandler(
-        matcher = routeMatcher,
+        matcher = routeMatcher(serverRes),
         connectionFactory = connectionFactory,
         logger = logger,
       )
@@ -65,19 +71,16 @@ package object webServer {
               _ <- connectionFactory.openRunClose(schema.printDdl(s => if (!s.startsWith("--")) lb.append(s)).pure[Query])
               list = lb.toList
               _ <- logger(L.requireFlags("schema")(list.map(L.log.info)))
-              _ <- rbFile match {
-                case Some(rbFile) =>
-                  for {
-                    exists <- rbFile.exists.pure[IO]
-                    _ <-
-                      if (exists)
-                        ("ruby" :: rbFile.toString :: dbFile.toString :: list).!.pure[IO]
-                      else
-                        ().pure[IO]
-                  } yield ()
-                case None =>
-                  ().pure[IO]
-              }
+              rbFileBytes <- getClass.getClassLoader.getResourceAsStream("ruby/db_diff.rb").readAllBytes.pure[IO]
+              _ <-
+                new File(s"${UUID.randomUUID}.rb")
+                  .pure[IO]
+                  .bracket { rbFile =>
+                    for {
+                      _ <- IO.writeFileBytes(rbFile, rbFileBytes)
+                      _ <- ("ruby" :: rbFile.toString :: dbFile.toString :: list).!.pure[IO]
+                    } yield ()
+                  } { rbFile => IO(rbFile.delete()) }
             } yield ()
           } else
             for {
@@ -88,13 +91,6 @@ package object webServer {
         server <- new Server(port).pure[IO]
         _ <- server.setHandler(handler).pure[IO]
         _ <- server.start().pure[IO]
-
-        serverRes = ServerRes(
-          dbFile = dbFile,
-          connectionFactory = connectionFactory,
-          logger = logger,
-        )
-        _ = withRes(serverRes)
       } yield ()
     }
   }
