@@ -1,11 +1,13 @@
 package klib.webServer
 
-import scala.concurrent.Future
 import scala.concurrent.Promise
+import scala.scalajs.js
+
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import org.scalajs.dom._
+
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
@@ -81,7 +83,7 @@ object HttpRequest {
         headers = headers,
       )
 
-    def rawBody(body: String): Stage2 =
+    def rawBody(body: js.Any): Stage2 =
       new Stage2(
         method = method,
         baseUrl = baseUrl,
@@ -94,7 +96,7 @@ object HttpRequest {
       new Stage2(
         method = method,
         baseUrl = baseUrl,
-        body = jsonToString(encoder.apply(body)).some,
+        body = Some(jsonToString(encoder.apply(body))),
         params = params,
         headers = headers,
       )
@@ -104,7 +106,7 @@ object HttpRequest {
   final class Stage2 private[HttpRequest] (
       method: String,
       baseUrl: String,
-      body: Maybe[String],
+      body: Maybe[js.Any],
       params: List[(String, String)],
       headers: List[(String, String)],
   ) {
