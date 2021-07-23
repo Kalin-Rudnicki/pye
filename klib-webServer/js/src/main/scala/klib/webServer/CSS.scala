@@ -17,6 +17,9 @@ object CSS {
     implicit def blockToModifier(b: StyleSheet#Block): Modifier =
       `class` := b.classes
 
+    implicit def elementToModifier(e: StyleSheet#Block#Element): Modifier =
+      e.block __ e
+
     implicit def bToModifier(b: CSS.B[_]): Modifier =
       `class` := b.classes
 
@@ -123,19 +126,21 @@ object CSS {
 
   abstract class StyleSheet { styleSheet =>
 
-    abstract class Block private (_name: Maybe[String]) { block =>
+    abstract class Block private (_name: Maybe[String]) { _block =>
       def this() = this(None)
       def this(name: String) = this(name.some)
 
       private[CSS] val name: String =
-        _name.getOrElse(calcName(block.getClass, styleSheet.getClass))
+        _name.getOrElse(calcName(_block.getClass, styleSheet.getClass))
 
       abstract class Element private (_name: Maybe[String]) { element =>
         def this() = this(None)
         def this(name: String) = this(name.some)
 
         private[CSS] val name: String =
-          _name.getOrElse(calcName(element.getClass, block.getClass))
+          _name.getOrElse(calcName(element.getClass, _block.getClass))
+
+        private[CSS] val block: Block = _block
 
         abstract class Modifier private (_name: Maybe[String]) { modifier =>
           def this() = this(None)
@@ -153,7 +158,7 @@ object CSS {
         def this(name: String) = this(name.some)
 
         private[CSS] val name: String =
-          _name.getOrElse(calcName(modifier.getClass, block.getClass))
+          _name.getOrElse(calcName(modifier.getClass, _block.getClass))
 
       }
 

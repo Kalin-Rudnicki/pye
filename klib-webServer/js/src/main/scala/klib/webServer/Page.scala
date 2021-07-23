@@ -212,4 +212,46 @@ object Page {
 
   }
 
+  // TODO (KR) : Make Page more FP and less OO
+  /*
+  object builder {
+
+    def noEnv: Builder1[Unit] =
+      new Builder1[Unit](
+        envF = () => ().pure[HttpResponse],
+      )
+
+    def env[Env](envF: => HttpResponse[Env]): Builder1[Env] =
+      new Builder1[Env](
+        envF = () => envF,
+      )
+
+  }
+
+  final class Builder1[Env](
+      envF: () => HttpResponse[Env],
+  ) {
+
+    def constName(name: String): Builder2[Env] =
+      new Builder2[Env](
+        envF = envF,
+        nameF = _ => name,
+      )
+
+    def name(nameF: Env => String): Builder2[Env] =
+      new Builder2[Env](
+        envF = envF,
+        nameF = nameF,
+      )
+
+  }
+
+  final class Builder2[Env](
+      envF: () => HttpResponse[Env],
+      nameF: Env => String,
+  )
+
+  final class Built[Env]
+   */
+
 }
