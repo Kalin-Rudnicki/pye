@@ -21,6 +21,49 @@ trait inputs {
 
   // --- input ---
 
+  // TODO (KR) : This could use some cleaning up...
+  def file(
+      label: String,
+      id: String,
+      decorators: Decorators,
+  ): Widget.Builder[Maybe[dom.File], Var[dom.FileList]] = {
+    def convertFileList(fl: dom.FileList): ?[Maybe[dom.File]] =
+      (fl != null && fl.length == 1).maybe(fl(0)).pure[?]
+
+    Widget
+      .Builder[Maybe[dom.File], Var[dom.FileList]] { s =>
+        Widget(convertFileList(s.value)) {
+          val _label =
+            JD.label(JD.id := s"$id-label", `for` := id, `class` := s"kws:file-input-label kws:field-label", label)(
+              decorators.labelModifiers,
+            )
+          val _input =
+            JD.input(JD.id := id, `class` := s"kws:file-input", `type` := "file")(decorators.inputModifiers).render
+
+          val _errors =
+            span(JD.id := s"$id-errors", `class` := s"kws:file-input-errors kws:field-errors")(decorators.errorsModifiers)
+
+          val prevOnChange = _input.onchange
+          _input.onchange = { e =>
+            if (prevOnChange != null)
+              prevOnChange(e)
+            if (!e.defaultPrevented) {
+              s.silentValue = _input.files
+            }
+          }
+
+          _input.files = s.value
+
+          span(JD.id := s"$id-container", `class` := s"kws:file-input-container kws:field-container")(
+            _label,
+            _input,
+            _errors,
+          )(decorators.containerModifiers).render
+        }
+      }
+      .labelErrors(label)
+  }
+
   private def textWidget(
       _type: String,
       __input: TypedTag[Input],

@@ -22,24 +22,23 @@ object RouteMatcher {
   final class MatchData(
       val logger: Logger,
       val connectionFactory: ConnectionFactory,
-      val body: String, // TODO (KR) : Might need ??[_]
+      val body: IO[String],
+      val bodyBytes: IO[Array[Byte]],
       val headers: Map[String, String],
       val params: Map[String, String],
       val cookies: Map[String, String],
   ) {
 
     def bodyAs[B: Decoder]: IO[B] =
-      (
-        for {
-          json <- parse(body).to_\/.toMaybe
-          b <- implicitly[Decoder[B]].decodeJson(json).to_\/.toMaybe
-        } yield b
-      ) match {
-        case Some(b) =>
-          b.pure[IO]
-        case None =>
-          IO.error(Message("Failed to decode body"))
-      }
+      for {
+        _body <- body
+        res <- {
+          for {
+            json <- parse(_body).toErrorAccumulator: ?[Json]
+            b <- implicitly[Decoder[B]].decodeJson(json).toErrorAccumulator
+          } yield b
+        }.toIO
+      } yield res
 
     implicit private def decodeStringFromCirceDecoder[T](implicit decoder: Decoder[T]): DecodeString[T] =
       s =>

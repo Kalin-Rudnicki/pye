@@ -1,5 +1,7 @@
 package klib.webServer
 
+import java.io.BufferedInputStream
+
 import scala.jdk.CollectionConverters._
 
 import jakarta.servlet.http.HttpServletRequest
@@ -64,8 +66,21 @@ final class ServerHandler(
         }
         .traverse
         .map(_.toMap)
-    lazy val body: String =
-      request.getReader.lines().toArray().mkString("\n")
+
+    val body: IO[String] =
+      request.getReader
+        .lines()
+        .toArray()
+        .mkString("\n")
+        .pure[IO]
+
+    // TODO (KR) :
+    val bodyBytes: IO[Array[Byte]] =
+      for {
+        len <- request.getContentLength.pure[IO]
+        bytes <- new Array[Byte](len).pure[IO]
+        // TODO (KR) :
+      } yield ???
 
     def rec(
         params: Map[String, String],
@@ -109,6 +124,7 @@ final class ServerHandler(
               logger = logger,
               connectionFactory = connectionFactory,
               body = body,
+              bodyBytes = bodyBytes,
               headers = headers,
               params = params,
               cookies = cookies,
@@ -122,6 +138,7 @@ final class ServerHandler(
                   logger = logger,
                   connectionFactory = connectionFactory,
                   body = body,
+                  bodyBytes = bodyBytes,
                   headers = headers,
                   params = params,
                   cookies = cookies,
