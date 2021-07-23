@@ -6,7 +6,8 @@ end
 
 db_name, *schemas = ARGV
 
-db_path = db_name.start_with?(?/) ? db_name : File.expand_path(File.join(__FILE__, '../../../../../..', db_name))
+db_path = db_name
+log("INFO ", 32, "db_path: #{db_path}")
 
 db = SQLite3::Database.new(db_path)
 
