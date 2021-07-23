@@ -17,13 +17,9 @@ object KlibWebserverPlugin extends AutoPlugin {
 
   import autoImport._
 
-  override def globalSettings: Seq[Def.Setting[_]] =
-    Seq(
-      webCompDir := sourceDirectory.value / "../webComp",
-    )
-
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
+      webCompDir := sourceDirectory.value / "../webComp",
       webComp :=
         Def.inputTaskDyn {
           import complete.DefaultParsers._

@@ -54,7 +54,7 @@ lazy val `klib-webserver-plugin` =
     .settings(
       name := "klib-webserver-plugin",
       scalaVersion := "2.12.10",
-      version := "0.0.1",
+      version := "0.0.2",
       addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.5.0"),
       SharedSettings,
     )
