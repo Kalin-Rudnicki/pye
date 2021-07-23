@@ -74,13 +74,8 @@ final class ServerHandler(
         .mkString("\n")
         .pure[IO]
 
-    // TODO (KR) :
     val bodyBytes: IO[Array[Byte]] =
-      for {
-        len <- request.getContentLength.pure[IO]
-        bytes <- new Array[Byte](len).pure[IO]
-        // TODO (KR) :
-      } yield ???
+      request.getInputStream.readAllBytes.pure[IO]
 
     def rec(
         params: Map[String, String],
