@@ -58,40 +58,37 @@ trait containers {
       vw: Int,
       vh: Int,
       z: Int = 1,
-      clickOffModalToClose: Boolean = false,
-  )(node: HTMLElement): Unit = {
-    node.style.width = s"${vw}vw"
-    node.style.height = s"${vh}vh"
-    node.style.margin = s"${(100 - vh).toFloat / 2}vh ${(100 - vw).toFloat / 2}vw"
+      clickOffModalToClose: Boolean = true,
+  )(innerModal: HTMLElement): Unit = {
+    innerModal.style.width = s"${vw}vw"
+    innerModal.style.height = s"${vh}vh"
+    innerModal.style.margin = s"${(100 - vh).toFloat / 2}vh ${(100 - vw).toFloat / 2}vw"
 
-    if (clickOffModalToClose) {
-      val prevOnClick = node.onclick
-      node.onclick = e => {
-        if (prevOnClick != null)
-          prevOnClick(e)
-        e.stopPropagation()
-      }
-    }
-
-    val t: Div = div().render
-
-    val modal =
+    val outerModal =
       div(
         `class` := Page.Standard.names.Modal,
         zIndex := z,
-      )(node).render
+      )(innerModal).render
 
-    modal.onclick = _ => modal.dispatchEvent(events.closeModalEvent)
+    val prevOnClick = innerModal.onclick
+    innerModal.onclick = e => {
+      if (prevOnClick != null)
+        prevOnClick(e)
+      e.stopPropagation()
+    }
 
-    modal.addEventListener(
+    if (clickOffModalToClose)
+      outerModal.onclick = _ => outerModal.dispatchEvent(events.closeModalEvent)
+
+    outerModal.addEventListener(
       "close-modal",
       { (e: Event) =>
         e.stopPropagation()
-        document.body.removeChild(modal)
+        document.body.removeChild(outerModal)
       },
     )
 
-    document.body.appendChild(modal)
+    document.body.appendChild(outerModal)
   }
 
 }
