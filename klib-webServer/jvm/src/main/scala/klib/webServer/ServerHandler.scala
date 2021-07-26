@@ -1,7 +1,5 @@
 package klib.webServer
 
-import java.io.BufferedInputStream
-
 import scala.jdk.CollectionConverters._
 
 import jakarta.servlet.http.HttpServletRequest
@@ -15,7 +13,6 @@ import klib.fp.types._
 import klib.utils._
 import klib.utils.Logger.{helpers => L}
 import klib.utils.Logger.helpers.Implicits._
-import klib.fp.typeclass.DecodeString
 import klib.webServer.db.ConnectionFactory
 
 final class ServerHandler(
@@ -23,8 +20,6 @@ final class ServerHandler(
     connectionFactory: ConnectionFactory,
     logger: Logger,
 ) extends AbstractHandler {
-  // TODO (KR) : Pass as param instead
-  private val isTestEnv: Boolean = true
 
   override def handle(
       target: String,
@@ -67,15 +62,11 @@ final class ServerHandler(
         .traverse
         .map(_.toMap)
 
-    val body: IO[String] =
-      request.getReader
-        .lines()
-        .toArray()
-        .mkString("\n")
-        .pure[IO]
-
     val bodyBytes: IO[Array[Byte]] =
       request.getInputStream.readAllBytes.pure[IO]
+
+    val body: IO[String] =
+      bodyBytes.map(new String(_))
 
     def rec(
         params: Map[String, String],
