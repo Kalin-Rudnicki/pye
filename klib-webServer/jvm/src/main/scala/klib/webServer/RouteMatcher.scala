@@ -101,8 +101,6 @@ object RouteMatcher {
 
   }
 
-  object MatchData
-
   // =====|  |=====
 
   final class OneOf private[RouteMatcher] (val children: List[RouteMatcher]) extends RouteMatcher

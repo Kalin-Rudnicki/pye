@@ -1,6 +1,7 @@
 package klib.webServer
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.scalajs.js.URIUtils
 
 import org.scalajs.dom._
 import org.scalajs.dom.html._
@@ -11,19 +12,36 @@ import klib.Implicits._
 import klib.fp.types._
 
 final class Page[Env] private[Page] (
+    path: String,
     envF: () => HttpResponse[Env],
     titleF: Env => String,
     bodyF: Env => Body,
     errorHandler: ErrorHandler,
 ) {
 
-  def render(): Unit = {
+  private def renderAnd(and: String => Unit): Unit = {
     implicit val eh: ErrorHandler = errorHandler
     envF().onComplete { env =>
-      window.document.title = titleF(env)
+      val title = titleF(env)
+
+      window.document.title = title
       window.document.body = bodyF(env)
+      and(title)
     }
   }
+
+  def push(): Unit =
+    renderAnd { title =>
+      window.history.pushState(null, title, path)
+    }
+
+  def replace(): Unit =
+    renderAnd { title =>
+      window.history.replaceState(null, title, path)
+    }
+
+  def replaceNoTrace(): Unit =
+    renderAnd { _ => }
 
 }
 object Page {
@@ -64,15 +82,18 @@ object Page {
 
   object builder {
 
-    def noEnv: Builder1[Unit] =
-      new Builder1[Unit](
-        envF = () => ().pure[HttpResponse],
-      )
+    def path(paths: String*)(params: (String, String)*): Builder1 = {
+      val pathString =
+        paths
+          .map(URIUtils.encodeURIComponent)
+          .mkString("/")
+      val paramString =
+        params
+          .map(p => s"${URIUtils.encodeURIComponent(p._1)}=${URIUtils.encodeURIComponent(p._2)}")
+          .mkString("&")
 
-    def env[Env](envF: => HttpResponse[Env]): Builder1[Env] =
-      new Builder1[Env](
-        envF = () => envF,
-      )
+      new Builder1(s"/pages/$pathString${params.nonEmpty ? s"?$paramString" | ""}")
+    }
 
   }
 
@@ -146,25 +167,47 @@ object Page {
 
   }
 
-  final class Builder1[Env] private[Page] (
+  final class Builder1 private[Page] (
+      path: String,
+  ) {
+
+    def noEnv: Builder2[Unit] =
+      new Builder2[Unit](
+        path = path,
+        envF = () => ().pure[HttpResponse],
+      )
+
+    def env[Env](envF: => HttpResponse[Env]): Builder2[Env] =
+      new Builder2[Env](
+        path = path,
+        envF = () => envF,
+      )
+
+  }
+
+  final class Builder2[Env] private[Page] (
+      path: String,
       envF: () => HttpResponse[Env],
   ) {
 
-    def constName(title: String): Builder2[Env] =
-      new Builder2[Env](
+    def constName(title: String): Builder3[Env] =
+      new Builder3[Env](
+        path = path,
         envF = envF,
         titleF = _ => title,
       )
 
-    def name(titleF: Env => String): Builder2[Env] =
-      new Builder2[Env](
+    def name(titleF: Env => String): Builder3[Env] =
+      new Builder3[Env](
+        path = path,
         envF = envF,
         titleF = titleF,
       )
 
   }
 
-  final class Builder2[Env] private[Page] (
+  final class Builder3[Env] private[Page] (
+      path: String,
       envF: () => HttpResponse[Env],
       titleF: Env => String,
   ) {
@@ -189,12 +232,13 @@ object Page {
             console.log(error.toString)
         }
       }
-      // TODO (KR) :
+
       val keyMap = new KeyMap
       val sb = bodyF(errorHandler)(keyMap)(new StandardBuilder1[Env])
       keyMap.bindToWindow()
 
       new Page[Env](
+        path = path,
         envF = envF,
         titleF = titleF,
         bodyF = env => {
@@ -278,8 +322,9 @@ object Page {
       )
     }
 
-    def errorHandler(errorHandler: ErrorHandler): Builder3[Env] =
-      new Builder3[Env](
+    def errorHandler(errorHandler: ErrorHandler): Builder4[Env] =
+      new Builder4[Env](
+        path = path,
         envF = envF,
         titleF = titleF,
         errorHandler = errorHandler,
@@ -287,7 +332,8 @@ object Page {
 
   }
 
-  final class Builder3[Env] private[Page] (
+  final class Builder4[Env] private[Page] (
+      path: String,
       envF: () => HttpResponse[Env],
       titleF: Env => String,
       errorHandler: ErrorHandler,
@@ -295,6 +341,7 @@ object Page {
 
     def body(bodyF: (Env, ErrorHandler) => Body): Page[Env] =
       new Page[Env](
+        path = path,
         envF = envF,
         titleF = titleF,
         errorHandler = errorHandler,
