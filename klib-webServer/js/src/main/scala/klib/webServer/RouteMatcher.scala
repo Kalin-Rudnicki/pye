@@ -8,11 +8,42 @@ import org.scalajs.dom.experimental.URLSearchParams
 import klib.Implicits._
 import klib.fp.typeclass.DecodeString
 import klib.fp.types._
+import klib.utils._
 
 sealed trait RouteMatcher {
 
   def /:(const: String): RouteMatcher =
     RouteMatcher.const(const)(this)
+
+  def toIdtString: IndentedString = {
+    import IndentedString._
+
+    this match {
+      case oneOf: RouteMatcher.OneOf =>
+        inline(
+          "one-of:",
+          indented(
+            oneOf.children.map(_.toIdtString),
+          ),
+        )
+      case const: RouteMatcher.Const =>
+        inline(
+          const.const,
+          indented(
+            const.child.toIdtString,
+          ),
+        )
+      case _: RouteMatcher.Complete =>
+        "complete"
+      case pathArg: RouteMatcher.PathArg[_] =>
+        inline(
+          "path-arg",
+          indented(
+            pathArg.child(null.asInstanceOf[pathArg.Type]).toIdtString,
+          ),
+        )
+    }
+  }
 
   def attemptToLoadPage(): Unit = {
     val paths =
@@ -27,7 +58,7 @@ sealed trait RouteMatcher {
         }
         .sortBy(_._1)
 
-    def oneOfMatch(oneOf: RouteMatcher.OneOf): Maybe[Page[_]] = {
+    def oneOfMatch(paths: List[String], oneOf: RouteMatcher.OneOf): Maybe[Page[_]] = {
       @tailrec
       def loop(children: List[RouteMatcher]): Maybe[Page[_]] =
         children match {
@@ -52,7 +83,7 @@ sealed trait RouteMatcher {
         case pHead :: pTail =>
           routeMatcher match {
             case oneOf: RouteMatcher.OneOf =>
-              oneOfMatch(oneOf)
+              oneOfMatch(paths, oneOf)
             case const: RouteMatcher.Const =>
               if (const.const == pHead)
                 attemptMatch(pTail, const.child)
@@ -72,7 +103,7 @@ sealed trait RouteMatcher {
         case Nil =>
           routeMatcher match {
             case oneOf: RouteMatcher.OneOf =>
-              oneOfMatch(oneOf)
+              oneOfMatch(paths, oneOf)
             case complete: RouteMatcher.Complete =>
               complete.paramMatch.lift(params).toMaybe
             case _: RouteMatcher.Const =>
