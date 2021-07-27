@@ -27,6 +27,23 @@ sealed trait RouteMatcher {
         }
         .sortBy(_._1)
 
+    def oneOfMatch(oneOf: RouteMatcher.OneOf): Maybe[Page[_]] = {
+      @tailrec
+      def loop(children: List[RouteMatcher]): Maybe[Page[_]] =
+        children match {
+          case cHead :: cTail =>
+            attemptMatch(paths, cHead) match {
+              case None           => loop(cTail)
+              case some @ Some(_) => some
+            }
+          case Nil =>
+            None
+        }
+
+      loop(oneOf.children)
+    }
+
+    @tailrec
     def attemptMatch(
         paths: List[String],
         routeMatcher: RouteMatcher,
@@ -34,20 +51,8 @@ sealed trait RouteMatcher {
       paths match {
         case pHead :: pTail =>
           routeMatcher match {
-            case of: RouteMatcher.OneOf =>
-              @tailrec
-              def loop(children: List[RouteMatcher]): Maybe[Page[_]] =
-                children match {
-                  case cHead :: cTail =>
-                    attemptMatch(paths, cHead) match {
-                      case None           => loop(cTail)
-                      case some @ Some(_) => some
-                    }
-                  case Nil =>
-                    None
-                }
-
-              loop(of.children)
+            case oneOf: RouteMatcher.OneOf =>
+              oneOfMatch(oneOf)
             case const: RouteMatcher.Const =>
               if (const.const == pHead)
                 attemptMatch(pTail, const.child)
@@ -66,9 +71,13 @@ sealed trait RouteMatcher {
           }
         case Nil =>
           routeMatcher match {
+            case oneOf: RouteMatcher.OneOf =>
+              oneOfMatch(oneOf)
             case complete: RouteMatcher.Complete =>
               complete.paramMatch.lift(params).toMaybe
-            case _ =>
+            case _: RouteMatcher.Const =>
+              None
+            case _: RouteMatcher.PathArg[_] =>
               None
           }
       }
