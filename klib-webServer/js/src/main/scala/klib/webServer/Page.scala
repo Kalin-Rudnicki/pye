@@ -192,6 +192,7 @@ object Page {
       // TODO (KR) :
       val keyMap = new KeyMap
       val sb = bodyF(errorHandler)(keyMap)(new StandardBuilder1[Env])
+      keyMap.bindToWindow()
 
       new Page[Env](
         envF = envF,
