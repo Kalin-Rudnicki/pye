@@ -7,7 +7,7 @@ import klib.fp.types._
 
 final class HttpResponse[+T] private (val future: Future[?[T]]) {
 
-  def onComplete(errorHandler: Throwable => Unit)(f: T => Unit)(implicit ec: ExecutionContext): Unit =
+  def onComplete(f: T => Unit)(implicit ec: ExecutionContext, errorHandler: ErrorHandler): Unit =
     future.onComplete {
       _.to_?.flatten match {
         case Alive(r) =>

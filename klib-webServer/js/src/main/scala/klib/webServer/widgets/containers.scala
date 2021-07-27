@@ -18,12 +18,11 @@ trait containers {
   def form[V, S, R](
       wb: Widget.Builder[V, S],
       endpoint: V => HttpResponse[R],
-      errorHandler: Throwable => Unit,
       submitButtonLabel: String = "Submit",
       decorators: FormDecorators = FormDecorators(),
   )(
       onSuccess: R => Unit,
-  )(implicit ec: ExecutionContext): Widget.Builder[V, S] =
+  )(implicit ec: ExecutionContext, errorHandler: Throwable => Unit): Widget.Builder[V, S] =
     Widget.Builder[V, S] { s =>
       val w = wb(s)
       Widget(w.value) {
@@ -43,7 +42,7 @@ trait containers {
             e.stopPropagation()
             w.value match {
               case Alive(v) =>
-                endpoint(v).onComplete(errorHandler)(onSuccess)
+                endpoint(v).onComplete(onSuccess)
               case Dead(errors) =>
                 errors.foreach(errorHandler)
             }
@@ -54,12 +53,15 @@ trait containers {
       }
     }
 
-  def displayModal(
+  // =====|  |=====
+
+  def makeModal(
       vw: Int,
       vh: Int,
       z: Int = 1,
       clickOffModalToClose: Boolean = true,
-  )(innerModal: HTMLElement): Unit = {
+      modalMods: Seq[Modifier] = Seq.empty,
+  )(innerModal: HTMLElement): Div = {
     innerModal.style.width = s"${vw}vw"
     innerModal.style.height = s"${vh}vh"
     innerModal.style.margin = s"${(100 - vh).toFloat / 2}vh ${(100 - vw).toFloat / 2}vw"
@@ -88,8 +90,25 @@ trait containers {
       },
     )
 
-    document.body.appendChild(outerModal)
+    outerModal
   }
+
+  def displayModal(
+      vw: Int,
+      vh: Int,
+      z: Int = 1,
+      clickOffModalToClose: Boolean = true,
+      modalMods: Seq[Modifier] = Seq.empty,
+  )(innerModal: HTMLElement): Unit =
+    document.body.appendChild(
+      makeModal(
+        vw = vw,
+        vh = vh,
+        z = z,
+        clickOffModalToClose = clickOffModalToClose,
+        modalMods = modalMods,
+      )(innerModal),
+    )
 
 }
 object containers extends containers

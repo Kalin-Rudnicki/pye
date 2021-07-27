@@ -8,7 +8,7 @@ import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
-import klib.webServer.HttpResponse
+import klib.webServer._
 
 final class Widget[+V] private (
     val render: () => Node,
@@ -168,16 +168,14 @@ object Widget {
 
     def wrapInForm[R](
         endpoint: V => HttpResponse[R],
-        errorHandler: Throwable => Unit,
         submitButtonLabel: String = "Submit",
         decorators: containers.FormDecorators = containers.FormDecorators(),
     )(
         onSuccess: R => Unit,
-    )(implicit ec: ExecutionContext): Builder[V, S] =
+    )(implicit ec: ExecutionContext, errorHandler: ErrorHandler): Builder[V, S] =
       containers.form(
         this,
         endpoint,
-        errorHandler,
         submitButtonLabel,
         decorators,
       )(onSuccess)
