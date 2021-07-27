@@ -9,33 +9,37 @@ import scalatags.Text.Frag
 import klib.Implicits._
 import klib.fp.types._
 
-final case class Response(
-    body: Array[Byte],
-    code: Response.Code,
-    contentType: Maybe[String] = None,
-    headers: Map[String, String],
-    cookies: List[Cookie], // TODO (KR) : Correct?
-) {
-
-  def withHeaders(headers: (String, String)*): Response =
-    this.copy(
-      headers = this.headers ++ headers,
-    )
-
-  def withCookies(cookies: Cookie*): Response =
-    this.copy(
-      cookies = this.cookies ++ cookies,
-    )
-
-}
+sealed trait Response
 
 object Response {
+
+  final case class Redirect(to: String) extends Response
+
+  final case class Data(
+      body: Array[Byte],
+      code: Response.Code,
+      contentType: Maybe[String] = None,
+      headers: Map[String, String],
+      cookies: List[Cookie],
+  ) extends Response {
+
+    def withHeaders(headers: (String, String)*): Data =
+      this.copy(
+        headers = this.headers ++ headers,
+      )
+
+    def withCookies(cookies: Cookie*): Data =
+      this.copy(
+        cookies = this.cookies ++ cookies,
+      )
+
+  }
 
   def file(
       file: File,
       contentType: Maybe[String] = None,
       code: Response.Code = Response.Code.OK,
-  ): IO[Response] =
+  ): IO[Data] =
     for {
       exists <- file.exists.pure[IO]
       result <-
@@ -51,8 +55,8 @@ object Response {
       body: Array[Byte],
       contentType: Maybe[String] = None,
       code: Response.Code = Response.Code.OK,
-  ): Response =
-    Response(
+  ): Data =
+    Data(
       body = body,
       code = code,
       contentType = contentType,
@@ -64,7 +68,7 @@ object Response {
       body: String,
       contentType: Maybe[String] = None,
       code: Response.Code = Response.Code.OK,
-  ): Response =
+  ): Data =
     raw(
       body = body.getBytes,
       code = code,
@@ -75,7 +79,7 @@ object Response {
       json: J,
       code: Response.Code = Response.Code.OK,
       jsonToString: Json => String = _.noSpaces,
-  ): Response =
+  ): Data =
     text(
       jsonToString(implicitly[Encoder[J]].apply(json)),
       "application/json".some,
@@ -85,7 +89,7 @@ object Response {
   def html(
       frag: Frag,
       code: Response.Code = Response.Code.OK,
-  ): Response =
+  ): Data =
     text(
       body = frag.render, // TODO (KR) : correct?
       code = code,

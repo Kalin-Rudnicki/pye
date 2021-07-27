@@ -105,7 +105,7 @@ final class ServerHandler(
           else
             None.pure[IO]
         case any: RouteMatcher.Any =>
-          any.toResult(args, params)(
+          any.toResult(args)(
             new RouteMatcher.MatchData(
               logger = logger,
               connectionFactory = connectionFactory,
@@ -150,11 +150,16 @@ final class ServerHandler(
     def writeResult(r: Response): IO[Unit] =
       IO {
         baseRequest.setHandled(true)
-        response.setStatus(r.code.code)
-        r.contentType.foreach(response.setContentType)
-        response.getOutputStream.write(r.body)
-        r.headers.foreach { case (key, value) => response.setHeader(key, value) }
-        r.cookies.foreach(response.addCookie)
+        r match {
+          case Response.Redirect(to) =>
+            response.sendRedirect(to)
+          case Response.Data(body, code, contentType, headers, cookies) =>
+            response.setStatus(code.code)
+            contentType.foreach(response.setContentType)
+            response.getOutputStream.write(body)
+            headers.foreach { case (key, value) => response.setHeader(key, value) }
+            cookies.foreach(response.addCookie)
+        }
       }
 
     def htmlFromBody(bodies: Frag*): Frag =

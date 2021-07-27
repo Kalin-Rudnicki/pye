@@ -112,7 +112,7 @@ object RouteMatcher {
   final class Complete private[RouteMatcher] (val toResult: MatchData => IO[Maybe[Response]]) extends RouteMatcher
 
   final class Any private[RouteMatcher] (
-      val toResult: (List[String], Map[String, String]) => MatchData => IO[Maybe[Response]],
+      val toResult: List[String] => MatchData => IO[Maybe[Response]],
   ) extends RouteMatcher
 
   final class Method private[RouteMatcher] (val method: String, val child: RouteMatcher) extends RouteMatcher
@@ -122,7 +122,7 @@ object RouteMatcher {
     type Type = A
   }
 
-  def any(toResult: (List[String], Map[String, String]) => MatchData => IO[Maybe[Response]]): RouteMatcher =
+  def any(toResult: List[String] => MatchData => IO[Maybe[Response]]): RouteMatcher =
     new Any(toResult)
 
   def complete(toResult: MatchData => IO[Maybe[Response]]): RouteMatcher =

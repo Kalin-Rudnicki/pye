@@ -22,11 +22,57 @@ package object webServer {
       logger: Logger,
   )
 
-  def makeServer(
+  def standardServer(
       schema: Schema,
+      resourcesRoot: File,
+      api: ServerRes => RouteMatcher,
       defaultPort: Int = 8080,
       defaultDbPath: String = "test-database.db",
+      routeMatcherExtra: ServerRes => RouteMatcher = _ => RouteMatcher.oneOf(),
+  ): Executable = {
+    import RouteMatcher._
+
+    makeServer(
+      schema = schema,
+      routeMatcher = serverRes =>
+        oneOf(
+          method("GET")(
+            complete { _ =>
+              Response.Redirect("/pages").some.pure[IO]
+            },
+          ),
+          "resources" /: method("GET")(
+            any { remaining => md =>
+              val remainingJoined = remaining.mkString("/")
+
+              for {
+                _ <- md.logger(L.log.debug(s"attempting to fetch resource: $remainingJoined"))
+                f <-
+                  if (remaining.contains(".."))
+                    IO.error(Message("Found '..' in resources path"))
+                  else {
+                    new File(resourcesRoot, remainingJoined).pure[IO]
+                  }
+                r <- Response.file(f)
+              } yield r.some
+            },
+          ),
+          "pages" /: any { _ => _ =>
+            Response.file(new File(resourcesRoot, "index.html")).map(_.some)
+          },
+          "api" /: api(serverRes),
+          routeMatcherExtra(serverRes),
+        ),
+      defaultPort = defaultPort,
+      defaultDbPath = defaultDbPath,
+    )
+  }
+
+  def makeServer(
+      schema: Schema,
       routeMatcher: ServerRes => RouteMatcher,
+      defaultPort: Int = 8080,
+      defaultDbPath: String = "test-database.db",
   ): Executable = {
     final class Conf(args: Seq[String]) extends Executable.Conf(args) {
       val port: ScallopOption[Int] = opt[Int](default = defaultPort.someOpt)
