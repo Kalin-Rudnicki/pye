@@ -2,7 +2,7 @@ package klib.webServer
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import klib.Implicits._
-import klib.fp.typeclass.Monad
+import klib.fp.typeclass._
 import klib.fp.types._
 
 final class HttpResponse[+T] private (val future: Future[?[T]]) {
@@ -68,6 +68,14 @@ object HttpResponse {
 
         new HttpResponse[A](p.future)
       }
+
+    }
+
+  implicit def httpResponseTraverseList(implicit ec: ExecutionContext): Traverse[List, HttpResponse] =
+    new Traverse[List, HttpResponse] {
+
+      override def traverse[T](t: List[HttpResponse[T]]): HttpResponse[List[T]] =
+        HttpResponse(Future.traverse(t)(_.future).map(_.traverse))
 
     }
 
