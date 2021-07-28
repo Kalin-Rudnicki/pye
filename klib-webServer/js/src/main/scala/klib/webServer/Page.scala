@@ -323,7 +323,8 @@ object Page {
               ),
               pageBottom.map(_._2).toOption,
             ),
-            sb._inBody.reverseMap(_(env)).flatten,
+          )(
+            sb._inBody.reverseMap(_(env)).flatten: _*,
           ).render
         },
         errorHandler = errorHandler,
