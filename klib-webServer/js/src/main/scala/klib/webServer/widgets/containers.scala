@@ -87,16 +87,17 @@ trait containers {
       e.stopPropagation()
     }
 
-    clickOffModalAction match {
-      case Some(action) =>
-        action match {
-          case ModalBackgroundClickAction.Close =>
-            outerModal.onclick = _ => outerModal.dispatchEvent(events.closeModalEvent)
-          case ModalBackgroundClickAction.Custom(action) =>
-            action(outerModal)
-        }
-      case None =>
-    }
+    outerModal.onclick = _ =>
+      clickOffModalAction match {
+        case Some(action) =>
+          action match {
+            case ModalBackgroundClickAction.Close =>
+              outerModal.dispatchEvent(events.closeModalEvent)
+            case ModalBackgroundClickAction.Custom(action) =>
+              action(outerModal)
+          }
+        case None =>
+      }
 
     outerModal.addEventListener(
       "close-modal",
