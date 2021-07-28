@@ -121,7 +121,7 @@ object Page {
       private[Page] val _pageRight: Maybe[Env => Div],
       private[Page] val _pageCenterTop: Maybe[Env => Div],
       private[Page] val _pageCenterBottom: Maybe[Env => Div],
-      private[Page] val _inBody: List[Modifier],
+      private[Page] val _inBody: List[Env => List[Modifier]],
   ) {
 
     private def copy(
@@ -132,7 +132,7 @@ object Page {
         _pageRight: Maybe[Env => Div] = this._pageRight,
         _pageCenterTop: Maybe[Env => Div] = this._pageCenterTop,
         _pageCenterBottom: Maybe[Env => Div] = this._pageCenterBottom,
-        _inBody: List[Modifier] = Nil,
+        _inBody: Maybe[Env => List[Modifier]] = None,
     ): StandardBuilder2[Env] =
       new StandardBuilder2[Env](
         _pageCenterMiddle = _pageCenterMiddle,
@@ -142,7 +142,7 @@ object Page {
         _pageRight = _pageRight,
         _pageCenterTop = _pageCenterTop,
         _pageCenterBottom = _pageCenterBottom,
-        _inBody = this._inBody ::: _inBody,
+        _inBody = _inBody.cata(_ :: this._inBody, this._inBody),
       )
 
     def noPageTop: StandardBuilder2[Env] = copy(_pageTop = None)
@@ -169,8 +169,8 @@ object Page {
     def pageCenterBottom(build: Env => Div): StandardBuilder2[Env] =
       copy(_pageCenterBottom = Some(build(_)))
 
-    def inBody(modifiers: Modifier*): StandardBuilder2[Env] =
-      copy(_inBody = modifiers.toList)
+    def inBody(build: Env => List[Modifier]): StandardBuilder2[Env] =
+      copy(_inBody = build.some)
 
   }
 
@@ -323,7 +323,7 @@ object Page {
               ),
               pageBottom.map(_._2).toOption,
             ),
-            sb._inBody,
+            sb._inBody.reverseMap(_(env)).flatten,
           ).render
         },
         errorHandler = errorHandler,
