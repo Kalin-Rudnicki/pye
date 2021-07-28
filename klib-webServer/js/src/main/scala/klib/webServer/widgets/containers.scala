@@ -2,11 +2,13 @@ package klib.webServer.widgets
 
 import scala.concurrent.ExecutionContext
 import org.scalajs.dom._
+import org.scalajs.dom.html.Div
 import org.scalajs.dom.raw.HTMLElement
 import scalatags.JsDom.all._
+import klib.Implicits._
 import klib.fp.types._
+import klib.webServer
 import klib.webServer._
-import org.scalajs.dom.html.Div
 
 trait containers {
 
@@ -55,11 +57,17 @@ trait containers {
 
   // =====|  |=====
 
+  sealed trait ModalBackgroundClickAction
+  object ModalBackgroundClickAction {
+    case object Close extends ModalBackgroundClickAction
+    final case class Custom(action: Div => Unit) extends ModalBackgroundClickAction
+  }
+
   def makeModal(
       vw: Int,
       vh: Int,
       z: Int = 1,
-      clickOffModalToClose: Boolean = true,
+      clickOffModalAction: Maybe[ModalBackgroundClickAction] = ModalBackgroundClickAction.Close.some,
       modalMods: Seq[Modifier] = Seq.empty,
   )(innerModal: HTMLElement): Div = {
     innerModal.style.width = s"${vw}vw"
@@ -79,8 +87,16 @@ trait containers {
       e.stopPropagation()
     }
 
-    if (clickOffModalToClose)
-      outerModal.onclick = _ => outerModal.dispatchEvent(events.closeModalEvent)
+    clickOffModalAction match {
+      case Some(action) =>
+        action match {
+          case ModalBackgroundClickAction.Close =>
+            outerModal.onclick = _ => outerModal.dispatchEvent(events.closeModalEvent)
+          case ModalBackgroundClickAction.Custom(action) =>
+            action(outerModal)
+        }
+      case None =>
+    }
 
     outerModal.addEventListener(
       "close-modal",
@@ -97,7 +113,7 @@ trait containers {
       vw: Int,
       vh: Int,
       z: Int = 1,
-      clickOffModalToClose: Boolean = true,
+      clickOffModalAction: Maybe[ModalBackgroundClickAction] = ModalBackgroundClickAction.Close.some,
       modalMods: Seq[Modifier] = Seq.empty,
   )(innerModal: HTMLElement): Unit =
     document.body.appendChild(
@@ -105,7 +121,7 @@ trait containers {
         vw = vw,
         vh = vh,
         z = z,
-        clickOffModalToClose = clickOffModalToClose,
+        clickOffModalAction = clickOffModalAction,
         modalMods = modalMods,
       )(innerModal),
     )
