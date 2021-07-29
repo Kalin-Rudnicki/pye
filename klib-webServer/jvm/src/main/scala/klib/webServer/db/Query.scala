@@ -53,39 +53,6 @@ object Query {
 
     }
 
-  sealed trait QueryMT
-  type QueryM[+T] = Query[Maybe[T]] @@ QueryMT
-
-  implicit val queryMMonad: Monad[QueryM] =
-    new Monad[QueryM] {
-      override def map[A, B](t: QueryM[A], f: A => B): QueryM[B] =
-        t.unwrap
-          .map(_.map(f))
-          .wrap[QueryM[B]]
-
-      override def apply[A, B](t: QueryM[A], f: QueryM[A => B]): QueryM[B] =
-        ado[Query]
-          .join(
-            t,
-            f,
-          )
-          .map {
-            case (uT, uF) =>
-              uT.apply(uF)
-          }
-          .wrap[QueryM[B]]
-
-      override def pure[A](a: => A): QueryM[A] = a.pure[Maybe].pure[Query].wrap[QueryM[A]]
-
-      override def flatten[A](t: QueryM[QueryM[A]]): QueryM[A] =
-        (
-          for {
-            outer <- t.unwrap
-            inner <- outer.map(_.unwrap).traverse
-          } yield inner.flatten
-        ).wrap[QueryM[A]]
-    }
-
   implicit val queryTraverseList: Traverse[List, Query] =
     new Traverse[List, Query] {
 
