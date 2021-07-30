@@ -10,9 +10,9 @@ import org.scalajs.dom.raw.HTMLElement
 import scala.scalajs.js
 
 final class KeyMap(
-    onDownKeys: List[KeyMap.Key],
-    onPressKeys: List[KeyMap.Key],
-    onUpKeys: List[KeyMap.Key],
+    val onDownKeys: List[KeyMap.Key],
+    val onPressKeys: List[KeyMap.Key],
+    val onUpKeys: List[KeyMap.Key],
 ) {
 
   private def buildListener(lb: List[KeyMap.Key]): js.Function1[KeyboardEvent, _] = { e =>
