@@ -1,10 +1,12 @@
 package klib.webServer.test
 
-import scalatags.JsDom.all._
+import io.circe._
+import io.circe.generic.auto._
 
-import klib.Implicits._
-import klib.fp.types._
-import klib.webServer._
-import klib.webServer.CSS._
-
-object Test {}
+object Test {
+  def main(args: Array[String]): Unit = {
+    println(
+      implicitly[Encoder[Unit]].apply(()).toString,
+    )
+  }
+}

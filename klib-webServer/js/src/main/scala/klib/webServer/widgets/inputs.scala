@@ -235,5 +235,37 @@ trait inputs {
       }
       .labelErrors(label)
 
+  def toggleButton(
+      buttonLabel: String,
+      onToggle: Maybe[Boolean => Unit] = None,
+      buttonDecorators: Seq[Modifier] = Seq.empty,
+  ): Widget.Builder[Boolean, Var[Boolean]] =
+    Widget.Builder[Boolean, Var[Boolean]] { s =>
+      Widget[Boolean](s.value.pure[?]) {
+        val btn =
+          button(
+            `class` := List(
+              "kws:toggle-button".some,
+              s.value.maybe("kws:toggle-button--true"),
+              (!s.value).maybe("kws:toggle-button--false"),
+            ).flatMap(_.toOption)
+              .mkString(" "),
+          )(
+            buttonLabel,
+          )(buttonDecorators).render
+
+        btn.onclick = e => {
+          e.stopPropagation()
+          s.value = !s.value
+          btn.classList.toggle("kws:toggle-button--true")
+          btn.classList.toggle("kws:toggle-button--false")
+
+          onToggle.foreach(_(s.value))
+        }
+
+        btn
+      }
+    }
+
 }
 object inputs extends inputs
