@@ -9,15 +9,13 @@ import org.scalajs.dom.raw.HTMLElement
 
 import scala.scalajs.js
 
-final class KeyMap {
-  import scala.collection.mutable
+final class KeyMap(
+    onDownKeys: List[KeyMap.Key],
+    onPressKeys: List[KeyMap.Key],
+    onUpKeys: List[KeyMap.Key],
+) {
 
-  // TODO (KR) : Add a binding for displaying keymap, or at least logging it...
-  private val onDownKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
-  private val onPressKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
-  private val onUpKeys: mutable.ListBuffer[KeyMap.Key] = mutable.ListBuffer()
-
-  private def buildListener(lb: mutable.ListBuffer[KeyMap.Key]): js.Function1[KeyboardEvent, _] = { e =>
+  private def buildListener(lb: List[KeyMap.Key]): js.Function1[KeyboardEvent, _] = { e =>
     @tailrec
     def loop(keys: List[KeyMap.Key]): Unit =
       keys match {
@@ -34,7 +32,7 @@ final class KeyMap {
         case Nil =>
       }
 
-    loop(lb.toList)
+    loop(lb.reverse)
   }
 
   private[webServer] def bindToWindow(): Unit = {
@@ -43,32 +41,34 @@ final class KeyMap {
     window.onkeyup = buildListener(onUpKeys)
   }
 
+  // TODO (KR) : Not sure this is working very well...
   def bindToElement(element: HTMLElement): Unit = {
     element.onkeydown = buildListener(onDownKeys)
     element.onkeypress = buildListener(onPressKeys)
     element.onkeyup = buildListener(onUpKeys)
   }
 
-  def report: KeyMap.Report =
-    KeyMap.Report(
-      onKeyDown = onDownKeys.toList,
-      onKeyPress = onPressKeys.toList,
-      onKeyUp = onUpKeys.toList,
-    )
-
-  // =====|  |=====
-
-  def on(key: KeyMap.Key): this.type = {
-    {
-      key.on match {
-        case KeyMap.On.KeyDown  => onDownKeys
-        case KeyMap.On.KeyPress => onPressKeys
-        case KeyMap.On.KeyUp    => onUpKeys
-      }
-    }.append(key)
-
-    this
-  }
+  def on(key: KeyMap.Key): KeyMap =
+    key.on match {
+      case KeyMap.On.KeyDown =>
+        new KeyMap(
+          onDownKeys = key :: onDownKeys,
+          onPressKeys = onPressKeys,
+          onUpKeys = onUpKeys,
+        )
+      case KeyMap.On.KeyPress =>
+        new KeyMap(
+          onDownKeys = onDownKeys,
+          onPressKeys = key :: onPressKeys,
+          onUpKeys = onUpKeys,
+        )
+      case KeyMap.On.KeyUp =>
+        new KeyMap(
+          onDownKeys = onDownKeys,
+          onPressKeys = onPressKeys,
+          onUpKeys = key :: onUpKeys,
+        )
+    }
 
   def onDown(keyCodes: KeyMap.KeyCode*)(
       name: String,
@@ -76,7 +76,7 @@ final class KeyMap {
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
       stopsPropagation: Boolean = true,
-  )(action: KeyboardEvent => Unit): this.type =
+  )(action: KeyboardEvent => Unit): KeyMap =
     on(
       KeyMap.Key(
         keys = InfiniteSet.Inclusive(keyCodes.toSet),
@@ -96,7 +96,7 @@ final class KeyMap {
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
       stopsPropagation: Boolean = true,
-  )(action: KeyboardEvent => Unit): this.type =
+  )(action: KeyboardEvent => Unit): KeyMap =
     on(
       KeyMap.Key(
         keys = InfiniteSet.Inclusive(keyCodes.toSet),
@@ -116,7 +116,7 @@ final class KeyMap {
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
       stopsPropagation: Boolean = true,
-  )(action: KeyboardEvent => Unit): this.type =
+  )(action: KeyboardEvent => Unit): KeyMap =
     on(
       KeyMap.Key(
         keys = InfiniteSet.Inclusive(keyCodes.toSet),
@@ -131,13 +131,15 @@ final class KeyMap {
     )
 
 }
+
 object KeyMap {
 
-  final case class Report(
-      onKeyDown: List[Key],
-      onKeyPress: List[Key],
-      onKeyUp: List[Key],
-  )
+  def empty: KeyMap =
+    new KeyMap(
+      onDownKeys = Nil,
+      onPressKeys = Nil,
+      onUpKeys = Nil,
+    )
 
   final case class Key(
       keys: InfiniteSet[KeyCode],

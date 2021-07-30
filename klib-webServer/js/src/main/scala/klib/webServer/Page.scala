@@ -17,7 +17,18 @@ final class Page[Env] private[Page] (
     titleF: Env => String,
     bodyF: Env => Body,
     errorHandler: ErrorHandler,
+    keyMap: KeyMap,
 ) {
+
+  def withKeyMap(kmF: ErrorHandler => KeyMap => KeyMap): Page[Env] =
+    new Page(
+      path = path,
+      envF = envF,
+      titleF = titleF,
+      bodyF = bodyF,
+      errorHandler = errorHandler,
+      keyMap = kmF(errorHandler)(keyMap),
+    )
 
   private def renderAnd(and: String => Unit): Unit = {
     implicit val eh: ErrorHandler = errorHandler
@@ -27,6 +38,7 @@ final class Page[Env] private[Page] (
       window.document.title = title
       window.document.body = bodyF(env)
       and(title)
+      keyMap.bindToWindow()
     }
   }
 
@@ -219,7 +231,7 @@ object Page {
       titleF: Env => String,
   ) {
 
-    def standardBody(bodyF: ErrorHandler => KeyMap => StandardBuilder1[Env] => StandardBuilder2[Env]): Page[Env] = {
+    def standardBody(bodyF: ErrorHandler => StandardBuilder1[Env] => StandardBuilder2[Env]): Page[Env] = {
       import Standard.{names => N}
 
       val errorHandler: ErrorHandler = { error =>
@@ -240,9 +252,7 @@ object Page {
         }
       }
 
-      val keyMap = new KeyMap
-      val sb = bodyF(errorHandler)(keyMap)(new StandardBuilder1[Env])
-      keyMap.bindToWindow()
+      val sb = bodyF(errorHandler)(new StandardBuilder1[Env])
 
       new Page[Env](
         path = path,
@@ -328,6 +338,7 @@ object Page {
           ).render
         },
         errorHandler = errorHandler,
+        keyMap = KeyMap.empty,
       )
     }
 
@@ -355,6 +366,7 @@ object Page {
         titleF = titleF,
         errorHandler = errorHandler,
         bodyF = bodyF(_, errorHandler),
+        keyMap = KeyMap.empty,
       )
 
   }
