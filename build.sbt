@@ -19,11 +19,11 @@ lazy val `klib-webServer` =
     .in(file("klib-webServer"))
     .settings(
       name := "klib-webserver",
-      version := "1.4.4",
+      version := "1.4.5",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
-        MyOrg %%% "klib-core" % "1.2.12", // klib
+        MyOrg %%% "klib-core" % "1.2.13", // klib
         "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
