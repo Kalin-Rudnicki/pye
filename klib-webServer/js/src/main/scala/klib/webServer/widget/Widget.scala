@@ -22,11 +22,15 @@ final case class Widget[V, S, A](
 
   // =====|  |=====
 
-  def handleAction[A2](f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]]): Widget[V, S, A2] = {
-
-    // TODO (KR) :
-    ???
-  }
+  def handleAction[A2](f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]]): Widget[V, S, A2] =
+    Widget[V, S, A2](
+      elementF = { (rh, s) =>
+        // TODO (KR) :
+        val rh2: RaiseHandler[S, A2] = ???
+        ???
+      },
+      valueF = valueF,
+    )
 
   // =====|  |=====
 
@@ -102,7 +106,8 @@ object Widget {
   type ElemT = Element
   type ElementT = NonEmptyList[ElemT]
 
-  type StdForm[V, S] = Widget[V, S, CommonRaise.Submit.type]
+  type SubmitOr[V, S, A] = Widget[V, S, CommonRaise.SubmitOr[A]]
+  type Submit[V, S] = Widget[V, S, CommonRaise.Submit.type]
   type NoAction[V, S] = Widget[V, S, Nothing]
 
   // =====|  |=====
@@ -179,25 +184,33 @@ object Widget {
   implicit def widgetMonad[S, A]: Monad[Projection[S, A]#P] =
     new Monad[Projection[S, A]#P] {
 
-      override def map[V, V2](t: Widget[V, S, A], f: V => V2): Widget[V2, S, A] = {
-        // TODO (KR) :
-        ???
-      }
+      override def map[V, V2](t: Widget[V, S, A], f: V => V2): Widget[V2, S, A] =
+        t.mapValue(f)
 
-      override def apply[V, V2](t: Widget[V, S, A], f: Widget[V => V2, S, A]): Widget[V2, S, A] = {
-        // TODO (KR) :
-        ???
-      }
+      override def apply[V, V2](t: Widget[V, S, A], f: Widget[V => V2, S, A]): Widget[V2, S, A] =
+        Widget[V2, S, A](
+          elementF = (rh, s) => NonEmptyList.nel(t.elementF(rh, s), f.elementF(rh, s)).flatten,
+          valueF = s => t.valueF(s).apply(f.valueF.apply(s)),
+        )
 
-      override def pure[V](a: => V): Widget[V, S, A] = {
-        // TODO (KR) :
-        ???
-      }
+      override def pure[V](a: => V): Widget[V, S, A] =
+        Widget.builder.withState[S].withAction[A].element(span.render).withValue(_ => a.pure[?])
 
-      override def flatten[V](t: Widget[Widget[V, S, A], S, A]): Widget[V, S, A] = {
-        // TODO (KR) :
-        ???
-      }
+      override def flatMap[V, V2](t: Widget[V, S, A], f: V => Widget[V2, S, A]): Widget[V2, S, A] =
+        Widget[V2, S, A](
+          elementF = { (rh, s) =>
+            val tElements = t.elementF(rh, s)
+
+            t.valueF(s) match {
+              case Alive(r) =>
+                // TODO (KR) : Make sure when `t` updates `S`, `f` re-renders
+                NonEmptyList.nel(tElements, f(r).elementF(rh, s)).flatten
+              case Dead(_) =>
+                tElements
+            }
+          },
+          valueF = s => t.valueF(s).flatMap(f(_).valueF(s)),
+        )
 
     }
 

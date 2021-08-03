@@ -48,8 +48,8 @@ object Query {
       override def pure[A](a: => A): Query[A] =
         Query(a.pure[IO])
 
-      override def flatten[A](t: Query[Query[A]]): Query[A] =
-        Query(t.execute.flatMap(_.execute))
+      override def flatMap[A, B](t: Query[A], f: A => Query[B]): Query[B] =
+        Query(t.execute.flatMap(f(_).execute))
 
     }
 

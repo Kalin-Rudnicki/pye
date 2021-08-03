@@ -50,27 +50,32 @@ object Test {
 
     // =====|  |=====
 
-    // val personWidget: Widget[Person, PersonState, SubmitOr[Nothing]]
-    val personWidget: Widget.StdForm[Person, PersonState] =
-      ado[Widget.Projection[PersonState, CommonRaise.Submit.type]#P]
-        .join(
-          inputW[String]().required().labeled("First name:").zoomOut(GenLens[PersonState](_.firstName)),
-          Widget.builder.element(br.render),
-          inputW[String]().required().labeled("Last name:").zoomOut(GenLens[PersonState](_.lastName)),
-          Widget.builder.element(br.render),
-          inputW[Int]().required().labeled("Age:").zoomOut(GenLens[PersonState](_.age)),
-        )
-        .mapValue {
-          case (firstName, _, lastName, _, age) =>
-            Person(firstName, lastName, age)
-        }
+    val personWidget: Widget.Submit[Person, PersonState] =
+      for {
+        person <-
+          ado[Widget.Projection[PersonState, CommonRaise.Submit.type]#P]
+            .join(
+              inputW[String]().required().labeled("First name:").zoomOut(GenLens[PersonState](_.firstName)),
+              Widget.builder.element(br.render),
+              inputW[String]().required().labeled("Last name:").zoomOut(GenLens[PersonState](_.lastName)),
+              Widget.builder.element(br.render),
+              inputW[Int]().required().labeled("Age:").zoomOut(GenLens[PersonState](_.age)),
+            )
+            .mapValue {
+              case (firstName, _, lastName, _, age) =>
+                Person(firstName, lastName, age)
+            }: Widget.Projection[PersonState, CommonRaise.Submit.type]#P[Person]
+        _ <- Widget.builder.element {
+          div(s"[${person.firstName} ${person.lastName} (${person.age})]").render
+        }: Widget.Projection[PersonState, CommonRaise.Submit.type]#P[Unit]
+      } yield person
 
-    val coupleWidget: Widget.StdForm[Couple, CoupleState] =
+    val coupleWidget: Widget.Submit[Couple, CoupleState] =
       ado[Widget.Projection[CoupleState, CommonRaise.Submit.type]#P]
         .join(
-          personWidget.labeled("Man:").zoomOut(GenLens[CoupleState](_.person1)),
+          personWidget.labeled("Person1:").zoomOut(GenLens[CoupleState](_.person1)),
           Widget.builder.element(br.render),
-          personWidget.labeled("Woman:").zoomOut(GenLens[CoupleState](_.person2)),
+          personWidget.labeled("Person2:").zoomOut(GenLens[CoupleState](_.person2)),
         )
         .mapValue {
           case (person1, _, person2) =>
@@ -87,7 +92,7 @@ object Test {
           submitButton(),
         )
         .mapValue(_._2)
-        .handleAction { (coupleState, coupleValue, action) => // would always be `case object Submit`
+        .handleAction { (_, coupleValue, _) =>
           for {
             couple <- WrappedFuture.wrap_?(coupleValue)
             _ <- sendCreateCoupleApiRequest(couple)

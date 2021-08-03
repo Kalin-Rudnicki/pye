@@ -62,21 +62,15 @@ object WrappedFuture {
       override def pure[A](a: => A): WrappedFuture[A] =
         WrappedFuture.wrapValue(a)
 
-      override def flatten[A](t: WrappedFuture[WrappedFuture[A]]): WrappedFuture[A] = {
-        val p: Promise[?[A]] = Promise()
-        t.future.onComplete { t1 =>
-          t1.to_?.flatten match {
+      override def flatMap[A, B](t: WrappedFuture[A], f: A => WrappedFuture[B]): WrappedFuture[B] =
+        new WrappedFuture[B](
+          t.future.flatMap {
             case Alive(r) =>
-              r.future.onComplete { t2 =>
-                p.success(t2.to_?.flatten)
-              }
+              f(r).future
             case dead @ Dead(_) =>
-              p.success(dead)
-          }
-        }
-
-        new WrappedFuture[A](p.future)
-      }
+              Future(dead)
+          },
+        )
 
     }
 

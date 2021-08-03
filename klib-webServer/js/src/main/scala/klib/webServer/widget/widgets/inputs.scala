@@ -6,10 +6,8 @@ import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
-import klib.webServer
 import klib.webServer._
 import klib.webServer.widget._
-import klib.webServer.widget.widgets
 
 trait inputs {
 
@@ -22,7 +20,7 @@ trait inputs {
   def inputW[V: DecodeString](
       updateOn: UpdateOn = UpdateOn.Blur,
       // TODO (KR) : Decorators
-  ): Widget.StdForm[Maybe[V], String] =
+  ): Widget.Submit[Maybe[V], String] =
     Widget.builder
       .withState[String]
       .submitAction
@@ -31,7 +29,7 @@ trait inputs {
         val _input = input.render
 
         def updateState(): Unit =
-          rh.raise(Raise.UpdateState(_ => _input.value, force = false))
+          rh.raise(Raise.UpdateState[String](_ => _input.value, force = false))
 
         _input.value = s
         _input.onkeypress = { e =>

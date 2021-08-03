@@ -30,8 +30,8 @@ final case class RaiseHandler[S, A](
         raises.map[Raise[S, A]] {
           case standard: Raise.Standard[S2, A] =>
             standard match {
-              case Raise.UpdateState(updateState: (S2 => S2), force) =>
-                Raise.UpdateState[S](lens.modify(updateState), force)
+              case updateState: Raise.UpdateState[S2] =>
+                Raise.UpdateState[S](lens.modify(updateState.updateState), updateState.force)
               case displayMessage: Raise.DisplayMessage =>
                 displayMessage
               case history: Raise.History =>

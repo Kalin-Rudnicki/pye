@@ -10,7 +10,7 @@ trait forms {
   def submitButton[S](
       label: String = "Submit",
       // TODO (KR) : Decorators
-  ): Widget.StdForm[Unit, S] =
+  ): Widget.Submit[Unit, S] =
     Widget.builder.withState.submitAction.elementA { (rh: RaiseHandler[S, CommonRaise.Submit.type]) =>
       button(
         onclick := { (_: Event) =>
