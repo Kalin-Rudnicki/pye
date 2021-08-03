@@ -10,12 +10,16 @@ import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
+import klib.utils.Var
 import klib.webServer._
 
 final case class Widget[V, S, A](
     private[webServer] val elementF: (RaiseHandler[S, A], S) => Widget.ElementT,
     private[webServer] val valueF: S => ?[V],
 ) {
+  type Value = V
+  type State = S
+  type Action = A
 
   def render(handleAction: A => WrappedFuture[List[Raise.Standard[S]]])(initialState: S)(implicit
       ec: ExecutionContext,
@@ -23,74 +27,76 @@ final case class Widget[V, S, A](
     var currentState: S = initialState
 
     val raiseHandler: RaiseHandler[S, A] =
-      RaiseHandler[S, A] { raises =>
-        val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
-          raises
-            .map {
-              case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
-              case Raise.Action(action)        => handleAction(action)
-            }
-            .traverse
-            .map(_.flatten)
-
-        @tailrec
-        def loop(
-            queue: List[Raise.Standard[S]],
-        ): Unit =
-          queue match {
-            case head :: tail =>
-              head match {
-                case Raise.UpdateState(updateState, reRender) =>
-                  currentState = updateState(currentState)
-                  if (reRender) {
-                    // TODO (KR) :
-                    ???
-                  }
-                case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
-                  def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
-                  def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
-
-                  causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
-                    case Some(messagesElement) =>
-                      val messageElement =
-                        div(
-                          message,
-                          modifiers,
-                        ).render
-
-                      timeout.foreach {
-                        window.setTimeout(
-                          () => {
-                            messagesElement.removeChild(messageElement)
-                          },
-                          _,
-                        )
-                      }
-                    case None =>
-                      // TODO (KR) :
-                      window.alert(message)
-                  }
-                case history: Raise.History =>
-                  // TODO (KR) : Possibly keep track of if the page changed?
-                  history match {
-                    case Raise.History.Push(page)    => page.push()
-                    case Raise.History.Replace(page) => page.replace()
-                    case Raise.History.Go(delta)     => window.history.go(delta)
-                  }
+      RaiseHandler[S, A](
+        handleRaises = { raises =>
+          val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
+            raises
+              .map {
+                case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
+                case Raise.Action(action)        => handleAction(action)
               }
-              loop(tail)
-            case Nil =>
-          }
+              .traverse
+              .map(_.flatten)
 
-        standardRaises.future.onComplete {
-          _.to_?.flatten match {
-            case Alive(r) =>
-              loop(r)
-            case Dead(errors) =>
-              loop(errors.map(error => Raise.DisplayMessage.global.error(error.toString)))
+          @tailrec
+          def loop(
+              queue: List[Raise.Standard[S]],
+          ): Unit =
+            queue match {
+              case head :: tail =>
+                head match {
+                  case Raise.UpdateState(updateState, reRender) =>
+                    currentState = updateState(currentState)
+                    if (reRender) {
+                      // TODO (KR) :
+                      ???
+                    }
+                  case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
+                    def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
+                    def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
+
+                    causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
+                      case Some(messagesElement) =>
+                        val messageElement =
+                          div(
+                            message,
+                            modifiers,
+                          ).render
+
+                        timeout.foreach {
+                          window.setTimeout(
+                            () => {
+                              messagesElement.removeChild(messageElement)
+                            },
+                            _,
+                          )
+                        }
+                      case None =>
+                        // TODO (KR) :
+                        window.alert(message)
+                    }
+                  case history: Raise.History =>
+                    // TODO (KR) : Possibly keep track of if the page changed?
+                    history match {
+                      case Raise.History.Push(page)    => page.push()
+                      case Raise.History.Replace(page) => page.replace()
+                      case Raise.History.Go(delta)     => window.history.go(delta)
+                    }
+                }
+                loop(tail)
+              case Nil =>
+            }
+
+          standardRaises.future.onComplete {
+            _.to_?.flatten match {
+              case Alive(r) =>
+                loop(r)
+              case Dead(errors) =>
+                loop(errors.map(error => Raise.DisplayMessage.global.error(error.toString)))
+            }
           }
-        }
-      }
+        },
+      )
 
     elementF(raiseHandler, currentState)
   }
@@ -109,7 +115,7 @@ final case class Widget[V, S, A](
 
   // =====|  |=====
 
-  def zoomOut[S2](lens: Lens[S2, S]): Widget[V, S2, A] =
+  def zoomOut[S2](lens: Lens[S2, S]): Widget[V, S2, A] = {
     Widget[V, S2, A](
       elementF = { (rh: RaiseHandler[S2, A], s: S2) =>
         elementF(
@@ -121,6 +127,7 @@ final case class Widget[V, S, A](
         valueF(lens.get(s))
       },
     )
+  }
 
   def wrapElement(combineIn: ConcreteHtmlTag[_ <: Widget.ElemT])(wrapF: Widget.ElemT => Widget.ElemT): Widget[V, S, A] =
     Widget[V, S, A](
@@ -156,7 +163,7 @@ final case class Widget[V, S, A](
 
   def mapValue[V2](f: V => V2): Widget[V2, S, A] =
     Widget[V2, S, A](
-      elementF = elementF,
+      elementF = (rh, s) => elementF(???, s),
       valueF = valueF(_).map(f),
     )
 
