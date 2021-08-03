@@ -105,7 +105,7 @@ object Test {
 
     val coupleDiv: Element =
       div(
-        coupleForm.render { _ => }(CoupleState.empty).toList,
+        coupleForm.renderNoAction(CoupleState.empty).toList,
       ).render
 
   }

@@ -1,7 +1,10 @@
 package klib.webServer.widget.widgets
 
+import scala.concurrent.ExecutionContext
+
 import klib.Implicits._
 import klib.fp.types._
+import klib.webServer._
 import klib.webServer.widget._
 
 trait Implicits {
@@ -19,6 +22,13 @@ trait Implicits {
             ?.dead(Message("Missing required value"))
         },
       )
+
+  }
+
+  implicit class NoActionWidgetOps[V, S](widget: Widget.NoAction[V, S]) {
+
+    def renderNoAction(initialState: S)(implicit ec: ExecutionContext): Widget.ElementT =
+      widget.render { _ => Nil.pure[WrappedFuture] }(initialState)
 
   }
 

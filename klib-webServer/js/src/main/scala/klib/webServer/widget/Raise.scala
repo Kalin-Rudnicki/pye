@@ -8,17 +8,17 @@ import klib.webServer._
 
 sealed trait Raise[+S, +A]
 object Raise {
-  sealed trait Standard[+S, +A] extends Raise[S, A]
+  sealed trait Standard[+S] extends Raise[S, Nothing]
   final case class UpdateState[S](
       updateState: S => S,
       reRender: Boolean = true,
-  ) extends Standard[S, Nothing]
+  ) extends Standard[S]
   final case class DisplayMessage(
       message: String,
       modifiers: Seq[Modifier],
       timeout: Maybe[Int],
       causeId: Maybe[String],
-  ) extends Standard[Nothing, Nothing]
+  ) extends Standard[Nothing]
   object DisplayMessage {
     final class Builder private[DisplayMessage] (causeId: Maybe[String]) {
 
@@ -75,7 +75,7 @@ object Raise {
     val global: Builder = new Builder(None)
     def forId(id: String): Builder = new Builder(id.some)
   }
-  sealed trait History extends Standard[Nothing, Nothing]
+  sealed trait History extends Standard[Nothing]
   object History {
     final case class Push(page: Page[_]) extends History
     final case class Replace(page: Page[_]) extends History

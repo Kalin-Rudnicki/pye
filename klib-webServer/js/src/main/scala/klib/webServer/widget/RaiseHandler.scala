@@ -28,7 +28,7 @@ final case class RaiseHandler[S, A](
     RaiseHandler[S2, A] { raises =>
       handleRaises {
         raises.map[Raise[S, A]] {
-          case standard: Raise.Standard[S2, A] =>
+          case standard: Raise.Standard[S2] =>
             standard match {
               case updateState: Raise.UpdateState[S2] =>
                 Raise.UpdateState[S](lens.modify(updateState.updateState), updateState.reRender)

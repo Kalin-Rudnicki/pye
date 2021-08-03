@@ -1,6 +1,7 @@
 package klib.webServer.widget
 
 import scala.annotation.tailrec
+import scala.concurrent.ExecutionContext
 
 import monocle.Lens
 import org.scalajs.dom._
@@ -16,65 +17,79 @@ final case class Widget[V, S, A](
     private[webServer] val valueF: S => ?[V],
 ) {
 
-  def render(handleAction: A => Unit)(initialState: S): Widget.ElementT = {
+  def render(handleAction: A => WrappedFuture[List[Raise.Standard[S]]])(initialState: S)(implicit
+      ec: ExecutionContext,
+  ): Widget.ElementT = {
     var currentState: S = initialState
 
     val raiseHandler: RaiseHandler[S, A] =
       RaiseHandler[S, A] { raises =>
+        val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
+          raises
+            .map {
+              case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
+              case Raise.Action(action)        => handleAction(action)
+            }
+            .traverse
+            .map(_.flatten)
+
         @tailrec
         def loop(
-            queue: List[Raise[S, A]],
+            queue: List[Raise.Standard[S]],
         ): Unit =
           queue match {
             case head :: tail =>
               head match {
-                case standard: Raise.Standard[S, A] =>
-                  standard match {
-                    case Raise.UpdateState(updateState, reRender) =>
-                      currentState = updateState(currentState)
-                      if (reRender) {
-                        // TODO (KR) :
-                        ???
-                      }
-                    case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
-                      def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
-                      def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
-
-                      causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
-                        case Some(messagesElement) =>
-                          val messageElement =
-                            div(
-                              message,
-                              modifiers,
-                            ).render
-
-                          timeout.foreach {
-                            window.setTimeout(
-                              () => {
-                                messagesElement.removeChild(messageElement)
-                              },
-                              _,
-                            )
-                          }
-                        case None =>
-                          // TODO (KR) :
-                          window.alert(message)
-                      }
-                    case history: Raise.History =>
-                      history match {
-                        case Raise.History.Push(page)    => page.push()
-                        case Raise.History.Replace(page) => page.replace()
-                        case Raise.History.Go(delta)     => window.history.go(delta)
-                      }
+                case Raise.UpdateState(updateState, reRender) =>
+                  currentState = updateState(currentState)
+                  if (reRender) {
+                    // TODO (KR) :
+                    ???
                   }
-                case Raise.Action(action) =>
-                  handleAction(action)
-                  loop(tail)
+                case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
+                  def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
+                  def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
+
+                  causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
+                    case Some(messagesElement) =>
+                      val messageElement =
+                        div(
+                          message,
+                          modifiers,
+                        ).render
+
+                      timeout.foreach {
+                        window.setTimeout(
+                          () => {
+                            messagesElement.removeChild(messageElement)
+                          },
+                          _,
+                        )
+                      }
+                    case None =>
+                      // TODO (KR) :
+                      window.alert(message)
+                  }
+                case history: Raise.History =>
+                  // TODO (KR) : Possibly keep track of if the page changed?
+                  history match {
+                    case Raise.History.Push(page)    => page.push()
+                    case Raise.History.Replace(page) => page.replace()
+                    case Raise.History.Go(delta)     => window.history.go(delta)
+                  }
               }
+              loop(tail)
             case Nil =>
           }
 
-        loop(raises)
+        standardRaises.future.onComplete {
+          _.to_?.flatten match {
+            case Alive(r) =>
+              loop(r)
+            case Dead(errors) =>
+              loop(errors.map(error => Raise.DisplayMessage.global.error(error.toString)))
+          }
+        }
       }
 
     elementF(raiseHandler, currentState)
@@ -249,10 +264,19 @@ object Widget {
 
       override def apply[V, V2](t: Widget[V, S, A], f: Widget[V => V2, S, A]): Widget[V2, S, A] =
         Widget[V2, S, A](
-          elementF = (rh, s) => NonEmptyList.nel(t.elementF(rh, s), f.elementF(rh, s)).flatten,
+          elementF = { (rh, s) =>
+            NonEmptyList
+              .nel(
+                t.elementF(rh, s),
+                f.elementF(rh, s),
+              )
+              .flatten
+          },
           valueF = s => t.valueF(s).apply(f.valueF.apply(s)),
         )
 
+      // NOTE : This should really never be used,
+      //      : but it is required for applicative
       override def pure[V](a: => V): Widget[V, S, A] =
         Widget.builder.withState[S].withAction[A].element(span.render).withValue(_ => a.pure[?])
 
@@ -264,7 +288,12 @@ object Widget {
             t.valueF(s) match {
               case Alive(r) =>
                 // TODO (KR) : Make sure when `t` updates `S`, `f` re-renders
-                NonEmptyList.nel(tElements, f(r).elementF(rh, s)).flatten
+                NonEmptyList
+                  .nel(
+                    tElements,
+                    f(r).elementF(rh, s),
+                  )
+                  .flatten
               case Dead(_) =>
                 tElements
             }
