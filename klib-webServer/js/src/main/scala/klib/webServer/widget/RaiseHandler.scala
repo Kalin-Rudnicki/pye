@@ -31,7 +31,7 @@ final case class RaiseHandler[S, A](
           case standard: Raise.Standard[S2, A] =>
             standard match {
               case updateState: Raise.UpdateState[S2] =>
-                Raise.UpdateState[S](lens.modify(updateState.updateState), updateState.force)
+                Raise.UpdateState[S](lens.modify(updateState.updateState), updateState.reRender)
               case displayMessage: Raise.DisplayMessage =>
                 displayMessage
               case history: Raise.History =>

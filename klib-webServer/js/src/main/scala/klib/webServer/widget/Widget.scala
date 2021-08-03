@@ -1,5 +1,7 @@
 package klib.webServer.widget
 
+import scala.annotation.tailrec
+
 import monocle.Lens
 import org.scalajs.dom._
 import scalatags.JsDom.all._
@@ -15,9 +17,67 @@ final case class Widget[V, S, A](
 ) {
 
   def render(handleAction: A => Unit)(initialState: S): Widget.ElementT = {
+    var currentState: S = initialState
 
-    // TODO (KR) :
-    ???
+    val raiseHandler: RaiseHandler[S, A] =
+      RaiseHandler[S, A] { raises =>
+        @tailrec
+        def loop(
+            queue: List[Raise[S, A]],
+        ): Unit =
+          queue match {
+            case head :: tail =>
+              head match {
+                case standard: Raise.Standard[S, A] =>
+                  standard match {
+                    case Raise.UpdateState(updateState, reRender) =>
+                      currentState = updateState(currentState)
+                      if (reRender) {
+                        // TODO (KR) :
+                        ???
+                      }
+                    case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
+                      def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
+                      def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
+
+                      causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
+                        case Some(messagesElement) =>
+                          val messageElement =
+                            div(
+                              message,
+                              modifiers,
+                            ).render
+
+                          timeout.foreach {
+                            window.setTimeout(
+                              () => {
+                                messagesElement.removeChild(messageElement)
+                              },
+                              _,
+                            )
+                          }
+                        case None =>
+                          // TODO (KR) :
+                          window.alert(message)
+                      }
+                    case history: Raise.History =>
+                      history match {
+                        case Raise.History.Push(page)    => page.push()
+                        case Raise.History.Replace(page) => page.replace()
+                        case Raise.History.Go(delta)     => window.history.go(delta)
+                      }
+                  }
+                case Raise.Action(action) =>
+                  handleAction(action)
+                  loop(tail)
+              }
+            case Nil =>
+          }
+
+        loop(raises)
+      }
+
+    elementF(raiseHandler, currentState)
   }
 
   // =====|  |=====
@@ -25,7 +85,7 @@ final case class Widget[V, S, A](
   def handleAction[A2](f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]]): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
-        // TODO (KR) :
+        // TODO (KR) : Test
         val rh2: RaiseHandler[S, A2] = ???
         ???
       },

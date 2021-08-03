@@ -11,7 +11,7 @@ object Raise {
   sealed trait Standard[+S, +A] extends Raise[S, A]
   final case class UpdateState[S](
       updateState: S => S,
-      force: Boolean = true,
+      reRender: Boolean = true,
   ) extends Standard[S, Nothing]
   final case class DisplayMessage(
       message: String,

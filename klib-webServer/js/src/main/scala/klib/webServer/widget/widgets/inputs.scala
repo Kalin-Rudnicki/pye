@@ -29,7 +29,7 @@ trait inputs {
         val _input = input.render
 
         def updateState(): Unit =
-          rh.raise(Raise.UpdateState[String](_ => _input.value, force = false))
+          rh.raise(Raise.UpdateState[String](_ => _input.value, reRender = false))
 
         _input.value = s
         _input.onkeypress = { e =>
