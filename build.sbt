@@ -4,6 +4,7 @@ val MyOrg = "io.github.kalin-rudnicki"
 
 val MyScalaVersion = "2.13.4"
 val CirceVersion = "0.14.0-M4"
+val MonocleVersion = "3.0.0-M6"
 
 val SharedSettings =
   Seq(
@@ -29,6 +30,8 @@ lazy val `klib-webServer` =
         "io.circe" %%% "circe-core" % CirceVersion,
         "io.circe" %%% "circe-generic" % CirceVersion,
         "io.circe" %%% "circe-parser" % CirceVersion,
+        "com.github.julien-truffaut" %%% "monocle-core" % MonocleVersion,
+        "com.github.julien-truffaut" %%% "monocle-macro" % MonocleVersion,
       ),
       scalaVersion := MyScalaVersion,
       SharedSettings,
