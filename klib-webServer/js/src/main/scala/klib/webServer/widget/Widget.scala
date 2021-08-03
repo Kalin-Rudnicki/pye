@@ -5,7 +5,9 @@ import org.scalajs.dom._
 import scalatags.JsDom.all._
 
 import klib.Implicits._
+import klib.fp.typeclass._
 import klib.fp.types._
+import klib.webServer._
 
 final case class Widget[V, S, A](
     private[webServer] val elementF: (RaiseHandler[S, A], S) => Widget.ElementT,
@@ -18,6 +20,16 @@ final case class Widget[V, S, A](
     ???
   }
 
+  // =====|  |=====
+
+  def handleAction[A2](f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]]): Widget[V, S, A2] = {
+
+    // TODO (KR) :
+    ???
+  }
+
+  // =====|  |=====
+
   def zoomOut[S2](lens: Lens[S2, S]): Widget[V, S2, A] =
     Widget[V, S2, A](
       elementF = { (rh: RaiseHandler[S2, A], s: S2) =>
@@ -29,6 +41,56 @@ final case class Widget[V, S, A](
       valueF = { (s: S2) =>
         valueF(lens.get(s))
       },
+    )
+
+  def wrapElement(combineIn: ConcreteHtmlTag[_ <: Widget.ElemT])(wrapF: Widget.ElemT => Widget.ElemT): Widget[V, S, A] =
+    Widget[V, S, A](
+      elementF = { (a, s) =>
+        val elems = elementF(a, s)
+        val elem = if (elems.size == 1) elems.head else combineIn(elems.toList).render
+
+        NonEmptyList(wrapF(elem), Nil)
+      },
+      valueF = valueF,
+    )
+
+  def wrapElements(wrapF: Widget.ElementT => Widget.ElemT): Widget[V, S, A] =
+    Widget[V, S, A](
+      elementF = (a, s) => NonEmptyList(wrapF(elementF(a, s)), Nil),
+      valueF = valueF,
+    )
+
+  def labeled(_label: String, combineIn: ConcreteHtmlTag[_ <: Widget.ElemT] = span): Widget[V, S, A] =
+    wrapElements { elems =>
+      combineIn(
+        NonEmptyList
+          .nel[Widget.ElementT](
+            NonEmptyList.nel(label(_label).render),
+            elems,
+          )
+          .flatten
+          .toList,
+      ).render
+    }
+
+  // =====|  |=====
+
+  def mapValue[V2](f: V => V2): Widget[V2, S, A] =
+    Widget[V2, S, A](
+      elementF = elementF,
+      valueF = valueF(_).map(f),
+    )
+
+  def applyValue[V2](f: ?[V => V2]): Widget[V2, S, A] =
+    Widget[V2, S, A](
+      elementF = elementF,
+      valueF = valueF(_).apply(f),
+    )
+
+  def flatMapValue[V2](f: V => ?[V2]): Widget[V2, S, A] =
+    Widget[V2, S, A](
+      elementF = elementF,
+      valueF = valueF(_).flatMap(f),
     )
 
 }
@@ -112,5 +174,32 @@ object Widget {
     def noValue: Widget[Unit, S, A] = withValue[Unit](_ => ().pure[?])
 
   }
+
+  // =====|  |=====
+
+  implicit def widgetMonad[S, A]: Monad[Projection[S, A]#P] =
+    new Monad[Projection[S, A]#P] {
+
+      override def map[V, V2](t: Widget[V, S, A], f: V => V2): Widget[V2, S, A] = {
+        // TODO (KR) :
+        ???
+      }
+
+      override def apply[V, V2](t: Widget[V, S, A], f: Widget[V => V2, S, A]): Widget[V2, S, A] = {
+        // TODO (KR) :
+        ???
+      }
+
+      override def pure[V](a: => V): Widget[V, S, A] = {
+        // TODO (KR) :
+        ???
+      }
+
+      override def flatten[V](t: Widget[Widget[V, S, A], S, A]): Widget[V, S, A] = {
+        // TODO (KR) :
+        ???
+      }
+
+    }
 
 }
