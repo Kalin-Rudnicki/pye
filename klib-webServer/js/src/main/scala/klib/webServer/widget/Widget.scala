@@ -14,7 +14,7 @@ final case class Widget[V, S, A](
     private[webServer] val valueF: S => ?[V],
 ) {
 
-  def render(handleAction: A => Unit): Widget.NodeT = {
+  def render(handleAction: A => Unit)(initialState: S): Widget.ElementT = {
 
     // TODO (KR) :
     ???
@@ -101,7 +101,6 @@ object Widget {
 
   type ElemT = Element
   type ElementT = NonEmptyList[ElemT]
-  type NodeT = Node
 
   type StdForm[V, S] = Widget[V, S, CommonRaise.Submit.type]
   type NoAction[V, S] = Widget[V, S, Nothing]

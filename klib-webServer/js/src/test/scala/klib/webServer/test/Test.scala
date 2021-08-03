@@ -98,5 +98,10 @@ object Test {
         }
     }
 
+    val coupleDiv: Element =
+      div(
+        coupleForm.render { _ => }(CoupleState.empty).toList,
+      ).render
+
   }
 }
