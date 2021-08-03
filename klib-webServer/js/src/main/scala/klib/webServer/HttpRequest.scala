@@ -111,7 +111,7 @@ object HttpRequest {
       headers: List[(String, String)],
   ) {
 
-    private def build[Response](f: (Int, String) => ?[Response]): HttpResponse[Response] = {
+    private def build[Response](f: (Int, String) => ?[Response]): WrappedFuture[Response] = {
       val promise: Promise[?[Response]] = Promise()
 
       def encodeParam(p: (String, String)): String =
@@ -135,15 +135,28 @@ object HttpRequest {
           xhr.send()
       }
 
-      HttpResponse(promise.future)
+      WrappedFuture(promise.future)
     }
 
-    def raw: HttpResponse[(Int, String)] =
+    def raw: WrappedFuture[(Int, String)] =
       build[(Int, String)] { (status, responseText) =>
         (status, responseText).pure[?]
       }
 
-    def decodeResponse[Response](implicit decoder: DecodeString[Response]): HttpResponse[Response] =
+    def raw200: WrappedFuture[String] =
+      build[String] { (status, responseText) =>
+        if (status == 200)
+          responseText.pure[?]
+        else
+          decode[ErrorResponse](responseText).to_\/ match {
+            case Right(b) =>
+              b.to_?
+            case Left(_) =>
+              ?.dead(Message(s"Non-200 response with invalid error:\n$responseText"))
+          }
+      }
+
+    def decodeResponse[Response](implicit decoder: DecodeString[Response]): WrappedFuture[Response] =
       build[Response] { (_, responseText) =>
         decoder.decode(responseText) match {
           case alive: Alive[Response] =>
@@ -158,7 +171,7 @@ object HttpRequest {
         }
       }
 
-    def jsonResponse[Response](implicit decoder: Decoder[Response]): HttpResponse[Response] =
+    def jsonResponse[Response](implicit decoder: Decoder[Response]): WrappedFuture[Response] =
       build[Response] { (_, responseText) =>
         for {
           json <- parse(responseText).toErrorAccumulator: ?[Json]

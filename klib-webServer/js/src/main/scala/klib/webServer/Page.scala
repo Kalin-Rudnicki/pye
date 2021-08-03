@@ -13,7 +13,7 @@ import klib.fp.types._
 
 final class Page[Env] private[Page] (
     path: String,
-    envF: () => HttpResponse[Env],
+    envF: () => WrappedFuture[Env],
     titleF: Env => String,
     bodyF: Env => Body,
     errorHandler: ErrorHandler,
@@ -193,10 +193,10 @@ object Page {
     def noEnv: Builder2[Unit] =
       new Builder2[Unit](
         path = path,
-        envF = () => ().pure[HttpResponse],
+        envF = () => ().pure[WrappedFuture],
       )
 
-    def env[Env](envF: => HttpResponse[Env]): Builder2[Env] =
+    def env[Env](envF: => WrappedFuture[Env]): Builder2[Env] =
       new Builder2[Env](
         path = path,
         envF = () => envF,
@@ -206,7 +206,7 @@ object Page {
 
   final class Builder2[Env] private[Page] (
       path: String,
-      envF: () => HttpResponse[Env],
+      envF: () => WrappedFuture[Env],
   ) {
 
     def constName(title: String): Builder3[Env] =
@@ -227,7 +227,7 @@ object Page {
 
   final class Builder3[Env] private[Page] (
       path: String,
-      envF: () => HttpResponse[Env],
+      envF: () => WrappedFuture[Env],
       titleF: Env => String,
   ) {
 
@@ -354,7 +354,7 @@ object Page {
 
   final class Builder4[Env] private[Page] (
       path: String,
-      envF: () => HttpResponse[Env],
+      envF: () => WrappedFuture[Env],
       titleF: Env => String,
       errorHandler: ErrorHandler,
   ) {

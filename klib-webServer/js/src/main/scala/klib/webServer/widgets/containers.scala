@@ -19,12 +19,12 @@ trait containers {
 
   def form[V, S, R](
       wb: Widget.Builder[V, S],
-      endpoint: V => HttpResponse[R],
+      endpoint: V => WrappedFuture[R],
       submitButtonLabel: String = "Submit",
       decorators: FormDecorators = FormDecorators(),
   )(
       onSuccess: R => Unit,
-  )(implicit ec: ExecutionContext, errorHandler: Throwable => Unit): Widget.Builder[V, S] =
+  )(implicit ec: ExecutionContext, errorHandler: ErrorHandler): Widget.Builder[V, S] =
     Widget.Builder[V, S] { s =>
       val w = wb(s)
       Widget(w.value) {
