@@ -1,5 +1,7 @@
 package klib.webServer.widget
 
+import java.util.UUID
+
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 
@@ -42,12 +44,9 @@ final case class Widget[V, S, A](
             queue match {
               case head :: tail =>
                 head match {
-                  case Raise.UpdateState(updateState, reRender) =>
+                  case Raise.UpdateState(_, _) =>
                     // TODO (KR) :
-                    console.log(s"updateState ($reRender):")
-                    console.log(_state.toString)
-                    _state = updateState(_state)
-                    console.log(_state.toString)
+                    console.log("ROOT")
                   case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
                     def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
                     def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
@@ -93,10 +92,9 @@ final case class Widget[V, S, A](
             }
           }
         }
-      }
+      }.captureUpdateState()
 
-    raiseHandler.setWidget(this)
-    raiseHandler.render()
+    elementF(raiseHandler, raiseHandler._state)
   }
 
   // =====|  |=====
@@ -290,8 +288,8 @@ object Widget {
           elementF = { (rh, s) =>
             NonEmptyList
               .nel(
-                t.elementF(rh, s),
-                f.elementF(rh, s),
+                t.elementF(rh.captureUpdateState(), s),
+                f.elementF(rh.captureUpdateState(), s),
               )
               .flatten
           },
@@ -306,20 +304,32 @@ object Widget {
       override def flatMap[V, V2](t: Widget[V, S, A], f: V => Widget[V2, S, A]): Widget[V2, S, A] =
         Widget[V2, S, A](
           elementF = { (rh, s) =>
-            val tElements = t.elementF(rh, s)
+            var fElements: Widget.ElementT = null
 
-            t.valueF(s) match {
-              case Alive(r) =>
-                // TODO (KR) : Make sure when `t` updates `S`, `f` re-renders
-                NonEmptyList
-                  .nel(
-                    tElements,
-                    f(r).elementF(rh, s),
-                  )
-                  .flatten
-              case Dead(_) =>
-                tElements
+            def calcFElements(s: S): Widget.ElementT =
+              t.valueF(s) match {
+                case Alive(r) =>
+                  // TODO (KR) : Make sure when `t` updates `S`, `f` re-renders
+                  f(r).elementF(rh2, s)
+                case Dead(_) =>
+                  NonEmptyList.nel(span(id := UUID.randomUUID.toString).render)
+              }
+
+            lazy val rh2 = rh.captureUpdateState()
+            lazy val rh1 = rh.captureUpdateState { s =>
+              // TODO (KR) :
+              console.log(s"reRender flatMap dependency: $s")
             }
+
+            lazy val tElements = t.elementF(rh1, s)
+            fElements = calcFElements(rh._state)
+
+            NonEmptyList
+              .nel(
+                tElements,
+                fElements,
+              )
+              .flatten
           },
           valueF = s => t.valueF(s).flatMap(f(_).valueF(s)),
         )

@@ -10,11 +10,9 @@ trait RaiseHandler[S, A] {
   type RaiseT = Raise[S, A]
 
   private[webServer] val initialState: S
-  protected var _state: S = initialState
+  private[webServer] var _state: S = initialState
 
   private[webServer] val handleRaise: RaiseT => Unit
-
-  private var widget: Maybe[Widget[_, S, A]] = None
 
   // =====|  |=====
 
@@ -55,7 +53,7 @@ trait RaiseHandler[S, A] {
       },
     )
 
-  private[webServer] def handleUpdateAndPass: RaiseHandler[S, A] = {
+  private[webServer] def captureUpdateState(withNewState: S => Unit = { _ => }): RaiseHandler[S, A] = {
     val outer = this
 
     new RaiseHandler[S, A] {
@@ -66,31 +64,13 @@ trait RaiseHandler[S, A] {
           console.log(_state.toString)
           _state = updateState.updateState(_state)
           console.log(_state.toString)
+          outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
+          withNewState(_state)
         case raise =>
           outer.handleRaise(raise)
       }
     }
   }
-
-  private[webServer] def setWidget(widget: Widget[_, S, A]): Unit =
-    this.widget match {
-      case Some(_) =>
-        throw new RuntimeException("Widget is already set...")
-      case None =>
-        this.widget = widget.some
-    }
-
-  private[webServer] def render(): Widget.ElementT =
-    this.widget match {
-      case Some(widget) =>
-        val elements = widget.elementF(this, _state)
-
-        // TODO (KR) :
-
-        elements
-      case None =>
-        throw new RuntimeException("Widget is not set...")
-    }
 
 }
 
