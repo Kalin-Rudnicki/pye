@@ -6,32 +6,31 @@ import org.scalajs.dom._
 import klib.Implicits._
 import klib.fp.types._
 
-final class RaiseHandler[S, A](
+final class RaiseHandler[S, -A](
     private[webServer] val initialState: S,
     private[webServer] val handleRaise: Raise[S, A] => Unit,
 ) {
 
-  type RaiseT = Raise[S, A]
+  type RaiseT[A2] = Raise[S, A2]
 
   private[webServer] var _state: S = initialState
 
   // =====|  |=====
 
-  // TODO (KR) :
-  private def handleRaises(raises: List[RaiseT]): Unit =
+  private def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): Unit =
     raises.foreach(handleRaise)
 
-  def apply(r0: RaiseT, rN: RaiseT*): Unit =
+  def apply[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): Unit =
     handleRaises(r0 :: rN.toList)
 
-  def raise(r0: RaiseT, rN: RaiseT*): Unit =
+  def raise[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): Unit =
     handleRaises(r0 :: rN.toList)
-  def raises(rs: List[RaiseT]): Unit =
+  def raises[A2 <: A](rs: List[RaiseT[A2]]): Unit =
     handleRaises(rs)
 
-  def raiseAction(a0: A, aN: A*): Unit =
+  def raiseAction[A2 <: A](a0: A2, aN: A2*): Unit =
     handleRaises((a0 :: aN.toList).map(Raise.Action(_)))
-  def raiseActions(as: List[A]): Unit =
+  def raiseActions[A2 <: A](as: List[A2]): Unit =
     handleRaises(as.map(Raise.Action(_)))
 
   // =====|  |=====

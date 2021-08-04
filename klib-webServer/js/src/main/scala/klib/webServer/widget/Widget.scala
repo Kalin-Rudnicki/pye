@@ -14,13 +14,13 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import klib.webServer._
 
-final case class Widget[V, S, A](
+final case class Widget[V, S, +A](
     private[webServer] val elementF: (RaiseHandler[S, A], S) => Widget.ElementT,
     private[webServer] val valueF: S => ?[V],
 ) {
   type Value = V
   type State = S
-  type Action = A
+  type Action <: A
 
   def render(handleAction: A => WrappedFuture[List[Raise.Standard[S]]])(initialState: S)(implicit
       ec: ExecutionContext,
@@ -142,8 +142,6 @@ final case class Widget[V, S, A](
       },
     )
   }
-
-  def expandAction[A2 >: A]: Widget[V, S, A2] = this.asInstanceOf[Widget[V, S, A2]]
 
   def wrapElement(combineIn: ConcreteHtmlTag[_ <: Widget.ElemT])(wrapF: Widget.ElemT => Widget.ElemT): Widget[V, S, A] =
     Widget[V, S, A](
