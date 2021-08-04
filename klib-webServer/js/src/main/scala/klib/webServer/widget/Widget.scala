@@ -97,7 +97,7 @@ final case class Widget[V, S, +A](
         },
       ).captureUpdateState(this, elements)()
 
-    elements.value = elementF(raiseHandler, raiseHandler._state)
+    (elements.value = elementF(raiseHandler, raiseHandler._state)).runSyncOrDump(None)
 
     elements.value
   }
@@ -301,8 +301,12 @@ object Widget {
             val rhT = rh.captureUpdateState(t, tE)()
             val rhF = rh.captureUpdateState(f, fE)()
 
-            tE.value = t.elementF(rhT, s)
-            fE.value = f.elementF(rhF, s)
+            {
+              for {
+                _ <- tE.value = t.elementF(rhT, s)
+                _ <- fE.value = f.elementF(rhF, s)
+              } yield ()
+            }.runSyncOrDump(None)
 
             NonEmptyList
               .nel(
@@ -330,28 +334,33 @@ object Widget {
                 case Alive(r) =>
                   val fW = f(r)
                   val rh2 = rh.captureUpdateState(fW, fE)()
-                  f(r).elementF(rh2, s)
+                  fW.elementF(rh2, s)
                 case Dead(_) =>
                   NonEmptyList.nel(span(id := UUID.randomUUID.toString).render)
               }
 
             val rh1 = rh.captureUpdateState(t, tE) { s =>
-              // TODO (KR) :
-              console.log(s"reRender flatMap dependency: $s")
               val newFElems = calcFElements(s)
               RaiseHandler.replaceNodes(fE.value, newFElems)
-              fE.value = newFElems
+              (fE.value = newFElems).runSyncOrDump(None)
             }
 
-            tE.value = t.elementF(rh1, s)
-            fE.value = calcFElements(rh._state)
+            {
+              for {
+                _ <- tE.value = t.elementF(rh1, s)
+                _ <- fE.value = calcFElements(rh._state)
+              } yield ()
+            }.runSyncOrDump(None)
 
-            NonEmptyList
-              .nel(
-                tE.value,
-                fE.value,
-              )
-              .flatten
+            val tmp =
+              NonEmptyList
+                .nel(
+                  tE.value,
+                  fE.value,
+                )
+                .flatten
+
+            tmp
           },
           valueF = s => t.valueF(s).flatMap(f(_).valueF(s)),
         )

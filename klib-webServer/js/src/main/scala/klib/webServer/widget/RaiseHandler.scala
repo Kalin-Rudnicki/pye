@@ -66,6 +66,8 @@ final class RaiseHandler[S, -A](
       initialState = outer.initialState,
       handleRaise = {
         case updateState: Raise.UpdateState[S] =>
+          outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
+          this._state = updateState.updateState(this._state)
           if (updateState.reRender) {
             console.log("")
             console.log(s"reRender:")
@@ -75,9 +77,8 @@ final class RaiseHandler[S, -A](
 
             val newElements = widget.elementF(this, this._state)
             RaiseHandler.replaceNodes(elements.value, newElements)
-            elements.value = newElements
+            (elements.value = newElements).runSyncOrDump(None)
           }
-          outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
           withNewState(_state)
         case raise =>
           outer.handleRaise(raise)
