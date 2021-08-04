@@ -14,7 +14,6 @@ final class RaiseHandler[S, A](
   type RaiseT = Raise[S, A]
 
   private[webServer] var _state: S = initialState
-  console.log(s"initialState: $initialState, _state: ${_state}")
 
   // =====|  |=====
 
@@ -58,32 +57,21 @@ final class RaiseHandler[S, A](
   private[webServer] def captureUpdateState(withNewState: S => Unit = { _ => }): RaiseHandler[S, A] = {
     val outer = this
 
-    console.log("3.2")
-    val rh =
-      new RaiseHandler[S, A](
-        initialState = outer.initialState,
-        handleRaise = {
-          case updateState: Raise.UpdateState[S] =>
-            console.log(s"updateState(${updateState.reRender}):")
-            console.log(_state.toString)
-            _state = updateState.updateState(_state)
-            console.log(_state.toString)
-            outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
-            withNewState(_state)
-          case raise =>
-            outer.handleRaise(raise)
-        },
-      )
-
-    rh.show()
-    rh
-  }
-
-  // REMOVE : ...
-  def show(): Unit = {
-    console.log("-----")
-    console.log(initialState.toString)
-    console.log(_state.toString)
+    new RaiseHandler[S, A](
+      initialState = outer.initialState,
+      handleRaise = {
+        case updateState: Raise.UpdateState[S] =>
+          console.log("")
+          console.log(s"updateState(${updateState.reRender}):")
+          console.log(_state.toString)
+          _state = updateState.updateState(_state)
+          console.log(_state.toString)
+          outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
+          withNewState(_state)
+        case raise =>
+          outer.handleRaise(raise)
+      },
+    )
   }
 
 }
@@ -93,15 +81,23 @@ object RaiseHandler {
   def apply[S, A](
       initialState: S,
       handleRaise: Raise[S, A] => Unit,
-  ): RaiseHandler[S, A] = {
-    console.log("3.1")
-    val rh =
-      new RaiseHandler[S, A](
-        initialState = initialState,
-        handleRaise = handleRaise,
-      )
-    rh.show()
-    rh
+  ): RaiseHandler[S, A] =
+    new RaiseHandler[S, A](
+      initialState = initialState,
+      handleRaise = handleRaise,
+    )
+
+  def replaceNodes(oldElems: Widget.ElementT, newElems: Widget.ElementT): Unit = {
+    val parent = oldElems.head.parentNode
+    val addNode: Node => Unit =
+      Maybe(oldElems.toList.last.nextSibling) match {
+        case Some(nextSibling) =>
+          parent.insertBefore(_, nextSibling)
+        case None =>
+          parent.appendChild
+      }
+    oldElems.foreach(parent.removeChild)
+    newElems.foreach(addNode)
   }
 
 }

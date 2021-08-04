@@ -27,9 +27,6 @@ final case class Widget[V, S, A](
   ): Widget.ElementT = {
     val _initialState = initialState
 
-    console.log(1)
-
-    console.log("3.3")
     val raiseHandler: RaiseHandler[S, A] =
       new RaiseHandler[S, A](
         initialState = _initialState,
@@ -97,10 +94,6 @@ final case class Widget[V, S, A](
         },
       ).captureUpdateState()
 
-    raiseHandler.show()
-
-    console.log(2)
-
     elementF(raiseHandler, raiseHandler._state)
   }
 
@@ -111,7 +104,6 @@ final case class Widget[V, S, A](
   )(implicit ec: ExecutionContext): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
-        console.log("3.4")
         lazy val rh2: RaiseHandler[S, A] =
           new RaiseHandler[S, A](
             initialState = rh.initialState,
@@ -129,7 +121,6 @@ final case class Widget[V, S, A](
                 }
             },
           )
-        rh2.show()
 
         elementF(rh2, s)
       },
@@ -328,6 +319,9 @@ object Widget {
             lazy val rh1 = rh.captureUpdateState { s =>
               // TODO (KR) :
               console.log(s"reRender flatMap dependency: $s")
+              val newFElems = calcFElements(s)
+              RaiseHandler.replaceNodes(fElements, newFElems)
+              fElements = newFElems
             }
 
             lazy val tElements = t.elementF(rh1, s)
