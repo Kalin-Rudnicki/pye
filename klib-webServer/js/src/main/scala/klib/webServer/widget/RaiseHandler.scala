@@ -62,28 +62,31 @@ final class RaiseHandler[S, -A](
   ): RaiseHandler[S, A] = {
     val outer = this
 
-    new RaiseHandler[S, A](
-      initialState = outer.initialState,
-      handleRaise = {
-        case updateState: Raise.UpdateState[S] =>
-          outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
-          this._state = updateState.updateState(this._state)
-          if (updateState.reRender) {
-            console.log("")
-            console.log(s"reRender:")
-            console.log(_state.toString)
-            _state = updateState.updateState(_state)
-            console.log(_state.toString)
+    lazy val newRH: RaiseHandler[S, A] =
+      new RaiseHandler[S, A](
+        initialState = outer.initialState,
+        handleRaise = {
+          case updateState: Raise.UpdateState[S] =>
+            outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
+            newRH._state = updateState.updateState(newRH._state)
+            if (updateState.reRender) {
+              /*
+              console.log("")
+              console.log(s"reRender:")
+              console.log(newRH._state.toString)
+               */
 
-            val newElements = widget.elementF(this, this._state)
-            RaiseHandler.replaceNodes(elements.value, newElements)
-            (elements.value = newElements).runSyncOrDump(None)
-          }
-          withNewState(_state)
-        case raise =>
-          outer.handleRaise(raise)
-      },
-    )
+              val newElements = widget.elementF(newRH, newRH._state)
+              RaiseHandler.replaceNodes(elements.value, newElements)
+              (elements.value = newElements).runSyncOrDump(None)
+            }
+            withNewState(newRH._state)
+          case raise =>
+            outer.handleRaise(raise)
+        },
+      )
+
+    newRH
   }
 
 }
@@ -108,15 +111,10 @@ object RaiseHandler {
         case None =>
           parent.appendChild
       }
-    oldElems.foreach(parent.removeChild)
-    newElems.foreach(addNode)
-  }
+    oldElems.foreach { parent.removeChild }
 
-  def watchForUpdates[S, A](
-      raiseHandler: RaiseHandler[S, A],
-      widget: Widget[_, S, A],
-      elements: Var[Widget.ElementT],
-  ): Unit =
-    ???
+    // console.log("Adding:")
+    newElems.foreach { addNode }
+  }
 
 }
