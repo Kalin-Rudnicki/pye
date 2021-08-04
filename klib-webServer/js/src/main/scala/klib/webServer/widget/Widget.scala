@@ -12,6 +12,7 @@ import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
+import klib.utils.Var
 import klib.webServer._
 
 final case class Widget[V, S, +A](
@@ -26,6 +27,8 @@ final case class Widget[V, S, +A](
       ec: ExecutionContext,
   ): Widget.ElementT = {
     val _initialState = initialState
+
+    val elements = Var.`null`[Widget.ElementT]
 
     val raiseHandler: RaiseHandler[S, A] =
       new RaiseHandler[S, A](
@@ -92,9 +95,11 @@ final case class Widget[V, S, +A](
             }
           }
         },
-      ).captureUpdateState()
+      ).captureUpdateState(this, elements)()
 
-    elementF(raiseHandler, raiseHandler._state)
+    elements.value = elementF(raiseHandler, raiseHandler._state)
+
+    elements.value
   }
 
   // =====|  |=====
@@ -290,10 +295,19 @@ object Widget {
       override def apply[V, V2](t: Widget[V, S, A], f: Widget[V => V2, S, A]): Widget[V2, S, A] =
         Widget[V2, S, A](
           elementF = { (rh, s) =>
+            val tE = Var.`null`[Widget.ElementT]
+            val fE = Var.`null`[Widget.ElementT]
+
+            val rhT = rh.captureUpdateState(t, tE)()
+            val rhF = rh.captureUpdateState(f, fE)()
+
+            tE.value = t.elementF(rhT, s)
+            fE.value = f.elementF(rhF, s)
+
             NonEmptyList
               .nel(
-                t.elementF(rh.captureUpdateState(), s),
-                f.elementF(rh.captureUpdateState(), s),
+                tE.value,
+                fE.value,
               )
               .flatten
           },
@@ -308,33 +322,34 @@ object Widget {
       override def flatMap[V, V2](t: Widget[V, S, A], f: V => Widget[V2, S, A]): Widget[V2, S, A] =
         Widget[V2, S, A](
           elementF = { (rh, s) =>
-            var fElements: Widget.ElementT = null
+            val tE = Var.`null`[Widget.ElementT]
+            val fE = Var.`null`[Widget.ElementT]
 
             def calcFElements(s: S): Widget.ElementT =
               t.valueF(s) match {
                 case Alive(r) =>
-                  // TODO (KR) : Make sure when `t` updates `S`, `f` re-renders
+                  val fW = f(r)
+                  val rh2 = rh.captureUpdateState(fW, fE)()
                   f(r).elementF(rh2, s)
                 case Dead(_) =>
                   NonEmptyList.nel(span(id := UUID.randomUUID.toString).render)
               }
 
-            lazy val rh2 = rh.captureUpdateState()
-            lazy val rh1 = rh.captureUpdateState { s =>
+            val rh1 = rh.captureUpdateState(t, tE) { s =>
               // TODO (KR) :
               console.log(s"reRender flatMap dependency: $s")
               val newFElems = calcFElements(s)
-              RaiseHandler.replaceNodes(fElements, newFElems)
-              fElements = newFElems
+              RaiseHandler.replaceNodes(fE.value, newFElems)
+              fE.value = newFElems
             }
 
-            lazy val tElements = t.elementF(rh1, s)
-            fElements = calcFElements(rh._state)
+            tE.value = t.elementF(rh1, s)
+            fE.value = calcFElements(rh._state)
 
             NonEmptyList
               .nel(
-                tElements,
-                fElements,
+                tE.value,
+                fE.value,
               )
               .flatten
           },

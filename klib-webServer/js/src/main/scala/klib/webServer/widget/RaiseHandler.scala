@@ -5,6 +5,7 @@ import org.scalajs.dom._
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils.Var
 
 final class RaiseHandler[S, -A](
     private[webServer] val initialState: S,
@@ -53,18 +54,29 @@ final class RaiseHandler[S, -A](
       },
     )
 
-  private[webServer] def captureUpdateState(withNewState: S => Unit = { _ => }): RaiseHandler[S, A] = {
+  private[webServer] def captureUpdateState(
+      widget: Widget[_, S, A],
+      elements: Var[Widget.ElementT],
+  )(
+      withNewState: S => Unit = { _ => },
+  ): RaiseHandler[S, A] = {
     val outer = this
 
     new RaiseHandler[S, A](
       initialState = outer.initialState,
       handleRaise = {
         case updateState: Raise.UpdateState[S] =>
-          console.log("")
-          console.log(s"updateState(${updateState.reRender}):")
-          console.log(_state.toString)
-          _state = updateState.updateState(_state)
-          console.log(_state.toString)
+          if (updateState.reRender) {
+            console.log("")
+            console.log(s"reRender:")
+            console.log(_state.toString)
+            _state = updateState.updateState(_state)
+            console.log(_state.toString)
+
+            val newElements = widget.elementF(this, this._state)
+            RaiseHandler.replaceNodes(elements.value, newElements)
+            elements.value = newElements
+          }
           outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
           withNewState(_state)
         case raise =>
@@ -98,5 +110,12 @@ object RaiseHandler {
     oldElems.foreach(parent.removeChild)
     newElems.foreach(addNode)
   }
+
+  def watchForUpdates[S, A](
+      raiseHandler: RaiseHandler[S, A],
+      widget: Widget[_, S, A],
+      elements: Var[Widget.ElementT],
+  ): Unit =
+    ???
 
 }

@@ -123,6 +123,7 @@ object CSS {
       .stripPrefix("$")
       .stripSuffix("$")
       .replaceAll("\\$minus", "-")
+      .replaceAll("\\$colon", ":")
 
   abstract class StyleSheet { styleSheet =>
 
