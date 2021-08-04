@@ -34,6 +34,7 @@ trait inputs {
         var savedTimeout: Maybe[Int] = None
         val _input = inputTag(decorators).render
 
+        // TODO (KR) : Make sure state is updated before re-rendering
         def updateState(): Unit =
           rh.raise(Raise.UpdateState[String](_ => _input.value, reRender = false))
 
@@ -109,7 +110,7 @@ trait inputs {
       allowUnset: Boolean = false,
       decorators: Seq[Modifier] = Seq.empty,
       elementDecorators: Seq[Modifier] = Seq.empty,
-  ): Widget.NoAction[Maybe[T], Maybe[T]] = {
+  ): Widget[Maybe[T], Maybe[T], Nothing] = {
     val actualDecorators = Seq[Modifier](KlwsS.`klws:radio-group`) ++ decorators
 
     Widget.builder

@@ -143,6 +143,8 @@ final case class Widget[V, S, A](
     )
   }
 
+  def expandAction[A2 >: A]: Widget[V, S, A2] = this.asInstanceOf[Widget[V, S, A2]]
+
   def wrapElement(combineIn: ConcreteHtmlTag[_ <: Widget.ElemT])(wrapF: Widget.ElemT => Widget.ElemT): Widget[V, S, A] =
     Widget[V, S, A](
       elementF = { (a, s) =>
@@ -342,5 +344,10 @@ object Widget {
         )
 
     }
+
+  // =====|  |=====
+
+  def required[V, S, A](widget: Widget[Maybe[V], S, A]): Widget[V, S, A] =
+    widget.flatMapValue(_.toEA(Message("Missing required value")))
 
 }
