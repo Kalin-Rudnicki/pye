@@ -160,12 +160,16 @@ final case class Widget[V, S, A](
       valueF = valueF,
     )
 
-  def labeled(_label: String, combineIn: ConcreteHtmlTag[_ <: Widget.ElemT] = span): Widget[V, S, A] =
+  def labeled(
+      _label: String,
+      combineIn: ConcreteHtmlTag[_ <: Widget.ElemT] = span,
+      labelDecorators: Seq[Modifier] = Seq.empty,
+  ): Widget[V, S, A] =
     wrapElements { elems =>
       combineIn(
         NonEmptyList
           .nel[Widget.ElementT](
-            NonEmptyList.nel(label(_label).render),
+            NonEmptyList.nel(label(_label)(labelDecorators).render),
             elems,
           )
           .flatten
