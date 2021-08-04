@@ -10,7 +10,6 @@ import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
-import klib.utils.Var
 import klib.webServer._
 
 final case class Widget[V, S, A](
@@ -24,19 +23,17 @@ final case class Widget[V, S, A](
   def render(handleAction: A => WrappedFuture[List[Raise.Standard[S]]])(initialState: S)(implicit
       ec: ExecutionContext,
   ): Widget.ElementT = {
-    var currentState: S = initialState
+    val _initialState = initialState
 
     val raiseHandler: RaiseHandler[S, A] =
-      RaiseHandler[S, A](
-        handleRaises = { raises =>
+      new RaiseHandler[S, A] {
+        override private[webServer] val initialState: S = _initialState
+        override private[webServer] val handleRaise: RaiseT => Unit = { raise =>
           val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
-            raises
-              .map {
-                case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
-                case Raise.Action(action)        => handleAction(action)
-              }
-              .traverse
-              .map(_.flatten)
+            raise match {
+              case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
+              case Raise.Action(action)        => handleAction(action)
+            }
 
           @tailrec
           def loop(
@@ -46,11 +43,11 @@ final case class Widget[V, S, A](
               case head :: tail =>
                 head match {
                   case Raise.UpdateState(updateState, reRender) =>
-                    currentState = updateState(currentState)
-                    if (reRender) {
-                      // TODO (KR) :
-                      ???
-                    }
+                    // TODO (KR) :
+                    console.log(s"updateState ($reRender):")
+                    console.log(_state.toString)
+                    _state = updateState(_state)
+                    console.log(_state.toString)
                   case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
                     def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
                     def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
@@ -95,20 +92,39 @@ final case class Widget[V, S, A](
                 loop(errors.map(error => Raise.DisplayMessage.global.error(error.toString)))
             }
           }
-        },
-      )
+        }
+      }
 
-    elementF(raiseHandler, currentState)
+    raiseHandler.setWidget(this)
+    raiseHandler.render()
   }
 
   // =====|  |=====
 
-  def handleAction[A2](f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]]): Widget[V, S, A2] =
+  def handleAction[A2](
+      f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]],
+  )(implicit ec: ExecutionContext): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
-        // TODO (KR) : Test
-        val rh2: RaiseHandler[S, A2] = ???
-        ???
+        val rh2: RaiseHandler[S, A] =
+          new RaiseHandler[S, A] {
+            override private[webServer] val initialState: S = rh.initialState
+            override private[webServer] val handleRaise: RaiseT => Unit = {
+              case standard: Raise.Standard[S] =>
+                rh.raise(standard)
+              case action: Raise.Action[A] =>
+                f(_state, valueF(_state), action.action).future.onComplete {
+                  _.to_?.flatten match {
+                    case Alive(r) =>
+                      rh.raises(r)
+                    case Dead(errors) =>
+                      rh.raises(errors.map(e => Raise.DisplayMessage.global.error(e.toString)))
+                  }
+                }
+            }
+          }
+
+        elementF(rh2, s)
       },
       valueF = valueF,
     )
@@ -163,7 +179,7 @@ final case class Widget[V, S, A](
 
   def mapValue[V2](f: V => V2): Widget[V2, S, A] =
     Widget[V2, S, A](
-      elementF = (rh, s) => elementF(???, s),
+      elementF = elementF,
       valueF = valueF(_).map(f),
     )
 
