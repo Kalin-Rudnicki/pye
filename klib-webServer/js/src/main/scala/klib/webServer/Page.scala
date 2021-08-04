@@ -42,17 +42,20 @@ final class Page[Env] private[Page] (
     }
   }
 
-  private[webServer] def push(): Unit =
+  // TODO (KR) : private[webServer]
+  def push(): Unit =
     renderAnd { title =>
       window.history.pushState(null, title, path)
     }
 
-  private[webServer] def replace(): Unit =
+  // TODO (KR) : private[webServer]
+  def replace(): Unit =
     renderAnd { title =>
       window.history.replaceState(null, title, path)
     }
 
-  private[webServer] def replaceNoTrace(): Unit =
+  // TODO (KR) : private[webServer]
+  def replaceNoTrace(): Unit =
     renderAnd { _ => }
 
 }

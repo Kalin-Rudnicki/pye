@@ -6,13 +6,15 @@ import org.scalajs.dom._
 import klib.Implicits._
 import klib.fp.types._
 
-trait RaiseHandler[S, A] {
+final class RaiseHandler[S, A](
+    private[webServer] val initialState: S,
+    private[webServer] val handleRaise: Raise[S, A] => Unit,
+) {
+
   type RaiseT = Raise[S, A]
 
-  private[webServer] val initialState: S
   private[webServer] var _state: S = initialState
-
-  private[webServer] val handleRaise: RaiseT => Unit
+  console.log(s"initialState: $initialState, _state: ${_state}")
 
   // =====|  |=====
 
@@ -56,20 +58,32 @@ trait RaiseHandler[S, A] {
   private[webServer] def captureUpdateState(withNewState: S => Unit = { _ => }): RaiseHandler[S, A] = {
     val outer = this
 
-    new RaiseHandler[S, A] {
-      override private[webServer] val initialState: S = outer.initialState
-      override private[webServer] val handleRaise: RaiseT => Unit = {
-        case updateState: Raise.UpdateState[S] =>
-          console.log(s"updateState(${updateState.reRender}):")
-          console.log(_state.toString)
-          _state = updateState.updateState(_state)
-          console.log(_state.toString)
-          outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
-          withNewState(_state)
-        case raise =>
-          outer.handleRaise(raise)
-      }
-    }
+    console.log("3.2")
+    val rh =
+      new RaiseHandler[S, A](
+        initialState = outer.initialState,
+        handleRaise = {
+          case updateState: Raise.UpdateState[S] =>
+            console.log(s"updateState(${updateState.reRender}):")
+            console.log(_state.toString)
+            _state = updateState.updateState(_state)
+            console.log(_state.toString)
+            outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
+            withNewState(_state)
+          case raise =>
+            outer.handleRaise(raise)
+        },
+      )
+
+    rh.show()
+    rh
+  }
+
+  // REMOVE : ...
+  def show(): Unit = {
+    console.log("-----")
+    console.log(initialState.toString)
+    console.log(_state.toString)
   }
 
 }
@@ -80,13 +94,14 @@ object RaiseHandler {
       initialState: S,
       handleRaise: Raise[S, A] => Unit,
   ): RaiseHandler[S, A] = {
-    val _initialState = initialState
-    val _handleRaise = handleRaise
-
-    new RaiseHandler[S, A] {
-      override private[webServer] val initialState: S = _initialState
-      override private[webServer] val handleRaise: Raise[S, A] => Unit = _handleRaise
-    }
+    console.log("3.1")
+    val rh =
+      new RaiseHandler[S, A](
+        initialState = initialState,
+        handleRaise = handleRaise,
+      )
+    rh.show()
+    rh
   }
 
 }

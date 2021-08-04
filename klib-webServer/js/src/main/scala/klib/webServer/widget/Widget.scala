@@ -27,10 +27,13 @@ final case class Widget[V, S, A](
   ): Widget.ElementT = {
     val _initialState = initialState
 
+    console.log(1)
+
+    console.log("3.3")
     val raiseHandler: RaiseHandler[S, A] =
-      new RaiseHandler[S, A] {
-        override private[webServer] val initialState: S = _initialState
-        override private[webServer] val handleRaise: RaiseT => Unit = { raise =>
+      new RaiseHandler[S, A](
+        initialState = _initialState,
+        handleRaise = { raise =>
           val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
             raise match {
               case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
@@ -91,8 +94,12 @@ final case class Widget[V, S, A](
                 loop(errors.map(error => Raise.DisplayMessage.global.error(error.toString)))
             }
           }
-        }
-      }.captureUpdateState()
+        },
+      ).captureUpdateState()
+
+    raiseHandler.show()
+
+    console.log(2)
 
     elementF(raiseHandler, raiseHandler._state)
   }
@@ -104,14 +111,15 @@ final case class Widget[V, S, A](
   )(implicit ec: ExecutionContext): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
-        val rh2: RaiseHandler[S, A] =
-          new RaiseHandler[S, A] {
-            override private[webServer] val initialState: S = rh.initialState
-            override private[webServer] val handleRaise: RaiseT => Unit = {
+        console.log("3.4")
+        lazy val rh2: RaiseHandler[S, A] =
+          new RaiseHandler[S, A](
+            initialState = rh.initialState,
+            handleRaise = {
               case standard: Raise.Standard[S] =>
                 rh.raise(standard)
               case action: Raise.Action[A] =>
-                f(_state, valueF(_state), action.action).future.onComplete {
+                f(rh2._state, valueF(rh2._state), action.action).future.onComplete {
                   _.to_?.flatten match {
                     case Alive(r) =>
                       rh.raises(r)
@@ -119,8 +127,9 @@ final case class Widget[V, S, A](
                       rh.raises(errors.map(e => Raise.DisplayMessage.global.error(e.toString)))
                   }
                 }
-            }
-          }
+            },
+          )
+        rh2.show()
 
         elementF(rh2, s)
       },
@@ -216,7 +225,7 @@ object Widget {
 
     def noState: Builder2 = new Builder2
 
-    def element[S, A](elem: Widget.ElemT): Widget[Unit, S, A] =
+    def element[S, A](elem: => Widget.ElemT): Widget[Unit, S, A] =
       withState[S].withAction[A].element(elem).noValue
 
   }
@@ -243,24 +252,24 @@ object Widget {
   final class Builder3 private[Widget] {
     type S = Any
     type A = Nothing
-    def element(elem: Widget.ElemT): Builder4[S, A] = new Builder4[S, A]((_, _) => elem)
+    def element(elem: => Widget.ElemT): Builder4[S, A] = new Builder4[S, A]((_, _) => elem)
   }
   final class Builder3S[S] private[Widget] {
     type A = Nothing
     def elementS(elementF: S => Widget.ElemT): Builder4[S, A] = new Builder4[S, A]((_, s) => elementF(s))
-    def element(elem: Widget.ElemT): Builder4[S, A] = elementS(_ => elem)
+    def element(elem: => Widget.ElemT): Builder4[S, A] = elementS(_ => elem)
   }
   final class Builder3A[A] private[Widget] {
     type S = Any
     def elementA(elementF: RaiseHandler[S, A] => Widget.ElemT): Builder4[S, A] = new Builder4[S, A]((a, _) => elementF(a))
-    def element(elem: Widget.ElemT): Builder4[S, A] = elementA(_ => elem)
+    def element(elem: => Widget.ElemT): Builder4[S, A] = elementA(_ => elem)
   }
   final class Builder3SA[S, A] private[Widget] {
     def elementSA(elementF: (RaiseHandler[S, A], S) => Widget.ElemT): Builder4[S, A] =
       new Builder4[S, A]((a, s) => elementF(a, s))
     def elementS(elementF: S => Widget.ElemT): Builder4[S, A] = elementSA((_, s) => elementF(s))
     def elementA(elementF: RaiseHandler[S, A] => Widget.ElemT): Builder4[S, A] = elementSA((a, _) => elementF(a))
-    def element(elem: Widget.ElemT): Builder4[S, A] = elementSA((_, _) => elem)
+    def element(elem: => Widget.ElemT): Builder4[S, A] = elementSA((_, _) => elem)
   }
 
   final class Builder4[S, A] private[Widget] (elementF: (RaiseHandler[S, A], S) => Widget.ElemT) {
