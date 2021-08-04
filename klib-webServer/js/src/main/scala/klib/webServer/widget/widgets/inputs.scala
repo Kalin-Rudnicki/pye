@@ -48,9 +48,10 @@ trait inputs {
               case UpdateOn.KeyPress(timeout) =>
                 timeout match {
                   case Some(timeout) =>
+                    savedTimeout.foreach(window.clearTimeout)
                     savedTimeout = window
                       .setTimeout(
-                        () => {
+                        { () =>
                           savedTimeout = None
                           updateState()
                         },

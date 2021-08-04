@@ -5,6 +5,8 @@ import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.types._
 import klib.webServer._
+import klib.webServer.CSS.Implicits._
+import klib.webServer.widget.widgets.modifiers._
 
 sealed trait Raise[+S, +A]
 object Raise {
@@ -34,28 +36,15 @@ object Raise {
           causeId = causeId,
         )
 
-      def withClasses(
+      def info(
           message: String,
-          classes: List[String],
           timeout: Maybe[Int] = None,
           modifiers: List[Modifier] = Nil,
       ): DisplayMessage =
         apply(
           message = message,
           timeout = timeout,
-          modifiers = (`class` := classes.mkString(" ")) :: modifiers,
-        )
-
-      def info(
-          message: String,
-          timeout: Maybe[Int] = None,
-          modifiers: List[Modifier] = Nil,
-      ): DisplayMessage =
-        withClasses(
-          message = message,
-          classes = List("message-info"),
-          timeout = timeout,
-          modifiers = modifiers,
+          modifiers = (KwsS.message.m(_.info): Modifier) :: modifiers,
         )
 
       def error(
@@ -63,11 +52,10 @@ object Raise {
           timeout: Maybe[Int] = None,
           modifiers: List[Modifier] = Nil,
       ): DisplayMessage =
-        withClasses(
+        apply(
           message = message,
-          classes = List("message-error"),
           timeout = timeout,
-          modifiers = modifiers,
+          modifiers = (KwsS.message.m(_.error): Modifier) :: modifiers,
         )
 
     }

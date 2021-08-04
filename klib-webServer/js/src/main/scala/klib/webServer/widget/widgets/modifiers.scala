@@ -18,6 +18,11 @@ trait modifiers {
       }
     }
 
+    object message extends Block {
+      object info extends Modifier
+      object error extends Modifier
+    }
+
   }
 
 }

@@ -48,8 +48,7 @@ final case class Widget[V, S, +A](
               case head :: tail =>
                 head match {
                   case Raise.UpdateState(_, _) =>
-                    // TODO (KR) :
-                    console.log("ROOT")
+                  // NOTE : All updates should have been properly handled already...
                   case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
                     def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
                     def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
@@ -62,13 +61,20 @@ final case class Widget[V, S, +A](
                             modifiers,
                           ).render
 
-                        timeout.foreach {
-                          window.setTimeout(
-                            () => {
-                              messagesElement.removeChild(messageElement)
-                            },
-                            _,
-                          )
+                        messagesElement.appendChild(messageElement)
+                        val timeoutId =
+                          timeout.map {
+                            window.setTimeout(
+                              () => {
+                                messagesElement.removeChild(messageElement)
+                              },
+                              _,
+                            )
+                          }
+
+                        messageElement.onclick = { _ =>
+                          timeoutId.foreach(window.clearTimeout)
+                          messagesElement.removeChild(messageElement)
                         }
                       case None =>
                         // TODO (KR) :
@@ -114,7 +120,13 @@ final case class Widget[V, S, +A](
             initialState = rh.initialState,
             handleRaise = {
               case standard: Raise.Standard[S] =>
-                rh.raise(standard)
+                standard match {
+                  case updateState: Raise.UpdateState[S] =>
+                    rh2._state = updateState.updateState(rh2._state)
+                    rh.raise(updateState)
+                  case _ =>
+                    rh.raise(standard)
+                }
               case action: Raise.Action[A] =>
                 f(rh2._state, valueF(rh2._state), action.action).future.onComplete {
                   _.to_?.flatten match {
