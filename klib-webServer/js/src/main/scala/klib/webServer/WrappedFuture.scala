@@ -1,6 +1,7 @@
 package klib.webServer
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
@@ -31,6 +32,31 @@ object WrappedFuture {
 
   def wrapValue[T](t: => T)(implicit ec: ExecutionContext): WrappedFuture[T] =
     WrappedFuture(Future(Alive(t)))
+
+  // =====|  |=====
+
+  def timeout(timeout: Int)(implicit ec: ExecutionContext): WrappedFuture[Unit] = {
+    import org.scalajs.dom.window
+
+    val p: Promise[Unit] = Promise()
+
+    window.setTimeout(() => p.success(()), timeout)
+
+    wrapFuture(p.future)
+  }
+
+  def runSequential(futures: List[WrappedFuture[_]])(implicit ec: ExecutionContext): WrappedFuture[Unit] =
+    futures match {
+      case head :: tail =>
+        for {
+          _ <- head
+          _ <- runSequential(tail)
+        } yield ()
+      case Nil =>
+        ().pure[WrappedFuture]
+    }
+
+  // =====|  |=====
 
   implicit def wrappedFutureMonad(implicit ec: ExecutionContext): Monad[WrappedFuture] =
     new Monad[WrappedFuture] {

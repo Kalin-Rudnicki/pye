@@ -30,31 +30,53 @@ final class Page[Env] private[Page] (
       keyMap = kmF(errorHandler)(keyMap),
     )
 
-  private def renderAnd(and: String => Unit): Unit = {
-    implicit val eh: ErrorHandler = errorHandler
-    envF().onComplete { env =>
-      val title = titleF(env)
+  private def _renderAnd(and: Env => Unit): WrappedFuture[Unit] =
+    for {
+      env <- envF()
+      _ <- WrappedFuture.wrapValue {
+        val title = titleF(env)
 
-      window.document.title = title
-      window.document.body = bodyF(env)
-      and(title)
-      keyMap.bindToWindow()
+        window.document.title = title
+        window.document.body = bodyF(env)
+        and(env)
+        keyMap.bindToWindow()
+      }
+    } yield ()
+
+  private[webServer] def _push(): WrappedFuture[Unit] =
+    _renderAnd { env =>
+      window.history.pushState(null, titleF(env), path)
     }
+
+  private[webServer] def _replace(): WrappedFuture[Unit] =
+    _renderAnd { env =>
+      window.history.replaceState(null, titleF(env), path)
+    }
+
+  private[webServer] def _replaceNoTrace(): WrappedFuture[Unit] =
+    _renderAnd { _ => }
+
+  // TODO (KR) : Remove `_`, and remove deprecated
+
+  @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
+  def renderAnd(and: Env => Unit): Unit = {
+    implicit val eh: ErrorHandler = errorHandler
+    _renderAnd(and).onComplete { _ => console.log("Stop using the deprecated page-changer") }
   }
 
-  // TODO (KR) : private[webServer]
+  @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
   def push(): Unit =
-    renderAnd { title =>
-      window.history.pushState(null, title, path)
+    renderAnd { env =>
+      window.history.pushState(null, titleF(env), path)
     }
 
-  // TODO (KR) : private[webServer]
+  @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
   def replace(): Unit =
-    renderAnd { title =>
-      window.history.replaceState(null, title, path)
+    renderAnd { env =>
+      window.history.replaceState(null, titleF(env), path)
     }
 
-  // TODO (KR) : private[webServer]
+  @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
   def replaceNoTrace(): Unit =
     renderAnd { _ => }
 

@@ -2,7 +2,6 @@ package klib.webServer.widget
 
 import java.util.UUID
 
-import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 
 import monocle.Lens
@@ -26,82 +25,12 @@ final case class Widget[V, S, +A](
   def render(handleAction: A => WrappedFuture[List[Raise.Standard[S]]])(initialState: S)(implicit
       ec: ExecutionContext,
   ): Widget.ElementT = {
-    val _initialState = initialState
-
     val elements = Var.`null`[Widget.ElementT]
 
     val raiseHandler: RaiseHandler[S, A] =
-      new RaiseHandler[S, A](
-        initialState = _initialState,
-        handleRaise = { raise =>
-          val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
-            raise match {
-              case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
-              case Raise.Action(action)        => handleAction(action)
-            }
-
-          @tailrec
-          def loop(
-              queue: List[Raise.Standard[S]],
-          ): Unit =
-            queue match {
-              case head :: tail =>
-                head match {
-                  case Raise.UpdateState(_, _) =>
-                  // NOTE : All updates should have been properly handled already...
-                  case Raise.DisplayMessage(message, modifiers, timeout, causeId) =>
-                    def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
-                    def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
-
-                    causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
-                      case Some(messagesElement) =>
-                        val messageElement =
-                          div(
-                            message,
-                            modifiers,
-                          ).render
-
-                        messagesElement.appendChild(messageElement)
-                        val timeoutId =
-                          timeout.map {
-                            window.setTimeout(
-                              () => {
-                                messagesElement.removeChild(messageElement)
-                              },
-                              _,
-                            )
-                          }
-
-                        messageElement.onclick = { _ =>
-                          timeoutId.foreach(window.clearTimeout)
-                          messagesElement.removeChild(messageElement)
-                        }
-                      case None =>
-                        // TODO (KR) :
-                        window.alert(message)
-                    }
-                  case history: Raise.History =>
-                    // TODO (KR) : Possibly keep track of if the page changed?
-                    history match {
-                      case Raise.History.Push(page)    => page.push()
-                      case Raise.History.Replace(page) => page.replace()
-                      case Raise.History.Go(delta)     => window.history.go(delta)
-                    }
-                }
-                loop(tail)
-              case Nil =>
-            }
-
-          standardRaises.future.onComplete {
-            _.to_?.flatten match {
-              case Alive(r) =>
-                loop(r)
-              case Dead(errors) =>
-                loop(errors.map(error => Raise.DisplayMessage.global.error(error.toString)))
-            }
-          }
-        },
-      ).captureUpdateState(this, elements)()
+      RaiseHandler
+        .globalRaiseHandler[S, A](initialState, handleAction)
+        .captureUpdateState(this, elements)()
 
     (elements.value = elementF(raiseHandler, raiseHandler._state)).runSyncOrDump(None)
 
@@ -122,20 +51,18 @@ final case class Widget[V, S, +A](
               case standard: Raise.Standard[S] =>
                 standard match {
                   case updateState: Raise.UpdateState[S] =>
-                    rh2._state = updateState.updateState(rh2._state)
-                    rh.raise(updateState)
+                    for {
+                      _ <- WrappedFuture.wrapValue { rh2._state = updateState.updateState(rh2._state) }
+                      _ <- rh.raise(updateState)
+                    } yield ()
                   case _ =>
                     rh.raise(standard)
                 }
               case action: Raise.Action[A] =>
-                f(rh2._state, valueF(rh2._state), action.action).future.onComplete {
-                  _.to_?.flatten match {
-                    case Alive(r) =>
-                      rh.raises(r)
-                    case Dead(errors) =>
-                      rh.raises(errors.map(e => Raise.DisplayMessage.global.error(e.toString)))
-                  }
-                }
+                for {
+                  raises <- f(rh2._state, valueF(rh2._state), action.action)
+                  _ <- rh.raises(raises)
+                } yield ()
             },
           )
 
