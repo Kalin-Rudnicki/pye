@@ -32,6 +32,8 @@ final case class Widget[V, S, +A](
         .globalRaiseHandler[S, A](initialState, handleAction)
         .captureUpdateState(this, elements)()
 
+    raiseHandler._global = true
+
     (elements.value = elementF(raiseHandler, raiseHandler._state)).runSyncOrDump(None)
 
     elements.value
@@ -53,15 +55,15 @@ final case class Widget[V, S, +A](
                   case updateState: Raise.UpdateState[S] =>
                     for {
                       _ <- WrappedFuture.wrapValue { rh2._state = updateState.updateState(rh2._state) }
-                      _ <- rh.raise(updateState)
+                      _ <- rh.handleRaise(updateState)
                     } yield ()
                   case _ =>
-                    rh.raise(standard)
+                    rh.handleRaise(standard)
                 }
               case action: Raise.Action[A] =>
                 for {
                   raises <- f(rh2._state, valueF(rh2._state), action.action)
-                  _ <- rh.raises(raises)
+                  _ <- rh.handleRaises(raises)
                 } yield ()
             },
           )

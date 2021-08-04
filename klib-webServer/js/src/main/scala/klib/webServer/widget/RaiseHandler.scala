@@ -19,24 +19,34 @@ final class RaiseHandler[S, -A](
   type RaiseT[A2] = Raise[S, A2]
 
   private[webServer] var _state: S = initialState
+  private[webServer] var _global: Boolean = false
 
   // =====|  |=====
 
-  private def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): WrappedFuture[Unit] =
+  private[webServer] def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): WrappedFuture[Unit] =
     WrappedFuture.runSequential(raises.map(handleRaise))
 
-  def apply[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): WrappedFuture[Unit] =
-    handleRaises(r0 :: rN.toList)
+  private def handleAndRun[A2 <: A](raises: List[RaiseT[A2]]): Unit =
+    handleRaises(raises).future.onComplete {
+      _.to_?.flatten match {
+        case Alive(_) =>
+        case Dead(errors) =>
+          errors.map(RaiseHandler.convertThrowable).foreach(RaiseHandler.handleDisplayMessage)
+      }
+    }
 
-  def raise[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): WrappedFuture[Unit] =
-    handleRaises(r0 :: rN.toList)
-  def raises[A2 <: A](rs: List[RaiseT[A2]]): WrappedFuture[Unit] =
-    handleRaises(rs)
+  def apply[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): Unit =
+    handleAndRun(r0 :: rN.toList)
 
-  def raiseAction[A2 <: A](a0: A2, aN: A2*): WrappedFuture[Unit] =
-    handleRaises((a0 :: aN.toList).map(Raise.Action(_)))
-  def raiseActions[A2 <: A](as: List[A2]): WrappedFuture[Unit] =
-    handleRaises(as.map(Raise.Action(_)))
+  def raise[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): Unit =
+    handleAndRun(r0 :: rN.toList)
+  def raises[A2 <: A](rs: List[RaiseT[A2]]): Unit =
+    handleAndRun(rs)
+
+  def raiseAction[A2 <: A](a0: A2, aN: A2*): Unit =
+    handleAndRun((a0 :: aN.toList).map(Raise.Action(_)))
+  def raiseActions[A2 <: A](as: List[A2]): Unit =
+    handleAndRun(as.map(Raise.Action(_)))
 
   // =====|  |=====
 
@@ -125,6 +135,42 @@ object RaiseHandler {
     newElems.foreach { addNode }
   }
 
+  def convertThrowable(throwable: Throwable): Raise.DisplayMessage =
+    Raise.DisplayMessage.global.error(throwable.toString)
+
+  def handleDisplayMessage(msg: Raise.DisplayMessage): Unit = {
+    def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
+    def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
+
+    msg.causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
+      case Some(messagesElement) =>
+        val messageElement =
+          div(
+            msg.message,
+            msg.modifiers,
+          ).render
+
+        messagesElement.appendChild(messageElement)
+        val timeoutId =
+          msg.timeout.map {
+            window.setTimeout(
+              () => {
+                messagesElement.removeChild(messageElement)
+              },
+              _,
+            )
+          }
+
+        messageElement.onclick = { _ =>
+          timeoutId.foreach(window.clearTimeout)
+          messagesElement.removeChild(messageElement)
+        }
+      case None =>
+        // TODO (KR) :
+        window.alert(msg.message)
+    }
+  }
+
   def globalRaiseHandler[S, A](
       initialState: S,
       handleAction: A => WrappedFuture[List[Raise.Standard[S]]],
@@ -132,46 +178,6 @@ object RaiseHandler {
     new RaiseHandler[S, A](
       initialState = initialState,
       handleRaise = { raise =>
-        // TODO (KR) : Make sure everything happens in the desired order
-        val standardRaises: WrappedFuture[List[Raise.Standard[S]]] =
-          raise match {
-            case standard: Raise.Standard[S] => (standard :: Nil).pure[WrappedFuture]
-            case Raise.Action(action)        => handleAction(action)
-          }
-
-        def handleDisplayMessage(msg: Raise.DisplayMessage): Unit = {
-          def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
-          def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
-
-          msg.causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
-            case Some(messagesElement) =>
-              val messageElement =
-                div(
-                  msg.message,
-                  msg.modifiers,
-                ).render
-
-              messagesElement.appendChild(messageElement)
-              val timeoutId =
-                msg.timeout.map {
-                  window.setTimeout(
-                    () => {
-                      messagesElement.removeChild(messageElement)
-                    },
-                    _,
-                  )
-                }
-
-              messageElement.onclick = { _ =>
-                timeoutId.foreach(window.clearTimeout)
-                messagesElement.removeChild(messageElement)
-              }
-            case None =>
-              // TODO (KR) :
-              window.alert(msg.message)
-          }
-        }
-
         def handleStandard(std: Raise.Standard[S]): WrappedFuture[Unit] = {
           console.log(std.toString)
           std match {
@@ -193,22 +199,17 @@ object RaiseHandler {
           }
         }
 
-        {
-          for {
-            raises <- standardRaises
-            _ <- WrappedFuture.runSequential(raises.map(handleStandard))
-          } yield ()
-        }.future.onComplete {
-          _.to_?.flatten match {
-            case Alive(_) =>
-            case Dead(errors) =>
-              errors
-                .map(error => Raise.DisplayMessage.global.error(error.toString))
-                .foreach(handleDisplayMessage)
+        def handle(raise: Raise[S, A]): WrappedFuture[Unit] =
+          raise match {
+            case standard: Raise.Standard[S] => handleStandard(standard)
+            case Raise.Action(action) =>
+              for {
+                standards <- handleAction(action)
+                _ <- WrappedFuture.runSequential(standards.map(handleStandard))
+              } yield ()
           }
-        }
 
-        ().pure[WrappedFuture]
+        handle(raise)
       },
     )
 
