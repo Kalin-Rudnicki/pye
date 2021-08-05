@@ -99,5 +99,5 @@ lazy val `pye-root` =
     .aggregate(
       pye.js,
       pye.jvm,
-      // `pye-plugin`,
+      `pye-plugin`,
     )
