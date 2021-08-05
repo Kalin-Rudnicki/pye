@@ -2,6 +2,7 @@ package pye.legacyWidgets
 
 import scala.collection.mutable
 
+@deprecated(message = "Use new Widget", since = "3.0.0")
 final class Var[V] private (initialValue: V) {
 
   private val subscribed: mutable.ListBuffer[Widget[_]] = mutable.ListBuffer()

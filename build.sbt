@@ -20,7 +20,7 @@ lazy val pye =
     .in(file("pye"))
     .settings(
       name := "pye",
-      version := "2.0.7",
+      version := "3.0.0",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(

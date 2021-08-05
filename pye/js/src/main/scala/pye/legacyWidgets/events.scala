@@ -4,6 +4,7 @@ import org.scalajs.dom.Event
 
 trait events {
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def submitEvent: Event =
     new Event(
       "submit",
@@ -12,6 +13,7 @@ trait events {
       },
     )
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def closeModalEvent: Event =
     new Event(
       "close-modal",

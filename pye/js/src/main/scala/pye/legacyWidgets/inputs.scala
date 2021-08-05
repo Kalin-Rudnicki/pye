@@ -24,6 +24,7 @@ trait inputs {
   // --- input ---
 
   // TODO (KR) : This could use some cleaning up...
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def file(
       label: String,
       id: String,
@@ -66,6 +67,7 @@ trait inputs {
       .labelErrors(label)
   }
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   private def textWidget(
       _type: String,
       __input: TypedTag[Input],
@@ -123,6 +125,7 @@ trait inputs {
       }
       .labelErrors(label)
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def input(
       label: String,
       id: String,
@@ -140,6 +143,7 @@ trait inputs {
 
   // --- text area ---
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def textArea(
       label: String,
       id: String,
@@ -157,6 +161,7 @@ trait inputs {
 
   // =====|  |=====
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def radioGroup[T](
       label: String,
       id: String,
@@ -237,6 +242,7 @@ trait inputs {
       }
       .labelErrors(label)
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def toggleButton(
       buttonLabel: String,
       onToggle: Maybe[Boolean => Unit] = None,

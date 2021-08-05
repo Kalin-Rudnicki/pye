@@ -8,6 +8,7 @@ trait Implicits {
 
   implicit class StringWidgetBuilderOps[S](widget: Widget.Builder[String, S]) {
 
+    @deprecated(message = "Use new Widget", since = "3.0.0")
     def decode[T: DecodeString]: Widget.Builder[T, S] =
       widget.flatMapValue(implicitly[DecodeString[T]].decode)
 
@@ -15,6 +16,7 @@ trait Implicits {
 
   implicit class MaybeStringWidgetBuilderOps[S](widget: Widget.Builder[Maybe[String], S]) {
 
+    @deprecated(message = "Use new Widget", since = "3.0.0")
     def decode[T: DecodeString]: Widget.Builder[Maybe[T], S] =
       widget.flatMapValue {
         case Some(str) =>
@@ -27,6 +29,7 @@ trait Implicits {
 
   implicit class MaybeWidgetBuilderOps[T, S](widget: Widget.Builder[Maybe[T], S]) {
 
+    @deprecated(message = "Use new Widget", since = "3.0.0")
     def required(errorMsg: String = "Required field is empty"): Widget.Builder[T, S] =
       widget.flatMapValue(_.toEA(Message(errorMsg)))
 

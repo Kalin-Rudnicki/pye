@@ -13,11 +13,13 @@ import pye.{Widget => _, _}
 
 trait containers {
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   final case class FormDecorators(
       saveButtonModifiers: Seq[Modifier] = Seq.empty,
       containerModifiers: Seq[Modifier] = Seq.empty,
   )
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def form[V, S, R](
       wb: Widget.Builder[V, S],
       endpoint: V => AsyncIO[R],
@@ -69,6 +71,7 @@ trait containers {
     final case class Custom(action: Div => Unit) extends ModalBackgroundClickAction
   }
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def makeModal(
       vw: Int,
       vh: Int,
@@ -116,6 +119,7 @@ trait containers {
     outerModal
   }
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   def displayModal(
       vw: Int,
       vh: Int,

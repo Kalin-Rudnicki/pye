@@ -10,6 +10,7 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import pye._
 
+@deprecated(message = "Use new Widget", since = "3.0.0")
 final class Widget[+V] private (
     val render: () => Node,
     _value: => ?[V],
@@ -93,6 +94,7 @@ object Widget {
 
     }
 
+  @deprecated(message = "Use new Widget", since = "3.0.0")
   final class Builder[+V, -S] private[Widget] (private val build: S => Widget[V]) {
 
     def apply(s: S): Widget[V] = {
