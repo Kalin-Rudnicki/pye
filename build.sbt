@@ -1,26 +1,53 @@
 //
 
-val MyOrg = "io.github.kalin-rudnicki"
-
-val MyScalaVersion = "2.13.4"
+val Scala_2_12 = "2.12.10"
+val Scala_2_13 = "2.13.4"
 val CirceVersion = "0.14.0-M4"
 val MonocleVersion = "3.0.0-M6"
 
-val SharedSettings =
+val MyOrg = "io.github.kalin-rudnicki"
+val githubUsername = "Kalin-Rudnicki"
+val githubProject = "pye"
+
+ThisBuild / dynverVTagPrefix := false
+ThisBuild / dynverSonatypeSnapshots := true
+ThisBuild / watchBeforeCommand := Watch.clearScreen
+
+ThisBuild / version ~= (_.replace('+', '-'))
+ThisBuild / dynver ~= (_.replace('+', '-'))
+
+// =====|  |=====
+
+inThisBuild(
   Seq(
     organization := MyOrg,
     resolvers ++= Seq(
       Resolver.mavenLocal,
       Resolver.sonatypeRepo("public"),
     ),
-  )
+    //
+    description := "Webserver/frontend for ScalaJS.",
+    licenses := List("MIT" -> new URL("https://opensource.org/licenses/MIT")),
+    homepage := Some(url(s"https://github.com/$githubUsername/$githubProject")),
+    developers := List(
+      Developer(
+        id = "Kalin-Rudnicki",
+        name = "Kalin Rudnicki",
+        email = "kalin.rudnicki@gmail.com",
+        url = url(s"https://github.com/$githubUsername"),
+      ),
+    ),
+    sonatypeCredentialHost := "s01.oss.sonatype.org",
+  ),
+)
+
+// =====|  |=====
 
 lazy val pye =
   crossProject(JSPlatform, JVMPlatform)
     .in(file("pye"))
     .settings(
       name := "pye",
-      version := "3.0.0",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
@@ -33,8 +60,8 @@ lazy val pye =
         "com.github.julien-truffaut" %%% "monocle-core" % MonocleVersion,
         "com.github.julien-truffaut" %%% "monocle-macro" % MonocleVersion,
       ),
-      scalaVersion := MyScalaVersion,
-      SharedSettings,
+      scalaVersion := Scala_2_13,
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
     .jsSettings(
       libraryDependencies ++= Seq(
@@ -56,10 +83,10 @@ lazy val `pye-plugin` =
     .enablePlugins(SbtPlugin)
     .settings(
       name := "pye-plugin",
-      scalaVersion := "2.12.10",
-      version := "0.0.2",
+      scalaVersion := Scala_2_12,
+      version := "0.1.0",
       addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.5.0"),
-      SharedSettings,
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
 
 lazy val `pye-root` =
@@ -67,6 +94,7 @@ lazy val `pye-root` =
     .in(file("."))
     .settings(
       publish / skip := true,
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
     .aggregate(
       pye.js,
