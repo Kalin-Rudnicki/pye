@@ -4,7 +4,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import monocle.Lens
 import org.scalajs.dom._
-import scalatags.JsDom.all._
 
 import klib.Implicits._
 import klib.fp.types._
@@ -13,7 +12,7 @@ import klib.webServer._
 
 final class RaiseHandler[S, -A](
     private[webServer] val initialState: S,
-    private[webServer] val handleRaise: Raise[S, A] => WrappedFuture[Unit],
+    private[webServer] val handleRaise: Raise[S, A] => AsyncIO[Unit],
 ) {
 
   type RaiseT[A2] = Raise[S, A2]
@@ -23,16 +22,14 @@ final class RaiseHandler[S, -A](
 
   // =====|  |=====
 
-  private[webServer] def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): WrappedFuture[Unit] =
-    WrappedFuture.runSequential(raises.map(handleRaise))
+  private[webServer] def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): AsyncIO[Unit] =
+    AsyncIO.runSequentially(raises.map(handleRaise)).map { _ => }
 
   private def handleAndRun[A2 <: A](raises: List[RaiseT[A2]]): Unit =
-    handleRaises(raises).future.onComplete {
-      _.to_?.flatten match {
-        case Alive(_) =>
-        case Dead(errors) =>
-          errors.map(RaiseHandler.convertThrowable).foreach(RaiseHandler.handleDisplayMessage)
-      }
+    handleRaises(raises).runASync {
+      case Alive(_) =>
+      case Dead(errors) =>
+        errors.map(Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
     }
 
   def apply[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): Unit =
@@ -83,7 +80,7 @@ final class RaiseHandler[S, -A](
           case updateState: Raise.UpdateState[S] =>
             for {
               _ <- outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
-              _ <- WrappedFuture.wrapValue {
+              _ <- AsyncIO {
                 newRH._state = updateState.updateState(newRH._state)
                 if (updateState.reRender) {
                   /*
@@ -113,7 +110,7 @@ object RaiseHandler {
 
   def apply[S, A](
       initialState: S,
-      handleRaise: Raise[S, A] => WrappedFuture[Unit],
+      handleRaise: Raise[S, A] => AsyncIO[Unit],
   ): RaiseHandler[S, A] =
     new RaiseHandler[S, A](
       initialState = initialState,
@@ -135,77 +132,38 @@ object RaiseHandler {
     newElems.foreach { addNode }
   }
 
-  def convertThrowable(throwable: Throwable): Raise.DisplayMessage =
-    Raise.DisplayMessage.global.error(throwable.toString)
-
-  def handleDisplayMessage(msg: Raise.DisplayMessage): Unit = {
-    def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
-    def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
-
-    msg.causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
-      case Some(messagesElement) =>
-        val messageElement =
-          div(
-            msg.message,
-            msg.modifiers,
-          ).render
-
-        messagesElement.appendChild(messageElement)
-        val timeoutId =
-          msg.timeout.map {
-            window.setTimeout(
-              () => {
-                messagesElement.removeChild(messageElement)
-              },
-              _,
-            )
-          }
-
-        messageElement.onclick = { _ =>
-          timeoutId.foreach(window.clearTimeout)
-          messagesElement.removeChild(messageElement)
-        }
-      case None =>
-        // TODO (KR) :
-        window.alert(msg.message)
-    }
-  }
-
   def globalRaiseHandler[S, A](
       initialState: S,
-      handleAction: A => WrappedFuture[List[Raise.Standard[S]]],
+      handleAction: A => AsyncIO[List[Raise.Standard[S]]],
   ): RaiseHandler[S, A] =
     new RaiseHandler[S, A](
       initialState = initialState,
       handleRaise = { raise =>
-        def handleStandard(std: Raise.Standard[S]): WrappedFuture[Unit] = {
+        def handleStandard(std: Raise.Standard[S]): AsyncIO[Unit] = {
           console.log(std.toString)
           std match {
             case Raise.UpdateState(_, _) =>
               // NOTE : All updates should have been properly handled already...
-              WrappedFuture.wrapValue {}
-            case displayMessage: Raise.DisplayMessage =>
-              WrappedFuture.wrapValue(handleDisplayMessage(displayMessage))
+              AsyncIO {}
+            case message: Raise.DisplayMessage =>
+              AsyncIO(displayMessage(message))
             case history: Raise.History =>
               // TODO (KR) : Possibly keep track of if the page changed?
-              for {
-                _ <- history match {
-                  case Raise.History.Push(page)    => page._push()
-                  case Raise.History.Replace(page) => page._replace()
-                  case Raise.History.Go(delta)     => WrappedFuture.wrapValue { window.history.go(delta) }
-                }
-                _ <- WrappedFuture.timeout(500)
-              } yield ()
+              history match {
+                case Raise.History.Push(page)    => page._push()
+                case Raise.History.Replace(page) => page._replace()
+                case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
+              }
           }
         }
 
-        def handle(raise: Raise[S, A]): WrappedFuture[Unit] =
+        def handle(raise: Raise[S, A]): AsyncIO[Unit] =
           raise match {
             case standard: Raise.Standard[S] => handleStandard(standard)
             case Raise.Action(action) =>
               for {
                 standards <- handleAction(action)
-                _ <- WrappedFuture.runSequential(standards.map(handleStandard))
+                _ <- AsyncIO.runSequentially(standards.map(handleStandard))
               } yield ()
           }
 

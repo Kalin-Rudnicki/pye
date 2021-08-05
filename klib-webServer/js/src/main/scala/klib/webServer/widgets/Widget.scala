@@ -167,7 +167,7 @@ object Widget {
       })
 
     def wrapInForm[R](
-        endpoint: V => WrappedFuture[R],
+        endpoint: V => AsyncIO[R],
         submitButtonLabel: String = "Submit",
         decorators: containers.FormDecorators = containers.FormDecorators(),
     )(

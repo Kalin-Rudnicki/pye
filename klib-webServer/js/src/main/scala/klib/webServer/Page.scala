@@ -10,10 +10,11 @@ import scalatags.JsDom.tags2
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.webServer.widget.Raise
 
 final class Page[Env] private[Page] (
     path: String,
-    envF: () => WrappedFuture[Env],
+    envF: () => AsyncIO[Env],
     titleF: Env => String,
     bodyF: Env => Body,
     errorHandler: ErrorHandler,
@@ -30,10 +31,10 @@ final class Page[Env] private[Page] (
       keyMap = kmF(errorHandler)(keyMap),
     )
 
-  private def _renderAnd(and: Env => Unit): WrappedFuture[Unit] =
+  private def _renderAnd(and: Env => Unit): AsyncIO[Unit] =
     for {
       env <- envF()
-      _ <- WrappedFuture.wrapValue {
+      _ <- AsyncIO {
         val title = titleF(env)
 
         window.document.title = title
@@ -43,17 +44,17 @@ final class Page[Env] private[Page] (
       }
     } yield ()
 
-  private[webServer] def _push(): WrappedFuture[Unit] =
+  private[webServer] def _push(): AsyncIO[Unit] =
     _renderAnd { env =>
       window.history.pushState(null, titleF(env), path)
     }
 
-  private[webServer] def _replace(): WrappedFuture[Unit] =
+  private[webServer] def _replace(): AsyncIO[Unit] =
     _renderAnd { env =>
       window.history.replaceState(null, titleF(env), path)
     }
 
-  private[webServer] def _replaceNoTrace(): WrappedFuture[Unit] =
+  private[webServer] def _replaceNoTrace(): AsyncIO[Unit] =
     _renderAnd { _ => }
 
   // TODO (KR) : Remove `_`, and remove deprecated
@@ -61,7 +62,14 @@ final class Page[Env] private[Page] (
   @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
   def renderAnd(and: Env => Unit): Unit = {
     implicit val eh: ErrorHandler = errorHandler
-    _renderAnd(and).onComplete { _ => console.log("Stop using the deprecated page-changer") }
+    _renderAnd(and).runASync { res =>
+      console.log("Stop using the deprecated page-changer")
+      res match {
+        case Alive(_) =>
+        case Dead(errors) =>
+          errors.map(Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
+      }
+    }
   }
 
   @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
@@ -218,10 +226,10 @@ object Page {
     def noEnv: Builder2[Unit] =
       new Builder2[Unit](
         path = path,
-        envF = () => ().pure[WrappedFuture],
+        envF = () => ().pure[AsyncIO],
       )
 
-    def env[Env](envF: => WrappedFuture[Env]): Builder2[Env] =
+    def env[Env](envF: => AsyncIO[Env]): Builder2[Env] =
       new Builder2[Env](
         path = path,
         envF = () => envF,
@@ -231,7 +239,7 @@ object Page {
 
   final class Builder2[Env] private[Page] (
       path: String,
-      envF: () => WrappedFuture[Env],
+      envF: () => AsyncIO[Env],
   ) {
 
     def constName(title: String): Builder3[Env] =
@@ -252,7 +260,7 @@ object Page {
 
   final class Builder3[Env] private[Page] (
       path: String,
-      envF: () => WrappedFuture[Env],
+      envF: () => AsyncIO[Env],
       titleF: Env => String,
   ) {
 
@@ -379,7 +387,7 @@ object Page {
 
   final class Builder4[Env] private[Page] (
       path: String,
-      envF: () => WrappedFuture[Env],
+      envF: () => AsyncIO[Env],
       titleF: Env => String,
       errorHandler: ErrorHandler,
   ) {

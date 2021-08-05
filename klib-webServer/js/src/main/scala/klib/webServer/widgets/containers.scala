@@ -19,7 +19,7 @@ trait containers {
 
   def form[V, S, R](
       wb: Widget.Builder[V, S],
-      endpoint: V => WrappedFuture[R],
+      endpoint: V => AsyncIO[R],
       submitButtonLabel: String = "Submit",
       decorators: FormDecorators = FormDecorators(),
   )(
@@ -44,7 +44,12 @@ trait containers {
             e.stopPropagation()
             w.value match {
               case Alive(v) =>
-                endpoint(v).onComplete(onSuccess)
+                endpoint(v).runASync {
+                  case Alive(r) =>
+                    onSuccess(r)
+                  case Dead(errors) =>
+                    errors.foreach(errorHandler)
+                }
               case Dead(errors) =>
                 errors.foreach(errorHandler)
             }

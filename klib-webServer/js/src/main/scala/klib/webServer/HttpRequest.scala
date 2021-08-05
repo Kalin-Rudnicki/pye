@@ -111,7 +111,7 @@ object HttpRequest {
       headers: List[(String, String)],
   ) {
 
-    private def build[Response](f: (Int, String) => ?[Response]): WrappedFuture[Response] = {
+    private def build[Response](f: (Int, String) => ?[Response]): AsyncIO[Response] = {
       val promise: Promise[?[Response]] = Promise()
 
       def encodeParam(p: (String, String)): String =
@@ -120,7 +120,7 @@ object HttpRequest {
       val xhr = new XMLHttpRequest()
       xhr.open(
         method = method,
-        url = s"$baseUrl${params.isEmpty ? "" | s"?${params.reverse.map(encodeParam).mkString("&")}"}",
+        url = s"$baseUrl${params.isEmpty ? "" | s"?${params.reverseMap(encodeParam).mkString("&")}"}",
         async = true,
       )
       headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
@@ -135,15 +135,15 @@ object HttpRequest {
           xhr.send()
       }
 
-      WrappedFuture(promise.future)
+      AsyncIO.wrapWrappedEffect(promise.future)
     }
 
-    def raw: WrappedFuture[(Int, String)] =
+    def raw: AsyncIO[(Int, String)] =
       build[(Int, String)] { (status, responseText) =>
         (status, responseText).pure[?]
       }
 
-    def raw200: WrappedFuture[String] =
+    def raw200: AsyncIO[String] =
       build[String] { (status, responseText) =>
         if (status == 200)
           responseText.pure[?]
@@ -156,7 +156,7 @@ object HttpRequest {
           }
       }
 
-    def decodeResponse[Response](implicit decoder: DecodeString[Response]): WrappedFuture[Response] =
+    def decodeResponse[Response](implicit decoder: DecodeString[Response]): AsyncIO[Response] =
       build[Response] { (_, responseText) =>
         decoder.decode(responseText) match {
           case alive: Alive[Response] =>
@@ -171,7 +171,7 @@ object HttpRequest {
         }
       }
 
-    def jsonResponse[Response](implicit decoder: Decoder[Response]): WrappedFuture[Response] =
+    def jsonResponse[Response](implicit decoder: Decoder[Response]): AsyncIO[Response] =
       build[Response] { (_, responseText) =>
         for {
           json <- parse(responseText).toErrorAccumulator: ?[Json]

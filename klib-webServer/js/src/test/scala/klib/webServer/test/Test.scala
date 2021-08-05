@@ -82,7 +82,7 @@ object Test {
             Couple(person1, person2)
         }
 
-    def sendCreateCoupleApiRequest(couple: Couple): WrappedFuture[Unit] = ???
+    def sendCreateCoupleApiRequest(couple: Couple): AsyncIO[Unit] = ???
 
     val coupleForm: Widget.NoAction[Couple, CoupleState] = {
       ado[Widget.Projection[CoupleState, CommonRaise.Submit.type]#P]
@@ -94,7 +94,7 @@ object Test {
         .mapValue(_._2)
         .handleAction { (_, coupleValue, _) =>
           for {
-            couple <- WrappedFuture.wrap_?(coupleValue)
+            couple <- AsyncIO.wrapEffect(coupleValue)
             _ <- sendCreateCoupleApiRequest(couple)
           } yield List(
             Raise.UpdateState[CoupleState](_ => CoupleState.empty),

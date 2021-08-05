@@ -19,7 +19,7 @@ trait Implicits {
   implicit class NoActionWidgetOps[V, S](widget: Widget.NoAction[V, S]) {
 
     def renderNoAction(initialState: S)(implicit ec: ExecutionContext): Widget.ElementT =
-      widget.render { _ => Nil.pure[WrappedFuture] }(initialState)
+      widget.render { _ => Nil.pure[AsyncIO] }(initialState)
 
   }
 

@@ -60,6 +60,9 @@ object Raise {
 
     }
 
+    def fromThrowable(throwable: Throwable): DisplayMessage =
+      global.error(throwable.toString)
+
     val global: Builder = new Builder(None)
     def forId(id: String): Builder = new Builder(id.some)
   }

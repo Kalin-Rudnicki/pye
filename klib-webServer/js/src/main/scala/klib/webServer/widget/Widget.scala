@@ -22,7 +22,7 @@ final case class Widget[V, S, +A](
   type State = S
   type Action <: A
 
-  def render(handleAction: A => WrappedFuture[List[Raise.Standard[S]]])(initialState: S)(implicit
+  def render(handleAction: A => AsyncIO[List[Raise.Standard[S]]])(initialState: S)(implicit
       ec: ExecutionContext,
   ): Widget.ElementT = {
     val elements = Var.`null`[Widget.ElementT]
@@ -42,7 +42,7 @@ final case class Widget[V, S, +A](
   // =====|  |=====
 
   def handleAction[A2](
-      f: (S, ?[V], A) => WrappedFuture[List[Raise[S, A2]]],
+      f: (S, ?[V], A) => AsyncIO[List[Raise[S, A2]]],
   )(implicit ec: ExecutionContext): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
@@ -54,7 +54,7 @@ final case class Widget[V, S, +A](
                 standard match {
                   case updateState: Raise.UpdateState[S] =>
                     for {
-                      _ <- WrappedFuture.wrapValue { rh2._state = updateState.updateState(rh2._state) }
+                      _ <- AsyncIO { rh2._state = updateState.updateState(rh2._state) }
                       _ <- rh.handleRaise(updateState)
                     } yield ()
                   case _ =>
