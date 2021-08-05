@@ -51,7 +51,7 @@ lazy val pye =
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
-        MyOrg %%% "klib-core" % "1.3.4", // klib
+        MyOrg %%% "klib-core" % "1.3.5", // klib
         "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
