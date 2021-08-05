@@ -15,16 +15,16 @@ val SharedSettings =
     ),
   )
 
-lazy val `klib-webServer` =
+lazy val pye =
   crossProject(JSPlatform, JVMPlatform)
-    .in(file("klib-webServer"))
+    .in(file("pye"))
     .settings(
-      name := "klib-webserver",
+      name := "pye",
       version := "2.0.7",
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
-        MyOrg %%% "klib-core" % "1.3.2", // klib
+        MyOrg %%% "klib-core" % "1.3.3", // klib
         "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,
@@ -50,26 +50,26 @@ lazy val `klib-webServer` =
       ),
     )
 
-lazy val `klib-webserver-plugin` =
+lazy val `pye-plugin` =
   project
-    .in(file("klib-webserver-plugin"))
+    .in(file("pye-plugin"))
     .enablePlugins(SbtPlugin)
     .settings(
-      name := "klib-webserver-plugin",
+      name := "pye-plugin",
       scalaVersion := "2.12.10",
       version := "0.0.2",
       addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.5.0"),
       SharedSettings,
     )
 
-lazy val `klib-webserver-root` =
+lazy val `pye-root` =
   project
     .in(file("."))
     .settings(
       publish / skip := true,
     )
     .aggregate(
-      `klib-webServer`.js,
-      `klib-webServer`.jvm,
-      `klib-webserver-plugin`,
+      pye.js,
+      pye.jvm,
+      // `pye-plugin`,
     )
