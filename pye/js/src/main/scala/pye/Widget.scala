@@ -14,8 +14,8 @@ import klib.fp.types._
 import klib.utils.Var
 
 final case class Widget[V, S, +A](
-    private[webServer] val elementF: (RaiseHandler[S, A], S) => Widget.ElementT,
-    private[webServer] val valueF: S => ?[V],
+    private[pye] val elementF: (RaiseHandler[S, A], S) => Widget.ElementT,
+    private[pye] val valueF: S => ?[V],
 ) {
   type Value = V
   type State = S

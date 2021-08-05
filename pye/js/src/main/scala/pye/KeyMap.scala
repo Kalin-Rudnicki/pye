@@ -37,7 +37,7 @@ final class KeyMap(
     loop(lb.reverse)
   }
 
-  private[webServer] def bindToWindow(): Unit = {
+  private[pye] def bindToWindow(): Unit = {
     window.onkeydown = buildListener(onDownKeys)
     window.onkeypress = buildListener(onPressKeys)
     window.onkeyup = buildListener(onUpKeys)

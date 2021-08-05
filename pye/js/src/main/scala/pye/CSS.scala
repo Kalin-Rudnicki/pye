@@ -40,7 +40,7 @@ object CSS {
       modifiers.map(m => s"$block--$m"),
     ).flatten.mkString(" ")
 
-  final class B[B <: StyleSheet#Block] private[webServer] (
+  final class B[B <: StyleSheet#Block] private[pye] (
       modifiersOnly: Boolean,
       block: B,
   ) {
@@ -70,7 +70,7 @@ object CSS {
       classes
 
   }
-  final class BM[B <: StyleSheet#Block] private[webServer] (
+  final class BM[B <: StyleSheet#Block] private[pye] (
       modifiersOnly: Boolean,
       block: B,
       modifiers: List[B#Modifier],
@@ -92,7 +92,7 @@ object CSS {
       classes
 
   }
-  final class BEM[B <: StyleSheet#Block, E <: B#Element] private[webServer] (
+  final class BEM[B <: StyleSheet#Block, E <: B#Element] private[pye] (
       modifiersOnly: Boolean,
       block: B,
       element: E,

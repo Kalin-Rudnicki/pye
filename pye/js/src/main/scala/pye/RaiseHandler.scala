@@ -11,18 +11,18 @@ import klib.utils.Var
 import pye.Implicits._
 
 final class RaiseHandler[S, -A](
-    private[webServer] val initialState: S,
-    private[webServer] val handleRaise: Raise[S, A] => AsyncIO[Unit],
+    private[pye] val initialState: S,
+    private[pye] val handleRaise: Raise[S, A] => AsyncIO[Unit],
 ) {
 
   type RaiseT[A2] = Raise[S, A2]
 
-  private[webServer] var _state: S = initialState
-  private[webServer] var _global: Boolean = false
+  private[pye] var _state: S = initialState
+  private[pye] var _global: Boolean = false
 
   // =====|  |=====
 
-  private[webServer] def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): AsyncIO[Unit] =
+  private[pye] def handleRaises[A2 <: A](raises: List[RaiseT[A2]]): AsyncIO[Unit] =
     AsyncIO.runSequentially(raises.map(handleRaise)).map { _ => }
 
   private def handleAndRun[A2 <: A](raises: List[RaiseT[A2]]): Unit =
@@ -61,7 +61,7 @@ final class RaiseHandler[S, -A](
       },
     )
 
-  private[webServer] def captureUpdateState(
+  private[pye] def captureUpdateState(
       widget: Widget[_, S, A],
       elements: Var[Widget.ElementT],
   )(

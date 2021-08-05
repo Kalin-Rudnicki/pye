@@ -44,17 +44,17 @@ final class Page[Env] private[Page] (
       }
     } yield ()
 
-  private[webServer] def _push(): AsyncIO[Unit] =
+  private[pye] def _push(): AsyncIO[Unit] =
     _renderAnd { env =>
       window.history.pushState(null, titleF(env), path)
     }
 
-  private[webServer] def _replace(): AsyncIO[Unit] =
+  private[pye] def _replace(): AsyncIO[Unit] =
     _renderAnd { env =>
       window.history.replaceState(null, titleF(env), path)
     }
 
-  private[webServer] def _replaceNoTrace(): AsyncIO[Unit] =
+  private[pye] def _replaceNoTrace(): AsyncIO[Unit] =
     _renderAnd { _ => }
 
   // TODO (KR) : Remove `_`, and remove deprecated

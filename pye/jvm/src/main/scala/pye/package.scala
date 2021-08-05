@@ -1,4 +1,4 @@
-package pye
+//
 
 import java.io.File
 import java.util.UUID
@@ -11,10 +11,9 @@ import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
 import klib.utils.Logger.{helpers => L}
-import klib.utils.Logger.helpers.Implicits._
 import pye.db._
 
-package object webServer {
+package object pye {
 
   final case class ServerRes(
       dbFile: File,
