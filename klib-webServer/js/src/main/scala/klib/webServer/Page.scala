@@ -10,7 +10,6 @@ import scalatags.JsDom.tags2
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.webServer.widget.Raise
 
 final class Page[Env] private[Page] (
     path: String,
@@ -61,16 +60,11 @@ final class Page[Env] private[Page] (
 
   @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
   def renderAnd(and: Env => Unit): Unit = {
-    implicit val eh: ErrorHandler = errorHandler
-    _renderAnd(and).runASync { res =>
-      console.log("Stop using the deprecated page-changer")
-      res match {
-        case Alive(_) =>
-        case Dead(errors) =>
-          errors.map(Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
-      }
-    }
-  }
+    for {
+      _ <- _renderAnd(and)
+      _ <- AsyncIO(console.log("Stop using the deprecated page-changer"))
+    } yield ()
+  }.runAndShowErrors()
 
   @deprecated(message = "Use new widget framework to change pages", since = "2.0.2")
   def push(): Unit =

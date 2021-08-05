@@ -7,7 +7,6 @@ import org.scalajs.dom.raw.HTMLElement
 import scalatags.JsDom.all._
 import klib.Implicits._
 import klib.fp.types._
-import klib.webServer
 import klib.webServer._
 
 trait containers {

@@ -26,11 +26,7 @@ final class RaiseHandler[S, -A](
     AsyncIO.runSequentially(raises.map(handleRaise)).map { _ => }
 
   private def handleAndRun[A2 <: A](raises: List[RaiseT[A2]]): Unit =
-    handleRaises(raises).runASync {
-      case Alive(_) =>
-      case Dead(errors) =>
-        errors.map(Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
-    }
+    handleRaises(raises).runAndShowErrors()
 
   def apply[A2 <: A](r0: RaiseT[A2], rN: RaiseT[A2]*): Unit =
     handleAndRun(r0 :: rN.toList)

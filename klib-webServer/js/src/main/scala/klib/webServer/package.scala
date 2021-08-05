@@ -1,5 +1,7 @@
 package klib
 
+import scala.concurrent.ExecutionContext
+
 import org.scalajs.dom._
 import scalatags.JsDom.all._
 
@@ -41,6 +43,17 @@ package object webServer {
         // TODO (KR) :
         window.alert(msg.message)
     }
+  }
+
+  implicit class AsyncIOOps[T](asyncIO: AsyncIO[T]) {
+
+    def runAndShowErrors()(implicit ec: ExecutionContext): Unit =
+      asyncIO.runASync {
+        case Alive(_) =>
+        case Dead(errors) =>
+          errors.map(widget.Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
+      }
+
   }
 
 }
