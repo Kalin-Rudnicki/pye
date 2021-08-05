@@ -47,9 +47,10 @@ package object webServer {
 
   implicit class AsyncIOOps[T](asyncIO: AsyncIO[T]) {
 
-    def runAndShowErrors()(implicit ec: ExecutionContext): Unit =
+    def runAndShowErrors(onComplete: T => Unit = (_: T) => ())(implicit ec: ExecutionContext): Unit =
       asyncIO.runASync {
-        case Alive(_) =>
+        case Alive(res) =>
+          onComplete(res)
         case Dead(errors) =>
           errors.map(widget.Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
       }
