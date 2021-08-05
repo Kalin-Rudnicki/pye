@@ -4,13 +4,13 @@ import pye.CSS._
 
 trait modifiers {
 
-  object KwsS extends StyleSheet {
+  object PyeS extends StyleSheet {
 
-    object `klws:label` extends Block
-    object `klws:input` extends Block
-    object `klws:text-area` extends Block
+    object `pye:label` extends Block
+    object `pye:input` extends Block
+    object `pye:text-area` extends Block
 
-    object `kws:radio-group` extends Block {
+    object `pye:radio-group` extends Block {
       object option extends Element {
         object first extends Modifier
         object last extends Modifier

@@ -90,7 +90,7 @@ object Page {
 
     object names {
 
-      val KWSStandardStyle = "klib-webserver-standard-style"
+      val PyeStandardStyle = "pye-standard-style"
 
       val PageTopHeight = "--page-top-height"
       val PageBottomHeight = "--page-bottom-height"
@@ -314,13 +314,13 @@ object Page {
           val pageTopHeight = pageTop.cata(_._1, "0px")
           val pageBottomHeight = pageBottom.cata(_._1, "0px")
 
-          val currentStyles = document.head.getElementsByClassName(N.KWSStandardStyle)
+          val currentStyles = document.head.getElementsByClassName(N.PyeStandardStyle)
           0.until(currentStyles.length).foreach { i =>
             document.head.removeChild(currentStyles(i))
           }
           document.head.insertBefore(
             tags2
-              .style(`class` := N.KWSStandardStyle)(
+              .style(`class` := N.PyeStandardStyle)(
                 s"""
                    | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
                    | body { margin: 0; padding: 0; }

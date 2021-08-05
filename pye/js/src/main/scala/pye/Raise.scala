@@ -43,7 +43,7 @@ object Raise {
         apply(
           message = message,
           timeout = timeout,
-          modifiers = (KwsS.message.m(_.info): Modifier) :: modifiers,
+          modifiers = (PyeS.message.m(_.info): Modifier) :: modifiers,
         )
 
       def error(
@@ -54,7 +54,7 @@ object Raise {
         apply(
           message = message,
           timeout = timeout,
-          modifiers = (KwsS.message.m(_.error): Modifier) :: modifiers,
+          modifiers = (PyeS.message.m(_.error): Modifier) :: modifiers,
         )
 
     }

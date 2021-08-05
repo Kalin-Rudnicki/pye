@@ -85,7 +85,7 @@ trait inputs {
     )(
       updateOn = updateOn,
       decorators = Seq[Modifier](
-        KwsS.`klws:input`,
+        PyeS.`pye:input`,
       ) ++ decorators,
     )
 
@@ -99,7 +99,7 @@ trait inputs {
     )(
       updateOn = updateOn,
       decorators = Seq[Modifier](
-        KwsS.`klws:text-area`,
+        PyeS.`pye:text-area`,
       ) ++ decorators,
     )
 
@@ -111,7 +111,7 @@ trait inputs {
       decorators: Seq[Modifier] = Seq.empty,
       elementDecorators: Seq[Modifier] = Seq.empty,
   ): Widget[Maybe[T], Maybe[T], Nothing] = {
-    val actualDecorators = Seq[Modifier](KwsS.`kws:radio-group`) ++ decorators
+    val actualDecorators = Seq[Modifier](PyeS.`pye:radio-group`) ++ decorators
 
     Widget.builder
       .withState[Maybe[T]]
@@ -123,12 +123,12 @@ trait inputs {
           options.zipWithIndex.map {
             case ((_label, t), i) =>
               span(
-                KwsS.`kws:radio-group`
+                PyeS.`pye:radio-group`
                   .e(_.option)
                   .--?(
-                    (i == selectedIndex) -> KwsS.`kws:radio-group`.option.selected,
-                    (i == 0) -> KwsS.`kws:radio-group`.option.first,
-                    (i == options.length - 1) -> KwsS.`kws:radio-group`.option.last,
+                    (i == selectedIndex) -> PyeS.`pye:radio-group`.option.selected,
+                    (i == 0) -> PyeS.`pye:radio-group`.option.first,
+                    (i == options.length - 1) -> PyeS.`pye:radio-group`.option.last,
                   ),
                 onclick := { (e: MouseEvent) =>
                   if (e.ctrlKey) {
