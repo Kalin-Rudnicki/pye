@@ -9,6 +9,9 @@ trait modifiers {
     object `pye:label` extends Block
     object `pye:input` extends Block
     object `pye:text-area` extends Block
+    object `pye:file-input` extends Block {
+      object file extends Element
+    }
 
     object `pye:radio-group` extends Block {
       object option extends Element {

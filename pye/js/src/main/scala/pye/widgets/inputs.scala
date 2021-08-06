@@ -1,5 +1,7 @@
 package pye.widgets
 
+import scala.scalajs.js
+
 import org.scalajs.dom
 import org.scalajs.dom._
 import scalatags.JsDom.all._
@@ -44,7 +46,7 @@ trait inputs {
             rh.raiseAction(CommonRaise.Submit)
           } else
             updateOn match {
-              case UpdateOn.KeyPress(timeout) =>
+              case UpdateOn.KeyPress(timeout) => // TODO (KR) : Doesnt seem to be picking up on backspaces...
                 timeout match {
                   case Some(timeout) =>
                     savedTimeout.foreach(window.clearTimeout)
@@ -105,7 +107,148 @@ trait inputs {
 
   // ---  ---
 
-  def radioGroup[T](
+  private def genFileInputW[VS[_]](
+      fromFileList: List[File] => ?[Maybe[VS[File]]],
+      vsToList: VS[File] => List[File], // TODO (KR) : Ability to vary appearance
+  )(
+      fileType: Maybe[String],
+      onEmpty: Maybe[Element],
+  )(implicit
+      vsFunctor: Functor[VS],
+      vsTraverseList: Traverse[VS, ?],
+  ): Widget[Maybe[VS[File]], Maybe[VS[File]], Nothing] = {
+    def ensureFileType(
+        fileType: String,
+        file: File,
+    ): ?[File] =
+      if (fileType.startsWith("."))
+        file
+          .ensure(_.name.endsWith(fileType))
+          .toEA(Message(s"Invalid file-type: ${file.name}"))
+      else {
+        // TODO (KR) :
+        file.pure[?]
+      }
+
+    Widget.builder
+      .withState[Maybe[VS[File]]]
+      .withAction[Nothing]
+      .elementSA { (rh, s) =>
+        def setState(files: FileList): Unit = {
+          val fileList: List[File] =
+            0.until(files.length)
+              .toList
+              .map(files(_))
+
+          val res =
+            for {
+              fromList <- fromFileList(fileList)
+              ensured <- fileType match {
+                case Some(fileType) =>
+                  fromList.map(_.map(ensureFileType(fileType, _)).traverse).traverse
+                case None =>
+                  fromList.pure[?]
+              }
+            } yield ensured
+
+          res match {
+            case Alive(res) =>
+              rh.raise(Raise.UpdateState[Maybe[VS[File]]](_ => res))
+            case Dead(errors) =>
+              rh.raises(errors.map(Raise.DisplayMessage.fromThrowable))
+          }
+        }
+
+        val fileInput =
+          input(
+            `type` := "file",
+            fileType.map(accept := _).toOption,
+            multiple,
+            display := "none",
+          ).render
+
+        fileInput.onchange = { e =>
+          val files: FileList =
+            e.target
+              .asInstanceOf[js.Dynamic]
+              .files
+              .asInstanceOf[FileList]
+
+          setState(files)
+        }
+
+        div(
+          fileInput,
+          PyeS.`pye:file-input`,
+          onclick := { (_: Event) =>
+            fileInput.click()
+          // TODO (KR) :
+          },
+          ondragleave := { (_: Event) =>
+            // TODO (KR) :
+          },
+          ondragend := { (_: Event) =>
+            // TODO (KR) :
+          },
+          ondragover := { (e: Event) =>
+            e.preventDefault()
+          // TODO (KR) :
+          },
+          ondrop := { (e: DragEvent) =>
+            e.preventDefault()
+            setState(e.dataTransfer.files)
+          },
+        )(
+          s.cata(
+            vsToList(_).map { file =>
+              span(PyeS.`pye:file-input`.file)(file.name)
+            },
+            onEmpty.toOption,
+          ),
+        ).render
+      }
+      .withValue { s =>
+        s.pure[?]
+      }
+  }
+
+  private def defaultOnEmpty: Element =
+    span("Click or drag to select file").render
+
+  def fileInputW(
+      fileType: Maybe[String] = None,
+      onEmpty: Maybe[Element] = defaultOnEmpty.some,
+  ): Widget[Maybe[File], Maybe[File], Nothing] =
+    genFileInputW[Identity](
+      {
+        case Nil =>
+          None.pure[?]
+        case head :: Nil =>
+          head.some.pure[?]
+        case _ =>
+          ?.dead(Message("This input does not support multiple files"))
+      },
+      _ :: Nil,
+    )(
+      fileType = fileType,
+      onEmpty = onEmpty,
+    )
+
+  def multiFileInputW(
+      fileType: Maybe[String] = None,
+      onEmpty: Maybe[Element] = defaultOnEmpty.some,
+  ): Widget[Maybe[NonEmptyList[File]], Maybe[NonEmptyList[File]], Nothing] =
+    genFileInputW[NonEmptyList](
+      _.toNel.pure[?],
+      _.toList,
+    )(
+      fileType = fileType,
+      onEmpty = onEmpty,
+    )
+
+  // ---  ---
+
+  def radioGroupW[T](
       options: Array[(String, T)],
       allowUnset: Boolean = false,
       decorators: Seq[Modifier] = Seq.empty,

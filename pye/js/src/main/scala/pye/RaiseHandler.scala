@@ -136,7 +136,6 @@ object RaiseHandler {
       initialState = initialState,
       handleRaise = { raise =>
         def handleStandard(std: Raise.Standard[S]): AsyncIO[Unit] = {
-          console.log(std.toString)
           std match {
             case Raise.UpdateState(_, _) =>
               // NOTE : All updates should have been properly handled already...
