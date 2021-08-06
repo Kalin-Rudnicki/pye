@@ -40,30 +40,25 @@ final case class Widget[V, S, +A](
 
   // =====|  |=====
 
-  def handleAction[A2](
-      f: (S, ?[V], A) => AsyncIO[List[Raise[S, A2]]],
+  def handleRaise[A2](
+      f: (S, ?[V], Raise[S, A]) => AsyncIO[List[Raise[S, A2]]],
   )(implicit ec: ExecutionContext): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
         lazy val rh2: RaiseHandler[S, A] =
           new RaiseHandler[S, A](
             initialState = rh.initialState,
-            handleRaise = {
-              case standard: Raise.Standard[S] =>
-                standard match {
+            handleRaise = { raise =>
+              for {
+                _ <- raise match {
                   case updateState: Raise.UpdateState[S] =>
-                    for {
-                      _ <- AsyncIO { rh2._state = updateState.updateState(rh2._state) }
-                      _ <- rh.handleRaise(updateState)
-                    } yield ()
+                    AsyncIO { rh2._state = updateState.updateState(rh2._state) }
                   case _ =>
-                    rh.handleRaise(standard)
+                    ().pure[AsyncIO]
                 }
-              case action: Raise.Action[A] =>
-                for {
-                  raises <- f(rh2._state, valueF(rh2._state), action.action)
-                  _ <- rh.handleRaises(raises)
-                } yield ()
+                newRaises <- f(rh2._state, valueF(rh2._state), raise)
+                _ <- rh.handleRaises(newRaises)
+              } yield ()
             },
           )
 
@@ -71,6 +66,32 @@ final case class Widget[V, S, +A](
       },
       valueF = valueF,
     )
+
+  def handleAction[A2](
+      f: (S, ?[V], A) => AsyncIO[List[Raise[S, A2]]],
+  )(implicit ec: ExecutionContext): Widget[V, S, A2] =
+    handleRaise { (s, v, raise) =>
+      raise match {
+        case Raise.Action(action) =>
+          f(s, v, action)
+        case standard: Raise.Standard[S] =>
+          (standard :: Nil).pure[AsyncIO]
+      }
+    }
+
+  def onUpdateState[A2 >: A](
+      f: (S, ?[V]) => AsyncIO[List[Raise[S, A2]]],
+  )(implicit ec: ExecutionContext): Widget[V, S, A2] =
+    handleRaise { (s, v, raise) =>
+      raise match {
+        case updateState: Raise.UpdateState[S] =>
+          for {
+            newRaises <- f(s, v)
+          } yield updateState :: newRaises
+        case r =>
+          (r :: Nil).pure[AsyncIO]
+      }
+    }
 
   // =====|  |=====
 
