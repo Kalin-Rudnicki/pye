@@ -4,6 +4,8 @@ import org.scalajs.dom._
 import scalatags.JsDom.all._
 
 import pye._
+import pye.Implicits._
+import pye.widgets.modifiers._
 
 trait forms {
 
@@ -12,7 +14,7 @@ trait forms {
       // TODO (KR) : Decorators
   ): Widget.Submit[Unit, S] =
     Widget.builder.withState.submitAction.elementA { (rh: RaiseHandler[S, CommonRaise.Submit.type]) =>
-      button(
+      button(PyeS.`pye:form-button`)(
         onclick := { (_: Event) =>
           rh.raiseAction(CommonRaise.Submit)
         },

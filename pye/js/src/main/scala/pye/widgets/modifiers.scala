@@ -21,6 +21,8 @@ trait modifiers {
       }
     }
 
+    object `pye:form-button` extends Block
+
     object message extends Block {
       object info extends Modifier
       object error extends Modifier

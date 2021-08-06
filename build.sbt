@@ -62,6 +62,8 @@ lazy val pye =
       ),
       scalaVersion := Scala_2_13,
       sonatypeCredentialHost := "s01.oss.sonatype.org",
+      // TODO (KR) :
+      version := "3.0.7-SNAP-5",
     )
     .jsSettings(
       libraryDependencies ++= Seq(

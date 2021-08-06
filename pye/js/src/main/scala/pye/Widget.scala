@@ -141,6 +141,8 @@ final case class Widget[V, S, +A](
           .flatten
           .toList,
       ).render
+    }.mapError { throwable =>
+      Message(s"${_label} ${Maybe(throwable.getMessage).getOrElse(throwable.toString)}")
     }
 
   // =====|  |=====
@@ -161,6 +163,17 @@ final case class Widget[V, S, +A](
     Widget[V2, S, A](
       elementF = elementF,
       valueF = valueF(_).flatMap(f),
+    )
+
+  def mapError(f: Throwable => Throwable): Widget[V, S, A] =
+    Widget[V, S, A](
+      elementF = elementF,
+      valueF = valueF(_) match {
+        case Alive(r) =>
+          r.pure[?]
+        case Dead(errors) =>
+          Dead(errors.map(f))
+      },
     )
 
 }
