@@ -79,12 +79,6 @@ final class RaiseHandler[S, -A](
               _ <- AsyncIO {
                 newRH._state = updateState.updateState(newRH._state)
                 if (updateState.reRender) {
-                  /*
-                  console.log("")
-                  console.log(s"reRender:")
-                  console.log(newRH._state.toString)
-                   */
-
                   val newElements = widget.elementF(newRH, newRH._state)
                   RaiseHandler.replaceNodes(elements.value, newElements)
                   (elements.value = newElements).runSyncOrDump(None)
@@ -123,8 +117,6 @@ object RaiseHandler {
           parent.appendChild
       }
     oldElems.foreach { parent.removeChild }
-
-    // console.log("Adding:")
     newElems.foreach { addNode }
   }
 

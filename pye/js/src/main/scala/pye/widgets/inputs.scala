@@ -110,6 +110,7 @@ trait inputs {
   private def genFileInputW[VS[_]](
       fromFileList: List[File] => ?[Maybe[VS[File]]],
       vsToList: VS[File] => List[File], // TODO (KR) : Ability to vary appearance
+      allowMulti: Boolean,
   )(
       fileType: Maybe[String],
       onEmpty: Maybe[Element],
@@ -134,12 +135,7 @@ trait inputs {
       .withState[Maybe[VS[File]]]
       .withAction[Nothing]
       .elementSA { (rh, s) =>
-        def setState(files: FileList): Unit = {
-          val fileList: List[File] =
-            0.until(files.length)
-              .toList
-              .map(files(_))
-
+        def setState(fileList: List[File]): Unit = {
           val res =
             for {
               fromList <- fromFileList(fileList)
@@ -159,11 +155,16 @@ trait inputs {
           }
         }
 
+        def fileListToList(files: FileList): List[File] =
+          0.until(files.length)
+            .toList
+            .map(files(_))
+
         val fileInput =
           input(
             `type` := "file",
             fileType.map(accept := _).toOption,
-            multiple,
+            allowMulti.maybe(multiple).toOption,
             display := "none",
           ).render
 
@@ -174,7 +175,7 @@ trait inputs {
               .files
               .asInstanceOf[FileList]
 
-          setState(files)
+          setState(fileListToList(files))
         }
 
         div(
@@ -196,7 +197,14 @@ trait inputs {
           },
           ondrop := { (e: DragEvent) =>
             e.preventDefault()
-            setState(e.dataTransfer.files)
+            setState(
+              e.ctrlKey.maybe(s).flatten.cata(vsToList, Nil) ++
+                fileListToList(e.dataTransfer.files),
+            )
+          },
+          oncontextmenu := { (e: Event) =>
+            e.preventDefault()
+            setState(Nil)
           },
         )(
           s.cata(
@@ -220,7 +228,7 @@ trait inputs {
       onEmpty: Maybe[Element] = defaultOnEmpty.some,
   ): Widget[Maybe[File], Maybe[File], Nothing] =
     genFileInputW[Identity](
-      {
+      fromFileList = {
         case Nil =>
           None.pure[?]
         case head :: Nil =>
@@ -228,7 +236,8 @@ trait inputs {
         case _ =>
           ?.dead(Message("This input does not support multiple files"))
       },
-      _ :: Nil,
+      vsToList = _ :: Nil,
+      allowMulti = false,
     )(
       fileType = fileType,
       onEmpty = onEmpty,
@@ -239,8 +248,9 @@ trait inputs {
       onEmpty: Maybe[Element] = defaultOnEmpty.some,
   ): Widget[Maybe[NonEmptyList[File]], Maybe[NonEmptyList[File]], Nothing] =
     genFileInputW[NonEmptyList](
-      _.toNel.pure[?],
-      _.toList,
+      fromFileList = _.toNel.pure[?],
+      vsToList = _.toList,
+      allowMulti = true,
     )(
       fileType = fileType,
       onEmpty = onEmpty,
