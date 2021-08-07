@@ -75,7 +75,6 @@ final class RaiseHandler[S, -A](
         handleRaise = {
           case updateState: Raise.UpdateState[S] =>
             for {
-              _ <- outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
               _ <- AsyncIO {
                 newRH._state = updateState.updateState(newRH._state)
                 if (updateState.reRender) {
@@ -85,6 +84,7 @@ final class RaiseHandler[S, -A](
                 }
                 withNewState(newRH._state)
               }
+              _ <- outer.handleRaise(Raise.UpdateState[S](updateState.updateState, false))
             } yield ()
           case raise =>
             outer.handleRaise(raise)

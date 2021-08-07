@@ -2,8 +2,12 @@ package pye
 
 import scala.concurrent.ExecutionContext
 
+import scalatags.JsDom.all._
+
 import klib.Implicits._
 import klib.fp.types._
+import klib.fp.utils._
+import pye.CommonRaise.SubmitOr
 
 trait Implicits {
 
@@ -18,6 +22,48 @@ trait Implicits {
 
     def renderNoAction(initialState: S)(implicit ec: ExecutionContext): Widget.ElementT =
       widget.render { _ => Nil.pure[AsyncIO] }(initialState)
+
+  }
+
+  implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
+
+    def toFormMapO[R, A](
+        endpoint: V => AsyncIO[R],
+        thenRaise: R => AsyncIO[List[Raise[S, A]]],
+        mapO: O => AsyncIO[List[Raise[S, A]]],
+        submitButtonLabel: String = "Submit",
+    )(implicit ec: ExecutionContext): Widget[V, S, A] =
+      ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P]
+        .join(
+          widget,
+          Widget.builder.element(br.render),
+          widgets.forms.submitButton(submitButtonLabel),
+        )
+        .mapValue(_._1)
+        .handleAction { (_, v, a) =>
+          a match {
+            case CommonRaise.Submit =>
+              for {
+                aliveV <- AsyncIO.wrapEffect(v)
+                endpointRes <- endpoint(aliveV)
+                thenRaiseRes <- thenRaise(endpointRes)
+              } yield thenRaiseRes
+            case SubmitOr.Or(or) =>
+              mapO(or)
+          }
+        }
+
+    def toForm[R, A >: O](
+        endpoint: V => AsyncIO[R],
+        thenRaise: R => AsyncIO[List[Raise[S, A]]],
+        submitButtonLabel: String = "Submit",
+    )(implicit ec: ExecutionContext): Widget[V, S, A] =
+      toFormMapO(
+        endpoint = endpoint,
+        thenRaise = thenRaise,
+        submitButtonLabel = submitButtonLabel,
+        mapO = o => AsyncIO(Raise.Action(o) :: Nil),
+      )
 
   }
 

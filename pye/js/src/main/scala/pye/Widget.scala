@@ -80,14 +80,14 @@ final case class Widget[V, S, +A](
     }
 
   def onUpdateState[A2 >: A](
-      f: (S, ?[V]) => AsyncIO[List[Raise[S, A2]]],
+      f: (S, ?[V], Raise.UpdateState[S]) => AsyncIO[List[Raise[S, A2]]],
   )(implicit ec: ExecutionContext): Widget[V, S, A2] =
     handleRaise { (s, v, raise) =>
       raise match {
         case updateState: Raise.UpdateState[S] =>
           for {
-            newRaises <- f(s, v)
-          } yield updateState :: newRaises
+            newRaises <- f(s, v, updateState)
+          } yield newRaises
         case r =>
           (r :: Nil).pure[AsyncIO]
       }
