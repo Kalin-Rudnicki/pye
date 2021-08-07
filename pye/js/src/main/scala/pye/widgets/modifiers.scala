@@ -11,6 +11,8 @@ trait modifiers {
     object `pye:text-area` extends Block
     object `pye:file-input` extends Block {
       object file extends Element
+
+      object `dragged-into` extends Modifier
     }
 
     object `pye:radio-group` extends Block {

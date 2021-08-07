@@ -160,7 +160,7 @@ trait inputs {
             .toList
             .map(files(_))
 
-        val fileInput =
+        val hiddenFileInput =
           input(
             `type` := "file",
             fileType.map(accept := _).toOption,
@@ -168,7 +168,7 @@ trait inputs {
             display := "none",
           ).render
 
-        fileInput.onchange = { e =>
+        hiddenFileInput.onchange = { e =>
           val files: FileList =
             e.target
               .asInstanceOf[js.Dynamic]
@@ -178,42 +178,46 @@ trait inputs {
           setState(fileListToList(files))
         }
 
-        div(
-          fileInput,
-          PyeS.`pye:file-input`,
-          onclick := { (_: Event) =>
-            fileInput.click()
-          // TODO (KR) :
-          },
-          ondragleave := { (_: Event) =>
-            // TODO (KR) :
-          },
-          ondragend := { (_: Event) =>
-            // TODO (KR) :
-          },
-          ondragover := { (e: Event) =>
-            e.preventDefault()
-          // TODO (KR) :
-          },
-          ondrop := { (e: DragEvent) =>
-            e.preventDefault()
-            setState(
-              e.ctrlKey.maybe(s).flatten.cata(vsToList, Nil) ++
-                fileListToList(e.dataTransfer.files),
-            )
-          },
-          oncontextmenu := { (e: Event) =>
-            e.preventDefault()
-            setState(Nil)
-          },
-        )(
-          s.cata(
-            vsToList(_).map { file =>
-              span(PyeS.`pye:file-input`.file)(file.name)
+        val fileInput =
+          div(
+            hiddenFileInput,
+            PyeS.`pye:file-input`,
+            oncontextmenu := { (e: Event) =>
+              e.preventDefault()
+              setState(Nil)
             },
-            onEmpty.toOption,
-          ),
-        ).render
+          )(
+            s.cata(
+              vsToList(_).map { file =>
+                span(PyeS.`pye:file-input`.file)(file.name)
+              },
+              onEmpty.toOption,
+            ),
+          ).render
+
+        fileInput.onclick = { _ =>
+          // TODO (KR) : Ctrl + click to add
+          hiddenFileInput.click()
+        }
+        fileInput.ondragover = { e =>
+          e.preventDefault()
+          fileInput.classList.add(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
+        }
+        fileInput.ondragleave = { _ =>
+          fileInput.classList.remove(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
+        }
+        fileInput.ondragend = { _ =>
+          fileInput.classList.remove(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
+        }
+        fileInput.ondrop = { e =>
+          e.preventDefault()
+          setState(
+            e.ctrlKey.maybe(s).flatten.cata(vsToList, Nil) ++
+              fileListToList(e.dataTransfer.files),
+          )
+        }
+
+        fileInput
       }
       .withValue { s =>
         s.pure[?]
