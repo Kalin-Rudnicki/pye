@@ -4,19 +4,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.scalajs.js.URIUtils
 
 import org.scalajs.dom._
-import org.scalajs.dom.html._
+import org.scalajs.dom.{html => H}
 import scalatags.JsDom.all._
 import scalatags.JsDom.tags2
 
 import klib.Implicits._
 import klib.fp.types._
 import pye.Implicits._
+import pye.widgets.modifiers.PyeS
 
 final class Page[Env] private[Page] (
     path: String,
     envF: () => AsyncIO[Env],
     titleF: Env => String,
-    bodyF: Env => Body,
+    bodyF: Env => H.Body,
     errorHandler: ErrorHandler,
     keyMap: KeyMap,
 ) {
@@ -120,6 +121,30 @@ object Page {
 
   }
 
+  // =====|  |=====
+
+  sealed trait NavBarItem
+  object NavBarItem {
+
+    final case class Button(
+        action: NavBarAction,
+        modifiers: Seq[Modifier],
+    ) extends NavBarItem
+    object Button {
+      def build(action: NavBarAction, modifiers: Modifier*): Button =
+        Button(action, modifiers)
+    }
+
+  }
+
+  sealed trait NavBarAction
+  object NavBarAction {
+    final case class PushPage(page: Page[_]) extends NavBarAction
+    final case class Custom(onClick: MouseEvent => Unit) extends NavBarAction
+  }
+
+  // =====|  |=====
+
   object builder {
 
     def path(paths: String*)(params: (String, String)*): Builder1 = {
@@ -139,7 +164,7 @@ object Page {
 
   final class StandardBuilder1[Env] private[Page] {
 
-    def pageCenterMiddle(build: Env => Div): StandardBuilder2[Env] =
+    def pageCenterMiddle(build: Env => H.Div): StandardBuilder2[Env] =
       new StandardBuilder2[Env](
         _pageCenterMiddle = build,
         _pageTop = None,
@@ -154,24 +179,24 @@ object Page {
   }
 
   final class StandardBuilder2[Env] private[Page] (
-      private[Page] val _pageCenterMiddle: Env => Div,
-      private[Page] val _pageTop: Maybe[Env => (String, Div)],
-      private[Page] val _pageBottom: Maybe[Env => (String, Div)],
-      private[Page] val _pageLeft: Maybe[Env => Div],
-      private[Page] val _pageRight: Maybe[Env => Div],
-      private[Page] val _pageCenterTop: Maybe[Env => Div],
-      private[Page] val _pageCenterBottom: Maybe[Env => Div],
+      private[Page] val _pageCenterMiddle: Env => H.Div,
+      private[Page] val _pageTop: Maybe[Env => (String, H.Div)],
+      private[Page] val _pageBottom: Maybe[Env => (String, H.Div)],
+      private[Page] val _pageLeft: Maybe[Env => H.Div],
+      private[Page] val _pageRight: Maybe[Env => H.Div],
+      private[Page] val _pageCenterTop: Maybe[Env => H.Div],
+      private[Page] val _pageCenterBottom: Maybe[Env => H.Div],
       private[Page] val _inBody: List[Env => List[Modifier]],
   ) {
 
     private def copy(
-        _pageCenterMiddle: Env => Div = this._pageCenterMiddle,
-        _pageTop: Maybe[Env => (String, Div)] = this._pageTop,
-        _pageBottom: Maybe[Env => (String, Div)] = this._pageBottom,
-        _pageLeft: Maybe[Env => Div] = this._pageLeft,
-        _pageRight: Maybe[Env => Div] = this._pageRight,
-        _pageCenterTop: Maybe[Env => Div] = this._pageCenterTop,
-        _pageCenterBottom: Maybe[Env => Div] = this._pageCenterBottom,
+        _pageCenterMiddle: Env => H.Div = this._pageCenterMiddle,
+        _pageTop: Maybe[Env => (String, H.Div)] = this._pageTop,
+        _pageBottom: Maybe[Env => (String, H.Div)] = this._pageBottom,
+        _pageLeft: Maybe[Env => H.Div] = this._pageLeft,
+        _pageRight: Maybe[Env => H.Div] = this._pageRight,
+        _pageCenterTop: Maybe[Env => H.Div] = this._pageCenterTop,
+        _pageCenterBottom: Maybe[Env => H.Div] = this._pageCenterBottom,
         _inBody: Maybe[Env => List[Modifier]] = None,
     ): StandardBuilder2[Env] =
       new StandardBuilder2[Env](
@@ -186,27 +211,57 @@ object Page {
       )
 
     def noPageTop: StandardBuilder2[Env] = copy(_pageTop = None)
-    def pageTop(height: String)(build: Env => Div): StandardBuilder2[Env] =
+    def pageTop(height: String)(build: Env => H.Div): StandardBuilder2[Env] =
       copy(_pageTop = Some(env => (height, build(env))))
+    def navBarTop(height: String)(items: Env => (List[NavBarItem], List[NavBarItem])): StandardBuilder2[Env] =
+      pageTop(height) { env =>
+        def convertNavBarItem(navBarItem: NavBarItem): Element =
+          navBarItem match {
+            case NavBarItem.Button(action, modifiers) =>
+              div(PyeS.`pye:nav-bar`.item)(
+                onclick := { (e: MouseEvent) =>
+                  action match {
+                    case NavBarAction.PushPage(page) =>
+                      // TODO (KR) : New Widget Actions
+                      page.push()
+                    case NavBarAction.Custom(onClick) =>
+                      onClick(e)
+                  }
+                },
+              )(modifiers).render
+          }
+
+        val (left, right) = items(env)
+
+        div(PyeS.`pye:nav-bar`)(
+          div(PyeS.`pye:nav-bar`.e(_.section).m(_.wrap))(
+            left.map(convertNavBarItem),
+          ),
+          div(PyeS.`pye:nav-bar`.e(_.section).m(_.expand)),
+          div(PyeS.`pye:nav-bar`.e(_.section).m(_.wrap))(
+            right.map(convertNavBarItem),
+          ),
+        ).render
+      }
 
     def noPageBottom: StandardBuilder2[Env] = copy(_pageBottom = None)
-    def pageBottom(height: String)(build: Env => Div): StandardBuilder2[Env] =
+    def pageBottom(height: String)(build: Env => H.Div): StandardBuilder2[Env] =
       copy(_pageBottom = Some(env => (height, build(env))))
 
     def noPageLeft: StandardBuilder2[Env] = copy(_pageLeft = None)
-    def pageLeft(build: Env => Div): StandardBuilder2[Env] =
+    def pageLeft(build: Env => H.Div): StandardBuilder2[Env] =
       copy(_pageLeft = Some(build(_)))
 
     def noPageRight: StandardBuilder2[Env] = copy(_pageRight = None)
-    def pageRight(build: Env => Div): StandardBuilder2[Env] =
+    def pageRight(build: Env => H.Div): StandardBuilder2[Env] =
       copy(_pageRight = Some(build(_)))
 
     def noPageCenterTop: StandardBuilder2[Env] = copy(_pageCenterTop = None)
-    def pageCenterTop(build: Env => Div): StandardBuilder2[Env] =
+    def pageCenterTop(build: Env => H.Div): StandardBuilder2[Env] =
       copy(_pageCenterTop = Some(build(_)))
 
     def noPageCenterBottom: StandardBuilder2[Env] = copy(_pageCenterBottom = None)
-    def pageCenterBottom(build: Env => Div): StandardBuilder2[Env] =
+    def pageCenterBottom(build: Env => H.Div): StandardBuilder2[Env] =
       copy(_pageCenterBottom = Some(build(_)))
 
     def inBody(build: Env => List[Modifier]): StandardBuilder2[Env] =
@@ -387,7 +442,7 @@ object Page {
       errorHandler: ErrorHandler,
   ) {
 
-    def body(bodyF: (Env, ErrorHandler) => Body): Page[Env] =
+    def body(bodyF: (Env, ErrorHandler) => H.Body): Page[Env] =
       new Page[Env](
         path = path,
         envF = envF,

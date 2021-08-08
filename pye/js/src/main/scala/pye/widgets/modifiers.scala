@@ -6,6 +6,17 @@ trait modifiers {
 
   object PyeS extends StyleSheet {
 
+    object `pye:nav-bar` extends Block {
+
+      object section extends Element {
+        object wrap extends Modifier
+        object expand extends Modifier
+      }
+
+      object item extends Element
+
+    }
+
     object `pye:label` extends Block
     object `pye:input` extends Block
     object `pye:text-area` extends Block
