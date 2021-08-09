@@ -36,14 +36,20 @@ trait inputs {
         val _input = inputTag(decorators).render
 
         // TODO (KR) : Make sure state is updated before re-rendering
+        def updateStateRaise(): Raise.Standard[String] =
+          Raise.UpdateState[String](_ => _input.value, reRender = false)
+
         def updateState(): Unit =
-          rh.raise(Raise.UpdateState[String](_ => _input.value, reRender = false))
+          rh.raise(updateStateRaise())
 
         _input.value = s
         _input.onkeypress = { e =>
           if (filterSubmit(e)) {
             e.preventDefault()
-            rh.raiseAction(CommonRaise.Submit)
+            rh.raise(
+              updateStateRaise(),
+              Raise.Action(CommonRaise.Submit),
+            )
           } else
             updateOn match {
               case UpdateOn.KeyPress(timeout) => // TODO (KR) : Doesnt seem to be picking up on backspaces...
