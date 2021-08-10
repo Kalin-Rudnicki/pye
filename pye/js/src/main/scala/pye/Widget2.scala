@@ -7,6 +7,7 @@ import org.scalajs.dom._
 import scalatags.JsDom.all._
 
 import klib.Implicits._
+import klib.fp.typeclass._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
@@ -21,23 +22,37 @@ object Raise2 {
   ) extends Raise2.StandardOrUpdate[S]
 
   sealed trait Standard extends Raise2.StandardOrUpdate[Nothing]
-  // TODO (KR) :
+  final case class DisplayMessage(
+      message: String,
+      modifiers: Seq[Modifier],
+      timeout: Maybe[Int],
+      causeId: Maybe[String],
+  ) extends Standard
+  sealed trait History extends Standard
+  object History {
+    final case class Push(page: Page[_]) extends History
+    final case class Replace(page: Page[_]) extends History
+    final case class Go(delta: Int) extends History
+
+    val Forward: Go = Go(1)
+    val Pop: Go = Go(-1)
+  }
 
   final case class Action[+A](action: A) extends Raise2[Nothing, A]
 }
 
 trait RaiseHandler2[S, -A] {
 
+  // TODO (KR) : Make private[pye]
   def _handleRaise(raise: Raise2[S, A]): AsyncIO[Unit]
   def _handleRaises(raises: List[Raise2[S, A]]): AsyncIO[Unit] =
     AsyncIO.runSequentially(raises.map(_handleRaise)).map { _ => }
 
+  // TODO (KR) : Add _ => Unit
+
 }
 
 sealed trait Widget2[V, S, +A] { thisWidget =>
-  type Value = V
-  type State = S
-  type Action <: A
 
   def render(
       handleActions: A => AsyncIO[List[Raise2.StandardOrUpdate[S]]],
@@ -265,32 +280,43 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
       }
 
     val appliedWidget: AppliedWidget[V] =
-      convert[V, A](
-        widget = thisWidget,
-        parentRaiseHandler = { raise =>
-          def handleStandardOrUpdate(sou: Raise2.StandardOrUpdate[S]): AsyncIO[Unit] =
-            sou match {
-              case standard: Raise2.Standard =>
-                // TODO (KR) :
-                ???
-              case Raise2.UpdateState(update, reRender) =>
+      Pointer
+        .withSelf[AppliedWidget[V]] { ptr =>
+          val rh: RaiseHandler2[S, A] = { raise =>
+            def handleStandardOrUpdate(sou: Raise2.StandardOrUpdate[S]): AsyncIO[Unit] =
+              sou match {
+                case standard: Raise2.Standard =>
+                  standard match {
+                    case msg: Raise2.DisplayMessage =>
+                      AsyncIO { displayMessage2(msg) }
+                    case history: Raise2.History =>
+                      history match {
+                        case Raise2.History.Push(page)    => page._push()
+                        case Raise2.History.Replace(page) => page._replace()
+                        case Raise2.History.Go(delta)     => AsyncIO { window.history.go(delta) }
+                      }
+                  }
+                case Raise2.UpdateState(update, reRender) =>
+                  for {
+                    _ <- AsyncIO.wrapIO(stateVar.value = update(stateVar.value))
+                    _ <- AsyncIO.wrapIO { reRender.maybe(ptr.value.reRender).traverse }
+                  } yield ()
+              }
+
+            raise match {
+              case sou: Raise2.StandardOrUpdate[S] =>
+                handleStandardOrUpdate(sou)
+              case Raise2.Action(action) =>
                 for {
-                  _ <- AsyncIO.wrapIO(stateVar.value = update(stateVar.value))
-                  // TODO (KR) : reRender
+                  sous <- handleActions(action)
+                  _ <- AsyncIO.runSequentially(sous.map(handleStandardOrUpdate))
                 } yield ()
             }
-
-          raise match {
-            case sou: Raise2.StandardOrUpdate[S] =>
-              handleStandardOrUpdate(sou)
-            case Raise2.Action(action) =>
-              for {
-                sous <- handleActions(action)
-                _ <- AsyncIO.runSequentially(sous.map(handleStandardOrUpdate))
-              } yield ()
           }
-        }, // TODO (KR) :
-      )
+
+          Pointer(convert(thisWidget, rh))
+        }
+        .value
 
     appliedWidget.reRender.runSyncOrThrow(None).toList
   }
@@ -324,7 +350,7 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Possibly make more efficient
-  def _apply[A0 >: A, V2](
+  private def _apply[A0 >: A, V2](
       w: Widget2[V => V2, S, A0],
   ): Widget2[V2, S, A0] =
     new Widget2.Apply[V2, S, A0] {
@@ -334,7 +360,7 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Possibly make more efficient
-  def _flatMap[A0 >: A, V2](
+  private def _flatMap[A0 >: A, V2](
       wF: V => Widget2[V2, S, A0],
   ): Widget2[V2, S, A0] =
     new Widget2.FlatMap[V2, S, A0] {
@@ -413,6 +439,33 @@ object Widget2 {
 
   // =====|  |=====
 
+  def element[V, S, A](
+      elementF: RaiseHandler2[S, A] => S => Element,
+      valueF: S => ?[V],
+  ): Widget2[V, S, A] =
+    elements[V, S, A](
+      elementF = rh => s => NonEmptyList.nel(elementF(rh)(s)),
+      valueF = valueF,
+    )
+
+  def elements[V, S, A](
+      elementF: RaiseHandler2[S, A] => S => Widget2.ElementT,
+      valueF: S => ?[V],
+  ): Widget2[V, S, A] = {
+    val _elementF = elementF
+    val _valueF = valueF
+
+    new Widget2.Leaf[V, S, A] {
+      override private[pye] final type LeafS = S
+      override private[pye] final type LeafA = A
+      override private[pye] final val lens: Lens[S, S] = Lens.id[S]
+      override private[pye] final val elementF: RaiseHandler2[S, A] => S => ElementT = _elementF
+      override private[pye] final val valueF: S => ?[V] = _valueF
+    }
+  }
+
+  // =====|  |=====
+
   private[pye] def replaceNodes(oldElems: Widget2.ElementT, newElems: Widget2.ElementT): IO[Unit] = {
     val parent = oldElems.head.parentNode
     val addNode: Node => Unit =
@@ -462,6 +515,32 @@ object Widget2 {
     private[pye] val w1: Widget2[V1, S, A]
     private[pye] val w2: V1 => Widget2[V, S, A]
   }
+
+  // =====|  |=====
+
+  type Projection[S, A] = { type P[V] = Widget2[V, S, A] }
+
+  implicit def widgetMonad[S, A]: Monad[Widget2.Projection[S, A]#P] =
+    new Monad[Projection[S, A]#P] {
+
+      override def map[V1, V2](t: Widget2[V1, S, A], f: V1 => V2): Widget2[V2, S, A] =
+        t.mapValue(f)
+
+      override def apply[V1, V2](t: Widget2[V1, S, A], f: Widget2[V1 => V2, S, A]): Widget2[V2, S, A] =
+        t._apply(f)
+
+      // NOTE : This should really never be used, but is needed for Applicative
+      //      : It would also be nice if ElementT could be an empty List,
+      //      : but at least for the time being, NonEmptyList is necessary
+      override def pure[V1](a: => V1): Widget2[V1, S, A] = {
+        // TODO (KR) :
+        ???
+      }
+
+      override def flatMap[V1, V2](t: Widget2[V1, S, A], f: V1 => Widget2[V2, S, A]): Widget2[V2, S, A] =
+        t._flatMap(f)
+
+    }
 
 }
 

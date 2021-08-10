@@ -43,4 +43,9 @@ package object pye {
     }
   }
 
+  def displayMessage2(msg: Raise2.DisplayMessage): Unit = {
+    // TODO (KR) :
+    ???
+  }
+
 }
