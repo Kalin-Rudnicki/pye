@@ -1,7 +1,5 @@
 package pye
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 import monocle.Lens
 import org.scalajs.dom._
 

@@ -1,6 +1,5 @@
 package pye
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.scalajs.js.URIUtils
 
 import org.scalajs.dom._

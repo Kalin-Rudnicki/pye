@@ -1,7 +1,5 @@
 package pye.legacyWidgets
 
-import scala.concurrent.ExecutionContext
-
 import org.scalajs.dom._
 import scalatags.JsDom.all._
 
@@ -171,7 +169,7 @@ object Widget {
         decorators: containers.FormDecorators = containers.FormDecorators(),
     )(
         onSuccess: R => Unit,
-    )(implicit ec: ExecutionContext, errorHandler: ErrorHandler): Builder[V, S] =
+    )(implicit errorHandler: ErrorHandler): Builder[V, S] =
       containers.form(
         this,
         endpoint,

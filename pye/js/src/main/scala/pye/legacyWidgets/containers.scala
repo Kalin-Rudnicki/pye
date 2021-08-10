@@ -1,7 +1,5 @@
 package pye.legacyWidgets
 
-import scala.concurrent.ExecutionContext
-
 import org.scalajs.dom._
 import org.scalajs.dom.html.Div
 import org.scalajs.dom.raw.HTMLElement
@@ -27,7 +25,7 @@ trait containers {
       decorators: FormDecorators = FormDecorators(),
   )(
       onSuccess: R => Unit,
-  )(implicit ec: ExecutionContext, errorHandler: ErrorHandler): Widget.Builder[V, S] =
+  )(implicit errorHandler: ErrorHandler): Widget.Builder[V, S] =
     Widget.Builder[V, S] { s =>
       val w = wb(s)
       Widget(w.value) {
@@ -47,7 +45,7 @@ trait containers {
             e.stopPropagation()
             w.value match {
               case Alive(v) =>
-                endpoint(v).runASync {
+                endpoint(v).runASyncGlobal {
                   case Alive(r) =>
                     onSuccess(r)
                   case Dead(errors) =>

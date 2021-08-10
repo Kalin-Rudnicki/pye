@@ -1,7 +1,5 @@
 package pye.test
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 import monocle.macros.GenLens
 import org.scalajs.dom._
 import scalatags.JsDom.all._

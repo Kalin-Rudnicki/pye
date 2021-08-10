@@ -4,6 +4,7 @@ val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
 val CirceVersion = "0.14.0-M4"
 val MonocleVersion = "3.0.0-M6"
+val KlibVersion = "1.4.0"
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
@@ -51,7 +52,7 @@ lazy val pye =
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "shared" / "main" / "scala",
       libraryDependencies ++= Seq(
-        MyOrg %%% "klib-core" % "1.3.6", // klib
+        MyOrg %%% "klib-core" % KlibVersion,
         "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
         "io.circe" %%% "circe-core" % CirceVersion,

@@ -2,8 +2,6 @@ package pye
 
 import java.util.UUID
 
-import scala.concurrent.ExecutionContext
-
 import monocle.Lens
 import org.scalajs.dom._
 import scalatags.JsDom.all._
@@ -21,9 +19,7 @@ final case class Widget[V, S, +A](
   type State = S
   type Action <: A
 
-  def render(handleAction: A => AsyncIO[List[Raise.Standard[S]]])(initialState: S)(implicit
-      ec: ExecutionContext,
-  ): Widget.ElementT = {
+  def render(handleAction: A => AsyncIO[List[Raise.Standard[S]]])(initialState: S): Widget.ElementT = {
     val elements = Var.`null`[Widget.ElementT]
 
     val raiseHandler: RaiseHandler[S, A] =
@@ -42,7 +38,7 @@ final case class Widget[V, S, +A](
 
   def handleRaise[A2](
       f: (S, ?[V], Raise[S, A]) => AsyncIO[List[Raise[S, A2]]],
-  )(implicit ec: ExecutionContext): Widget[V, S, A2] =
+  ): Widget[V, S, A2] =
     Widget[V, S, A2](
       elementF = { (rh, s) =>
         lazy val rh2: RaiseHandler[S, A] =
@@ -69,7 +65,7 @@ final case class Widget[V, S, +A](
 
   def handleAction[A2](
       f: (S, ?[V], A) => AsyncIO[List[Raise[S, A2]]],
-  )(implicit ec: ExecutionContext): Widget[V, S, A2] =
+  ): Widget[V, S, A2] =
     handleRaise { (s, v, raise) =>
       raise match {
         case Raise.Action(action) =>
@@ -81,7 +77,7 @@ final case class Widget[V, S, +A](
 
   def onUpdateState[A2 >: A](
       f: (S, ?[V], Raise.UpdateState[S]) => AsyncIO[List[Raise[S, A2]]],
-  )(implicit ec: ExecutionContext): Widget[V, S, A2] =
+  ): Widget[V, S, A2] =
     handleRaise { (s, v, raise) =>
       raise match {
         case updateState: Raise.UpdateState[S] =>

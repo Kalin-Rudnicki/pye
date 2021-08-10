@@ -2,6 +2,7 @@ package pye
 
 import scala.concurrent.Promise
 import scala.scalajs.js
+import scala.scalajs.js.URIUtils.encodeURIComponent
 
 import io.circe._
 import io.circe.generic.auto._
@@ -11,8 +12,6 @@ import org.scalajs.dom._
 import klib.Implicits._
 import klib.fp.typeclass._
 import klib.fp.types._
-
-import scala.scalajs.js.URIUtils.encodeURIComponent
 
 object HttpRequest {
 
@@ -135,7 +134,7 @@ object HttpRequest {
           xhr.send()
       }
 
-      AsyncIO.wrapWrappedEffect(promise.future)
+      AsyncIO.wrapWrappedEffect(_ => promise.future)
     }
 
     def raw: AsyncIO[(Int, String)] =

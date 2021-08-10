@@ -1,7 +1,5 @@
 package pye
 
-import scala.concurrent.ExecutionContext
-
 import scalatags.JsDom.all._
 
 import klib.Implicits._
@@ -20,7 +18,7 @@ trait Implicits {
 
   implicit class NoActionWidgetOps[V, S](widget: Widget.NoAction[V, S]) {
 
-    def renderNoAction(initialState: S)(implicit ec: ExecutionContext): Widget.ElementT =
+    def renderNoAction(initialState: S): Widget.ElementT =
       widget.render { _ => Nil.pure[AsyncIO] }(initialState)
 
   }
@@ -32,7 +30,7 @@ trait Implicits {
         thenRaise: R => AsyncIO[List[Raise[S, A]]],
         mapO: O => AsyncIO[List[Raise[S, A]]],
         submitButtonLabel: String = "Submit",
-    )(implicit ec: ExecutionContext): Widget[V, S, A] =
+    ): Widget[V, S, A] =
       ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P]
         .join(
           widget,
@@ -57,7 +55,7 @@ trait Implicits {
         endpoint: V => AsyncIO[R],
         thenRaise: R => AsyncIO[List[Raise[S, A]]],
         submitButtonLabel: String = "Submit",
-    )(implicit ec: ExecutionContext): Widget[V, S, A] =
+    ): Widget[V, S, A] =
       toFormMapO(
         endpoint = endpoint,
         thenRaise = thenRaise,
@@ -104,8 +102,8 @@ trait Implicits {
 
   implicit class AsyncIOOps[T](asyncIO: AsyncIO[T]) {
 
-    def runAndShowErrors(onComplete: T => Unit = (_: T) => ())(implicit ec: ExecutionContext): Unit =
-      asyncIO.runASync {
+    def runAndShowErrors(onComplete: T => Unit = (_: T) => ()): Unit =
+      asyncIO.runASyncGlobal {
         case Alive(res) =>
           onComplete(res)
         case Dead(errors) =>
