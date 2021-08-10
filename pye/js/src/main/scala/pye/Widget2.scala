@@ -1,5 +1,7 @@
 package pye
 
+import java.util.UUID
+
 import monocle.Lens
 import org.scalajs.dom._
 import scalatags.JsDom.all._
@@ -47,7 +49,7 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
     def rhCaptureReRender[_V, A2](
         w: Pointer[AppliedWidget[_V]],
         parentRH: RaiseHandler2[S, A2],
-        // afterUpdate: AsyncIO[Unit] = AsyncIO {},
+        afterUpdate: IO[Unit] = IO {},
     ): RaiseHandler2[S, A2] = {
       case sou: Raise2.StandardOrUpdate[S] =>
         sou match {
@@ -57,7 +59,8 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
             if (update.reRender)
               for {
                 _ <- parentRH._handleRaise(update)
-                // TODO (KR) :
+                _ <- AsyncIO.wrapIO(w.value.reRender)
+                _ <- AsyncIO.wrapIO(afterUpdate)
               } yield ()
             else
               parentRH._handleRaise(update)
@@ -88,14 +91,23 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               pRH._handleRaise(action)
           }
 
-          new AppliedWidget[V2] {
-            override private[pye] final val value: IO[V2] =
-              IO.wrapEffect { leaf.valueF(leaf.lens.get(stateVar.value)) }
-            override private[pye] final val makeElements: () => Widget2.ElementT =
-              () => leaf.elementF(leafRH)(leaf.lens.get(stateVar.value)) // TODO (KR) :
-            override private[pye] final val reRender: AsyncIO[Unit] =
-              ??? // TODO (KR) :
-          }
+          val eV = Var.`null`[Widget2.ElementT]
+
+          val aW =
+            new AppliedWidget[V2] {
+              override private[pye] final val value: IO[V2] =
+                IO.wrapEffect { leaf.valueF(leaf.lens.get(stateVar.value)) }
+              override private[pye] final val makeElements: () => Widget2.ElementT =
+                () => leaf.elementF(leafRH)(leaf.lens.get(stateVar.value)) // TODO (KR) :
+              override private[pye] final val reRender: IO[Widget2.ElementT] =
+                for {
+                  newElems <- IO { makeElements() }
+                  _ <- Widget2.replaceNodes(eV.value, newElems)
+                  _ <- eV.value = newElems
+                } yield newElems
+            }
+
+          aW
         case mapV: Widget2.MapV[V2, S, A2] =>
           val child: AppliedWidget[mapV.V1] = convert(mapV.w, parentRaiseHandler)
 
@@ -104,8 +116,8 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               IO.wrapEffect { mapV.f(child.value.runSync) }
             override private[pye] final val makeElements: () => Widget2.ElementT =
               child.makeElements
-            override private[pye] final val reRender: AsyncIO[Unit] =
-              ??? // TODO (KR) :
+            override private[pye] final val reRender: IO[Widget2.ElementT] =
+              child.reRender
           }
         case mapA: Widget2.MapA[V2, S, A2] =>
           Pointer
@@ -144,18 +156,14 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               IO.wrapEffect { w1.value.runSync.apply(w2.value.runSync) }
             override private[pye] final val makeElements: () => Widget2.ElementT =
               () => NonEmptyList.nel(w1.makeElements(), w2.makeElements()).flatten
-            override private[pye] final val reRender: AsyncIO[Unit] =
-              ??? // TODO (KR) :
+            override private[pye] final val reRender: IO[Widget2.ElementT] =
+              for {
+                w1E <- w1.reRender
+                w2E <- w2.reRender
+              } yield NonEmptyList.nel(w1E, w2E).flatten
           }
         case flatMap: Widget2.FlatMap[V2, S, A2] =>
-          val w1: AppliedWidget[flatMap.V1] =
-            Pointer
-              .withSelf[AppliedWidget[flatMap.V1]] { ptr =>
-                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler)
-                Pointer(convert(flatMap.w1, rh))
-              }
-              .value
-          def w2(v1: flatMap.V1): AppliedWidget[V2] =
+          def makeW2(v1: flatMap.V1): AppliedWidget[V2] =
             Pointer
               .withSelf[AppliedWidget[V2]] { ptr =>
                 val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler)
@@ -163,19 +171,44 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               }
               .value
 
+          val w1: AppliedWidget[flatMap.V1] =
+            Pointer
+              .withSelf[AppliedWidget[flatMap.V1]] { ptr =>
+                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler)
+                Pointer(convert(flatMap.w1, rh))
+              }
+              .value
+          val w2: AppliedWidget[V2] =
+            new AppliedWidget[V2] {
+              override private[pye] final val value: IO[V2] =
+                w1.value.flatMap(makeW2(_).value)
+              override private[pye] final val makeElements: () => Widget2.ElementT = { () =>
+                w1.value.runSync match {
+                  case Alive(r) =>
+                    makeW2(r).makeElements()
+                  case Dead(_) =>
+                    NonEmptyList.nel(span(id := UUID.randomUUID.toString).render)
+                }
+              }
+              override private[pye] final val reRender: IO[Widget2.ElementT] =
+                ??? // TODO (KR) :
+            }
+
+          /*
+            NOTE : Current approach is not going to work
+                 : There is no way to have the second part of flatMap know how to reRender
+           */
+
           new AppliedWidget[V2] {
             override private[pye] final val value: IO[V2] =
-              IO.wrapEffect { w1.value.runSync.flatMap(w2(_).value.runSync) }
-            override private[pye] final val makeElements: () => Widget2.ElementT = { () =>
-              w1.value.runSync match {
-                case Alive(r) =>
-                  NonEmptyList.nel(w1.makeElements(), w2(r).makeElements()).flatten
-                case Dead(_) =>
-                  w1.makeElements()
-              }
-            }
-            override private[pye] final val reRender: AsyncIO[Unit] =
-              ??? // TODO (KR) :
+              w2.value
+            override private[pye] final val makeElements: () => Widget2.ElementT =
+              w2.makeElements
+            override private[pye] final val reRender: IO[Widget2.ElementT] =
+              for {
+                w1E <- w1.reRender
+                w2E <- w2.reRender
+              } yield NonEmptyList.nel(w1E, w2E).flatten
           }
       }
 
@@ -329,11 +362,13 @@ object Widget2 {
 
   // =====|  |=====
 
-  private def replaceNodes(oldElems: Widget2.ElementT, newElems: Widget2.ElementT): AsyncIO[Unit] = {
-
-    // TODO (KR) :
-    ???
-  }
+  private def replaceNodes(oldElems: Widget2.ElementT, newElems: Widget2.ElementT): IO[Unit] =
+    Maybe(oldElems)
+      .map { elems =>
+        ??? : IO[Unit]
+      }
+      .traverse
+      .map { _ => }
 
   // =====|  |=====
 
@@ -375,6 +410,6 @@ sealed trait AppliedWidget[V] {
 
   private[pye] val value: IO[V]
   private[pye] val makeElements: () => Widget2.ElementT
-  private[pye] val reRender: AsyncIO[Unit]
+  private[pye] val reRender: IO[Widget2.ElementT]
 
 }
