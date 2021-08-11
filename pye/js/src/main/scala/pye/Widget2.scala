@@ -11,6 +11,7 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
+import pye.Implicits._
 
 sealed trait Raise2[+S, +A]
 object Raise2 {
@@ -43,12 +44,19 @@ object Raise2 {
 
 trait RaiseHandler2[S, -A] {
 
-  // TODO (KR) : Make private[pye]
-  def _handleRaise(raise: Raise2[S, A]): AsyncIO[Unit]
-  def _handleRaises(raises: List[Raise2[S, A]]): AsyncIO[Unit] =
+  private[pye] def _handleRaise(raise: Raise2[S, A]): AsyncIO[Unit]
+  private[pye] def _handleRaises(raises: List[Raise2[S, A]]): AsyncIO[Unit] =
     AsyncIO.runSequentially(raises.map(_handleRaise)).map { _ => }
 
-  // TODO (KR) : Add _ => Unit
+  def handleRaise(r0: Raise2[S, A], rN: Raise2[S, A]*): Unit =
+    handleRaises(r0 :: rN.toList)
+  def handleRaises(raises: List[Raise2[S, A]]): Unit =
+    _handleRaises(raises).runAndShowErrors()
+
+  def handleAction(a0: A, aN: A*): Unit =
+    handleActions(a0 :: aN.toList)
+  def handleActions(actions: List[A]): Unit =
+    handleRaises(actions.map(Raise2.Action(_)))
 
 }
 
@@ -87,9 +95,15 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
     def convert[V2, A2](
         widget: Widget2[V2, S, A2],
         parentRaiseHandler: RaiseHandler2[S, A2],
-    ): AppliedWidget[V2] =
+    ): AppliedWidget[V2] = {
+      // REMOVE : ...
+      console.log(s"<convert : ${widget.getClass.getName} / ${widget.getClass}>")
+
       widget match {
         case leaf: Widget2.Leaf[V2, S, A2] =>
+          // REMOVE : ...
+          console.log("leaf")
+
           // NOTE : Trusting the types that by the time the RaiseHandler gets here, it has the correct `A` type
           val pRH: RaiseHandler2[S, leaf.LeafA] =
             parentRaiseHandler.asInstanceOf[RaiseHandler2[S, leaf.LeafA]]
@@ -120,6 +134,9 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               } yield newElems
           }
         case mapV: Widget2.MapV[V2, S, A2] =>
+          // REMOVE : ...
+          console.log("mapV")
+
           val child: AppliedWidget[mapV.V1] = convert(mapV.w, parentRaiseHandler)
 
           new AppliedWidget[V2] {
@@ -131,6 +148,9 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               child.getElementsAndUpdate
           }
         case mapA: Widget2.MapA[V2, S, A2] =>
+          // REMOVE : ...
+          console.log("mapA")
+
           Pointer
             .withSelf[AppliedWidget[V2]] { ptr =>
               val mappedRH: RaiseHandler2[S, mapA.A1] = {
@@ -147,6 +167,9 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
             }
             .value
         case apply: Widget2.Apply[V2, S, A2] =>
+          // REMOVE : ...
+          console.log("apply")
+
           val w1: AppliedWidget[apply.V1] =
             Pointer
               .withSelf[AppliedWidget[apply.V1]] { ptr =>
@@ -188,6 +211,9 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
                 }
           }
         case flatMap: Widget2.FlatMap[V2, S, A2] =>
+          // REMOVE : ...
+          console.log("flatMap")
+
           def makeW2(v1: flatMap.V1): AppliedWidget[V2] =
             Pointer
               .withSelf[AppliedWidget[V2]] { ptr =>
@@ -196,6 +222,8 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
               }
               .value
 
+          console.log("1.1")
+
           lazy val w1: AppliedWidget[flatMap.V1] =
             Pointer
               .withSelf[AppliedWidget[flatMap.V1]] { ptr =>
@@ -203,23 +231,34 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
                   rhCaptureReRender(
                     ptr,
                     parentRaiseHandler,
-                    w2.reRender.map { _ => },
+                    IO.wrapEffect { w2.reRender.runSync }.map { _ => },
                   )
                 Pointer(convert(flatMap.w1, rh))
               }
               .value
 
+          console.log("1.2")
+
           lazy val w2: AppliedWidget[V2] =
             new AppliedWidget[V2] {
               private val inner: Var[Maybe[Widget2.ElementT] \/ AppliedWidget[V2]] = Var(None.left)
 
-              override private[pye] final val value: IO[V2] =
+              override private[pye] final val value: IO[V2] = {
+                console.log("3.1")
+
                 for {
+                  _ <- IO { console.log("3.1.1") }
                   v1 <- w1.value
-                  w2 <- IO { makeW2(v1) }
-                  v2 <- w2.value
+                  _ <- IO { console.log("3.1.2") }
+                  _w2 <- IO { makeW2(v1) }
+                  _ <- IO { console.log("3.1.3") }
+                  v2 <- _w2.value // TODO (KR) :
+                  _ <- IO { console.log("3.1.4") }
                 } yield v2
-              override private[pye] final val current: IO[Maybe[Widget2.ElementT]] =
+              }
+              override private[pye] final val current: IO[Maybe[Widget2.ElementT]] = {
+                console.log("3.2")
+
                 for {
                   evalInner <- IO { inner.value }
                   elems <- evalInner match {
@@ -227,25 +266,41 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
                     case Left(e)  => IO { e }
                   }
                 } yield elems
-              override private[pye] final val getElementsAndUpdate: IO[Widget2.ElementT] =
+              }
+              override private[pye] final val getElementsAndUpdate: IO[Widget2.ElementT] = {
+                console.log("3.3")
+
                 for {
+                  _ <- IO { console.log("3.3.1") }
                   v1_? <- IO { w1.value.runSync }
+                  _ <- IO { console.log("3.3.2") }
                   elems <- v1_? match {
                     case Alive(r) =>
                       for {
+                        _ <- IO { console.log("3.3.2.1.1") }
                         w2 <- IO { makeW2(r) }
+                        _ <- IO { console.log("3.3.2.1.2") }
                         newElems <- w2.getElementsAndUpdate
+                        _ <- IO { console.log("3.3.2.1.3") }
                         _ <- inner.value = w2.right
+                        _ <- IO { console.log("3.3.2.1.4") }
                       } yield newElems
                     case Dead(_) =>
                       for {
+                        _ <- IO { console.log("3.3.2.2.1") }
                         newElem <- IO { span(id := UUID.randomUUID.toString).render }
+                        _ <- IO { console.log("3.3.2.2.2") }
                         newElems = NonEmptyList.nel(newElem)
+                        _ <- IO { console.log("3.3.2.2.3") }
                         _ <- inner.value = newElems.some.left
+                        _ <- IO { console.log("3.3.2.2.4") }
                       } yield newElems
                   }
                 } yield elems
+              }
             }
+
+          console.log("1.3")
 
           /*
             NOTE : Current approach is not going to work
@@ -253,7 +308,9 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
            */
 
           new AppliedWidget[V2] {
-            override private[pye] final val current: IO[Maybe[Widget2.ElementT]] =
+            override private[pye] final val current: IO[Maybe[Widget2.ElementT]] = {
+              console.log("2.1")
+
               ado[MaybeMonad.Projection[IO]#P]
                 .join(
                   w1.current.toMaybeMonad,
@@ -264,20 +321,33 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
                     NonEmptyList.nel(w1E, w2E).flatten
                 }
                 .wrapped
-            override private[pye] final val value: IO[V2] =
+            }
+            override private[pye] final val value: IO[V2] = {
+              console.log("2.2")
+
               w2.value
-            override private[pye] final val getElementsAndUpdate: IO[Widget2.ElementT] =
+            }
+            override private[pye] final val getElementsAndUpdate: IO[Widget2.ElementT] = {
+              console.log("2.3")
+              console.log(w1.getElementsAndUpdate)
+              console.log(w2.getElementsAndUpdate)
+
               ado[IO]
                 .join(
+                  IO { console.log("2.3.1") },
                   w1.getElementsAndUpdate,
+                  IO { console.log("2.3.2") },
                   w2.getElementsAndUpdate,
+                  IO { console.log("2.3.3") },
                 )
                 .map {
-                  case (w1E, w2E) =>
+                  case (_, w1E, _, w2E, _) =>
                     NonEmptyList.nel(w1E, w2E).flatten
                 }
+            }
           }
       }
+    }
 
     val appliedWidget: AppliedWidget[V] =
       Pointer
@@ -318,7 +388,18 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
         }
         .value
 
-    appliedWidget.reRender.runSyncOrThrow(None).toList
+    console.log(appliedWidget)
+    val v1 = appliedWidget.reRender
+    console.log(v1.toString)
+    val v2 = v1.runSync
+    console.log(v2.toString)
+    v2 match {
+      case Alive(r) =>
+        r.toList
+      case Dead(errors) =>
+        errors.map(logThrowable(_)).traverse.runASyncGlobal { _ => }
+        ???
+    }
   }
 
   // TODO (KR) : Move to Implicit that limits `A` to `Nothing` (?)
@@ -550,11 +631,13 @@ sealed trait AppliedWidget[V] {
   private[pye] val value: IO[V]
   private[pye] val getElementsAndUpdate: IO[Widget2.ElementT]
 
-  private[pye] final val reRender: IO[Widget2.ElementT] =
+  private[pye] final val reRender: IO[Widget2.ElementT] = {
+    console.log("4.1")
     for {
       mOldElements <- current
       newElements <- getElementsAndUpdate
       _ <- mOldElements.map(Widget2.replaceNodes(_, newElements)).traverse
     } yield newElements
+  }
 
 }

@@ -1,9 +1,11 @@
 package pye
 
+import org.scalajs.dom._
 import scalatags.JsDom.all._
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils._
 import pye.Implicits._
 import pye.widgets.modifiers._
 
@@ -60,7 +62,16 @@ object Raise {
     }
 
     def fromThrowable(throwable: Throwable): DisplayMessage =
-      global.error(Maybe(throwable.getMessage).getOrElse(throwable.toString))
+      global.error(
+        throwable.toString,
+        modifiers = List(
+          oncontextmenu := { (e: Event) =>
+            e.preventDefault()
+            logThrowable(throwable)
+              .runASyncGlobal { _ => }
+          },
+        ),
+      )
 
     val global: Builder = new Builder(None)
     def forId(id: String): Builder = new Builder(id.some)
