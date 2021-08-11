@@ -4,6 +4,8 @@ import java.util.UUID
 
 import monocle.Lens
 import org.scalajs.dom._
+import scalatags.JsDom
+import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import klib.Implicits._
@@ -12,6 +14,7 @@ import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
 import pye.Implicits._
+import pye.Widget.ElementT
 import pye.widgets.modifiers.PyeS
 
 sealed trait Widget[V, S, +A] { thisWidget =>
@@ -65,9 +68,9 @@ sealed trait Widget[V, S, +A] { thisWidget =>
               pRH._handleRaise(action)
           }
 
-          val elems: Var[Maybe[Widget.ElementT]] = Var(None)
-
           new AppliedWidget[V2] {
+            private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
+
             override private[pye] final val value: IO[V2] =
               IO.wrapEffect { leaf.valueF(leaf.lens.get(stateVar.value)) }
             override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
@@ -244,6 +247,29 @@ sealed trait Widget[V, S, +A] { thisWidget =>
                     NonEmptyList.nel(w1E, w2E).flatten
                 }
           }
+        case wrapped: Widget.Wrapped[V2, S, A2] =>
+          val child: AppliedWidget[V2] =
+            Pointer
+              .withSelf[AppliedWidget[V2]] { ptr =>
+                val rh: RaiseHandler[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler, IO {})
+                Pointer(convert(wrapped.w, rh))
+              }
+              .value
+
+          new AppliedWidget[V2] {
+            private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
+
+            override private[pye] final val value: IO[V2] =
+              child.value
+            override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
+              IO { elems.value }
+            override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
+              for {
+                childElems <- child.getElementsAndUpdate
+                myElems = wrapped.f(childElems.toList)
+                _ <- elems.value = myElems.some
+              } yield myElems
+          }
       }
     }
 
@@ -331,6 +357,12 @@ sealed trait Widget[V, S, +A] { thisWidget =>
       override final val w2: V => Widget[V2, S, A0] = wF
     }
 
+  def wrapped(withElements: Modifier => Widget.ElementT): Widget[V, S, A] =
+    new Widget.Wrapped[V, S, A] {
+      override private[pye] final val w: Widget[V, S, A] = this
+      override private[pye] final val f: JsDom.all.Modifier => ElementT = withElements
+    }
+
   // =====|  |=====
 
   def zoomOut[S2](
@@ -379,6 +411,11 @@ sealed trait Widget[V, S, +A] { thisWidget =>
           override private[pye] final type V1 = flatMap.V1
           override private[pye] final val w1: Widget[V1, S2, A] = flatMap.w1.zoomOut(s2Lens)
           override private[pye] final val w2: V1 => Widget[V, S2, A] = flatMap.w2(_).zoomOut(s2Lens)
+        }
+      case wrap: Widget.Wrapped[V, S, A] =>
+        new Widget.Wrapped[V, S2, A] {
+          override private[pye] final val w: Widget[V, S2, A] = wrap.w.zoomOut(s2Lens)
+          override private[pye] final val f: JsDom.all.Modifier => ElementT = wrap.f
         }
     }
 
@@ -541,6 +578,11 @@ object Widget {
     private[pye] type V1
     private[pye] val w1: Widget[V1, S, A]
     private[pye] val w2: V1 => Widget[V, S, A]
+  }
+
+  sealed trait Wrapped[V, S, +A] extends Widget[V, S, A] {
+    private[pye] val w: Widget[V, S, A]
+    private[pye] val f: Modifier => Widget.ElementT
   }
 
   // =====|  |=====
