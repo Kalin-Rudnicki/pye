@@ -79,14 +79,11 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
           case standard: Raise2.Standard =>
             parentRH._handleRaise(standard)
           case update: Raise2.UpdateState[S] =>
-            if (update.reRender)
-              for {
-                _ <- parentRH._handleRaise(update)
-                _ <- AsyncIO.wrapIO(w.value.reRender)
-                _ <- AsyncIO.wrapIO(afterUpdate)
-              } yield ()
-            else
-              parentRH._handleRaise(update)
+            for {
+              _ <- parentRH._handleRaise(Raise2.UpdateState[S](update.update, false))
+              _ <- update.reRender ? AsyncIO.wrapIO(w.value.reRender).map { _ => } | AsyncIO {}
+              _ <- AsyncIO.wrapIO(afterUpdate)
+            } yield ()
         }
       case action: Raise2.Action[A] =>
         parentRH._handleRaise(action)
@@ -231,7 +228,7 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
                   rhCaptureReRender(
                     ptr,
                     parentRaiseHandler,
-                    IO.wrapEffect { w2.reRender.runSync }.map { _ => },
+                    w2.reRender.map { _ => },
                   )
                 Pointer(convert(flatMap.w1, rh))
               }
