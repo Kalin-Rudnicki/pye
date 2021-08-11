@@ -5,12 +5,11 @@ import scala.scalajs.js
 import klib.Implicits._
 import klib.fp.types._
 import klib.fp.utils._
-
 import pye.facades
 
 object sourceMap {
 
-  final class SourceMapConsumer private (raw: facades.raw.sourceMap.SourceMapConsumer) {
+  final class SourceMapConsumer private[sourceMap] (raw: facades.raw.sourceMap.SourceMapConsumer) {
 
     def originalPositionFor(
         line: Int,
@@ -62,6 +61,7 @@ object sourceMap {
         name: Maybe[String],
     )
 
+    // REMOVE : ...
     def callNew(arg: js.Any): AsyncIO[SourceMapConsumer] = {
       val jsPromise: js.Promise[facades.raw.sourceMap.SourceMapConsumer] =
         js.Dynamic.global.sourceMap.SourceMapConsumer
@@ -71,6 +71,28 @@ object sourceMap {
       for {
         rawConsumer <- AsyncIO.wrapFuture(_ => jsPromise.toFuture)
       } yield new SourceMapConsumer(rawConsumer)
+    }
+
+  }
+
+  object SourceMapData {
+
+    def allPositionsForLine(line: Int): Map[String, Array[Int]] = {
+      val srcMap: SourceMapConsumer = new SourceMapConsumer(facades.raw.sourceMap.SourceMapData.srcMap)
+      0.until(facades.raw.sourceMap.SourceMapData.srcLines(line - 1).length)
+        .toArray
+        .flatMap(i => srcMap.originalPositionFor(line, i, SourceMapConsumer.Bias.GreatestLowerBound).toOption)
+        .groupMap(_.source)(_.line)
+        .map {
+          case (k, v) =>
+            (
+              k.split("/src/main/[^/]+/") match {
+                case Array(_, path) => path.replaceAllLiterally("/", ".")
+                case _              => k
+              },
+              v.distinct.sorted,
+            )
+        }
     }
 
   }

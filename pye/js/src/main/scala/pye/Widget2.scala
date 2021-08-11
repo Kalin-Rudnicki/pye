@@ -72,7 +72,7 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
     def rhCaptureReRender[_V, A2](
         w: Pointer[AppliedWidget[_V]],
         parentRH: RaiseHandler2[S, A2],
-        afterUpdate: IO[Unit] = IO {},
+        afterUpdate: IO[Unit],
     ): RaiseHandler2[S, A2] = {
       case sou: Raise2.StandardOrUpdate[S] =>
         sou match {
@@ -173,14 +173,14 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
           val w1: AppliedWidget[apply.V1] =
             Pointer
               .withSelf[AppliedWidget[apply.V1]] { ptr =>
-                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler)
+                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler, IO {})
                 Pointer(convert(apply.w1, rh))
               }
               .value
           val w2: AppliedWidget[apply.V1 => V2] =
             Pointer
               .withSelf[AppliedWidget[apply.V1 => V2]] { ptr =>
-                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler)
+                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler, IO {})
                 Pointer(convert(apply.w2, rh))
               }
               .value
@@ -217,7 +217,7 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
           def makeW2(v1: flatMap.V1): AppliedWidget[V2] =
             Pointer
               .withSelf[AppliedWidget[V2]] { ptr =>
-                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler)
+                val rh: RaiseHandler2[S, A2] = rhCaptureReRender(ptr, parentRaiseHandler, IO {})
                 Pointer(convert(flatMap.w2(v1), rh))
               }
               .value
@@ -391,13 +391,15 @@ sealed trait Widget2[V, S, +A] { thisWidget =>
     console.log(appliedWidget)
     val v1 = appliedWidget.reRender
     console.log(v1.toString)
+    console.log(v1.execute.toString)
+    console.log(v1.execute)
     val v2 = v1.runSync
     console.log(v2.toString)
     v2 match {
       case Alive(r) =>
         r.toList
       case Dead(errors) =>
-        errors.map(logThrowable(_)).traverse.runASyncGlobal { _ => }
+        errors.foreach(error => console.log(throwableSourceMapReference(error)))
         ???
     }
   }
@@ -634,9 +636,13 @@ sealed trait AppliedWidget[V] {
   private[pye] final val reRender: IO[Widget2.ElementT] = {
     console.log("4.1")
     for {
+      _ <- IO { console.log("4.1.1") }
       mOldElements <- current
+      _ <- IO { console.log("4.1.2") }
       newElements <- getElementsAndUpdate
+      _ <- IO { console.log("4.1.3") }
       _ <- mOldElements.map(Widget2.replaceNodes(_, newElements)).traverse
+      _ <- IO { console.log("4.1.4") }
     } yield newElements
   }
 

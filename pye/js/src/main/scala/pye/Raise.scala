@@ -67,8 +67,7 @@ object Raise {
         modifiers = List(
           oncontextmenu := { (e: Event) =>
             e.preventDefault()
-            logThrowable(throwable)
-              .runASyncGlobal { _ => }
+            console.log(throwableSourceMapReference(throwable).toString("    "))
           },
         ),
       )
