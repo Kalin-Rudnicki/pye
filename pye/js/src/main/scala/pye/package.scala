@@ -91,7 +91,7 @@ package object pye {
     }
   }
 
-  def displayMessage2(msg: Raise2.DisplayMessage): Unit = {
+  def displayMessage2(msg: Raise.DisplayMessage): Unit = {
     // TODO (KR) :
     ???
   }

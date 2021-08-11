@@ -31,16 +31,16 @@ trait inputs {
     Widget.builder
       .withState[String]
       .submitAction
-      .elementSA { (rh, s) =>
+      .rsElement { rh => s =>
         var savedTimeout: Maybe[Int] = None
         val _input = inputTag(decorators).render
 
         // TODO (KR) : Make sure state is updated before re-rendering
-        def updateStateRaise(): Raise.Standard[String] =
+        def updateStateRaise(): Raise.UpdateState[String] =
           Raise.UpdateState[String](_ => _input.value, reRender = false)
 
         def updateState(): Unit =
-          rh.raise(updateStateRaise())
+          rh._handleRaise(updateStateRaise())
 
         _input.value = s
         _input.onkeypress = { e =>
@@ -140,7 +140,7 @@ trait inputs {
     Widget.builder
       .withState[Maybe[VS[File]]]
       .withAction[Nothing]
-      .elementSA { (rh, s) =>
+      .rsElement { rh => s =>
         def setState(fileList: List[File]): Unit = {
           val res =
             for {
@@ -279,7 +279,7 @@ trait inputs {
     Widget.builder
       .withState[Maybe[T]]
       .withAction[Nothing]
-      .elementSA { (rh, s) =>
+      .rsElement { rh => s =>
         val selectedIndex: Int = s.cata(s => options.indexWhere(_._2 == s), -1)
 
         val optionNodes =

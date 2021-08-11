@@ -13,7 +13,7 @@ trait forms {
       label: String = "Submit",
       // TODO (KR) : Decorators
   ): Widget.Submit[Unit, S] =
-    Widget.builder.withState.submitAction.elementA { (rh: RaiseHandler[S, CommonRaise.Submit.type]) =>
+    Widget.builder.withState.submitAction.rElement { (rh: RaiseHandler[S, CommonRaise.Submit.type]) =>
       button(PyeS.`pye:form-button`)(
         onclick := { (_: Event) =>
           rh.raiseAction(CommonRaise.Submit)

@@ -11,14 +11,14 @@ trait Implicits {
 
   implicit class MaybeWidgetOps[V, S, A](widget: Widget[Maybe[V], S, A]) {
 
-    def required(): Widget[V, S, A] =
-      Widget.required(widget)
+    def required(message: String = "Missing required value"): Widget[V, S, A] =
+      widget.flatMapValue(_.toEA(Message(message)))
 
   }
 
   implicit class NoActionWidgetOps[V, S](widget: Widget.NoAction[V, S]) {
 
-    def renderNoAction(initialState: S): Widget.ElementT =
+    def renderNoAction(initialState: S): Modifier =
       widget.render { _ => Nil.pure[AsyncIO] }(initialState)
 
   }
@@ -38,7 +38,7 @@ trait Implicits {
           widgets.forms.submitButton(submitButtonLabel),
         )
         .mapValue(_._1)
-        .handleAction { (_, v, a) =>
+        .mapAction { (_, v, a: SubmitOr[O]) =>
           a match {
             case CommonRaise.Submit =>
               for {

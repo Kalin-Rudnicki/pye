@@ -11,17 +11,20 @@ import pye.widgets.modifiers._
 
 sealed trait Raise[+S, +A]
 object Raise {
-  sealed trait Standard[+S] extends Raise[S, Nothing]
+  sealed trait StandardOrUpdate[+S] extends Raise[S, Nothing]
+
   final case class UpdateState[S](
-      updateState: S => S,
+      update: S => S,
       reRender: Boolean = true,
-  ) extends Standard[S]
+  ) extends Raise.StandardOrUpdate[S]
+
+  sealed trait Standard extends Raise.StandardOrUpdate[Nothing]
   final case class DisplayMessage(
       message: String,
       modifiers: Seq[Modifier],
       timeout: Maybe[Int],
       causeId: Maybe[String],
-  ) extends Standard[Nothing]
+  ) extends Standard
   object DisplayMessage {
     final class Builder private[DisplayMessage] (causeId: Maybe[String]) {
 
@@ -75,7 +78,7 @@ object Raise {
     val global: Builder = new Builder(None)
     def forId(id: String): Builder = new Builder(id.some)
   }
-  sealed trait History extends Standard[Nothing]
+  sealed trait History extends Standard
   object History {
     final case class Push(page: Page[_]) extends History
     final case class Replace(page: Page[_]) extends History
