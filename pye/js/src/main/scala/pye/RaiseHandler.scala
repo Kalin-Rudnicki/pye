@@ -20,4 +20,10 @@ trait RaiseHandler[S, -A] {
   def raiseActions(actions: List[A]): Unit =
     raises(actions.map(Raise.Action(_)))
 
+  def updateState(update: S => S, reRender: Boolean = true): Unit =
+    raise(Raise.UpdateState[S](update, reRender))
+
+  def setState(newState: S, reRender: Boolean = true): Unit =
+    updateState(_ => newState, reRender)
+
 }

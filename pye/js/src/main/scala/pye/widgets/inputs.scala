@@ -155,7 +155,7 @@ trait inputs {
 
           res match {
             case Alive(res) =>
-              rh.raise(Raise.UpdateState[Maybe[VS[File]]](_ => res))
+              rh.setState(res)
             case Dead(errors) =>
               rh.raises(errors.map(Raise.DisplayMessage.fromThrowable))
           }
@@ -265,6 +265,25 @@ trait inputs {
       fileType = fileType,
       onEmpty = onEmpty,
     )
+
+  // ---  ---
+
+  def toggleButtonW(
+      buttonLabel: String,
+      buttonDecorators: Seq[Modifier] = Seq.empty,
+  ): Widget[Boolean, Boolean, Nothing] =
+    Widget.builder
+      .withState[Boolean]
+      .noAction
+      .rsElement { rh => s =>
+        button(
+          // TODO (KR) : classes
+          onclick := { (_: Event) =>
+            rh.setState(!s)
+          },
+        )(buttonLabel)(buttonDecorators).render
+      }
+      .withValue(_.pure[?])
 
   // ---  ---
 
