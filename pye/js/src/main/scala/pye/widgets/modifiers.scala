@@ -26,6 +26,11 @@ trait modifiers {
       object `dragged-into` extends Modifier
     }
 
+    object `pye:toggle-button` extends Block {
+      object `true` extends Modifier
+      object `false` extends Modifier
+    }
+
     object `pye:radio-group` extends Block {
       object option extends Element {
         object first extends Modifier

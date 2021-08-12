@@ -277,7 +277,10 @@ trait inputs {
       .noAction
       .rsElement { rh => s =>
         button(
-          // TODO (KR) : classes
+          PyeS.`pye:toggle-button`.--?(
+            s -> PyeS.`pye:toggle-button`.`true`,
+            !s -> PyeS.`pye:toggle-button`.`false`,
+          ),
           onclick := { (_: Event) =>
             rh.setState(!s)
           },
