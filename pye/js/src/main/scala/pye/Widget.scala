@@ -19,7 +19,7 @@ import pye.widgets.modifiers.PyeS
 
 trait Widget[V, S, +A] { thisWidget =>
 
-  def render(
+  final def render(
       handleActions: A => AsyncIO[List[Raise.StandardOrUpdate[S]]],
   )(
       initialState: S,
@@ -61,7 +61,7 @@ trait Widget[V, S, +A] { thisWidget =>
             }
           }
 
-          Pointer(thisWidget.convert(rh, stateVar))
+          Pointer(thisWidget.convert(rh, () => stateVar.value))
         }
         .value
 
@@ -71,7 +71,7 @@ trait Widget[V, S, +A] { thisWidget =>
   // =====|  |=====
 
   // TODO (KR) : Possibly make more efficient
-  def mapValue_?[V2](
+  final def mapValue_?[V2](
       mapF: ?[V] => ?[V2],
   ): Widget[V2, S, A] =
     new Widget.MapV[V2, S, A] {
@@ -81,7 +81,7 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Possibly make more efficient
-  def mapAction[A0 >: A, A2](
+  final def mapAction[A0 >: A, A2](
       mapF: (S, ?[V], A0) => AsyncIO[List[Raise[S, A2]]],
   ): Widget[V, S, A2] =
     new Widget.MapA[V, S, A2] {
@@ -91,7 +91,7 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Possibly make more efficient
-  private def _apply[A0 >: A, V2](
+  private final def _apply[A0 >: A, V2](
       w: Widget[V => V2, S, A0],
   ): Widget[V2, S, A0] =
     new Widget.Apply[V2, S, A0] {
@@ -101,7 +101,7 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Possibly make more efficient
-  private def _flatMap[A0 >: A, V2](
+  private final def _flatMap[A0 >: A, V2](
       wF: V => Widget[V2, S, A0],
   ): Widget[V2, S, A0] =
     new Widget.FlatMap[V2, S, A0] {
@@ -110,7 +110,7 @@ trait Widget[V, S, +A] { thisWidget =>
       override final val w2: V => Widget[V2, S, A0] = wF
     }
 
-  def wrapped(withElements: Modifier => Widget.ElementT): Widget[V, S, A] =
+  final def wrapped(withElements: Modifier => Widget.ElementT): Widget[V, S, A] =
     new Widget.Wrapped[V, S, A] {
       override private[pye] final val w: Widget[V, S, A] = this
       override private[pye] final val f: JsDom.all.Modifier => ElementT = withElements
@@ -118,23 +118,45 @@ trait Widget[V, S, +A] { thisWidget =>
 
   // =====|  |=====
 
-  def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A]
+  final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
+    new Widget.ZoomOut[V, S2, A] {
+      override private[pye] final type S1 = S
+      override private[pye] final val w: Widget[V, S1, A] = thisWidget
+      override private[pye] final val lens: Lens[S2, S1] = s2Lens
 
-  protected def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V]
+      override protected def convert(parentRaiseHandler: RaiseHandler[S2, A], getState: () => S2): AppliedWidget[V] = {
+        val rh: RaiseHandler[S, A] = {
+          case soh: Raise.StandardOrUpdate[S] =>
+            soh match {
+              case update: Raise.UpdateState[S] =>
+                parentRaiseHandler._handleRaise(Raise.UpdateState[S2](lens.modify(update.update), update.reRender))
+              case standard: Raise.Standard =>
+                parentRaiseHandler._handleRaise(standard)
+            }
+          case action: Raise.Action[A] =>
+            parentRaiseHandler._handleRaise(action)
+        }
+
+        w.convert(rh, () => lens.get(getState()))
+      }
+
+    }
+
+  protected def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
 
   // =====|  |=====
 
-  def mapValue[V2](
+  final def mapValue[V2](
       mapF: V => V2,
   ): Widget[V2, S, A] =
     mapValue_?(_.map(mapF))
 
-  def flatMapValue[V2](
+  final def flatMapValue[V2](
       mapF: V => ?[V2],
   ): Widget[V2, S, A] =
     mapValue_?(_.flatMap(mapF))
 
-  def labelled(
+  final def labelled(
       labelText: String,
       decorators: Seq[Modifier] = Seq.empty,
   ): Widget[V, S, A] =
@@ -219,9 +241,6 @@ object Widget {
       val _valueF = valueF
 
       new Widget.Leaf[V, S, A] {
-        override private[pye] final type LeafS = S
-        override private[pye] final type LeafA = A
-        override private[pye] final val lens: Lens[S, S] = Lens.id[S]
         override private[pye] final val elementF: RaiseHandler[S, A] => S => ElementT = _elementF
         override private[pye] final val valueF: S => ?[V] = _valueF
       }
@@ -272,49 +291,20 @@ object Widget {
   // =====|  |=====
 
   sealed trait Leaf[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] type LeafS
-    private[pye] type LeafA
-    private[pye] val lens: Lens[S, LeafS]
-    private[pye] val elementF: RaiseHandler[LeafS, LeafA] => LeafS => Widget.ElementT
-    private[pye] val valueF: LeafS => ?[V]
+    private[pye] val elementF: RaiseHandler[S, A] => S => Widget.ElementT
+    private[pye] val valueF: S => ?[V]
 
-    override final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
-      new Widget.Leaf[V, S2, A] {
-        override private[pye] final type LeafS = thisWidget.LeafS
-        override private[pye] final type LeafA = thisWidget.LeafA
-        override private[pye] final val lens: Lens[S2, LeafS] = s2Lens.andThen(thisWidget.lens)
-        override private[pye] final val elementF: RaiseHandler[LeafS, LeafA] => LeafS => Widget.ElementT =
-          thisWidget.elementF
-        override private[pye] final val valueF: LeafS => ?[V] = thisWidget.valueF
-      }
-
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V] = {
-      // NOTE : Trusting the types that by the time the RaiseHandler gets here, it has the correct `A` type
-      val pRH: RaiseHandler[S, thisWidget.LeafA] =
-        parentRaiseHandler.asInstanceOf[RaiseHandler[S, thisWidget.LeafA]]
-
-      val leafRH: RaiseHandler[thisWidget.LeafS, thisWidget.LeafA] = {
-        case sou: Raise.StandardOrUpdate[thisWidget.LeafS] =>
-          sou match {
-            case standard: Raise.Standard =>
-              pRH._handleRaise(standard)
-            case update: Raise.UpdateState[thisWidget.LeafS] =>
-              pRH._handleRaise(Raise.UpdateState[S](thisWidget.lens.modify(update.update), update.reRender))
-          }
-        case action: Raise.Action[thisWidget.LeafA] =>
-          pRH._handleRaise(action)
-      }
-
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
         override private[pye] final val value: IO[V] =
-          IO.wrapEffect { thisWidget.valueF(thisWidget.lens.get(stateVar.value)) }
+          IO.wrapEffect { thisWidget.valueF(getState()) }
         override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
           IO { elems.value }
         override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
           for {
-            newElems <- IO { thisWidget.elementF(leafRH)(thisWidget.lens.get(stateVar.value)) }
+            newElems <- IO { thisWidget.elementF(parentRaiseHandler)(getState()) }
             _ <- elems.value = newElems.some
           } yield newElems
       }
@@ -327,15 +317,8 @@ object Widget {
     private[pye] val w: Widget[V1, S, A]
     private[pye] val f: ?[V1] => ?[V]
 
-    override final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
-      new Widget.MapV[V, S2, A] {
-        override private[pye] final type V1 = thisWidget.V1
-        override private[pye] final val w: Widget[V1, S2, A] = thisWidget.w.zoomOut(s2Lens)
-        override private[pye] final val f: ?[V1] => ?[V] = thisWidget.f
-      }
-
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V] = {
-      val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convert(parentRaiseHandler, stateVar)
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+      val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convert(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
         override private[pye] final val value: IO[V] =
@@ -354,25 +337,7 @@ object Widget {
     private[pye] val w: Widget[V, S, A1]
     private[pye] val f: (S, ?[V], A1) => AsyncIO[List[Raise[S, A]]]
 
-    override final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
-      new Widget.MapA[V, S2, A] {
-        override private[pye] final type A1 = thisWidget.A1
-        override private[pye] final val w: Widget[V, S2, A1] = thisWidget.w.zoomOut(s2Lens)
-        override private[pye] final val f: (S2, ?[V], A1) => AsyncIO[List[Raise[S2, A]]] = { (s2, v, a) =>
-          thisWidget.f(s2Lens.get(s2), v, a).map {
-            _.map {
-              case action: Raise.Action[A] => action
-              case sou: Raise.StandardOrUpdate[S] =>
-                sou match {
-                  case standard: Raise.Standard     => standard
-                  case update: Raise.UpdateState[S] => Raise.UpdateState(s2Lens.modify(update.update), update.reRender)
-                }
-            }
-          }
-        }
-      }
-
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V] =
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
       Pointer
         .withSelf[AppliedWidget[V]] { ptr =>
           val mappedRH: RaiseHandler[S, thisWidget.A1] = {
@@ -380,12 +345,12 @@ object Widget {
               parentRaiseHandler._handleRaise(sou)
             case action: Raise.Action[thisWidget.A1] =>
               for {
-                raises <- thisWidget.f(stateVar.value, ptr.value.value.runSync, action.action)
+                raises <- thisWidget.f(getState(), ptr.value.value.runSync, action.action)
                 _ <- parentRaiseHandler._handleRaises(raises)
               } yield ()
           }
 
-          Pointer(thisWidget.w.convert(mappedRH, stateVar))
+          Pointer(thisWidget.w.convert(mappedRH, getState))
         }
         .value
 
@@ -396,26 +361,19 @@ object Widget {
     private[pye] val w1: Widget[V1, S, A]
     private[pye] val w2: Widget[V1 => V, S, A]
 
-    override final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
-      new Widget.Apply[V, S2, A] {
-        override private[pye] final type V1 = thisWidget.V1
-        override private[pye] final val w1: Widget[V1, S2, A] = thisWidget.w1.zoomOut(s2Lens)
-        override private[pye] final val w2: Widget[V1 => V, S2, A] = thisWidget.w2.zoomOut(s2Lens)
-      }
-
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V] = {
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val w1: AppliedWidget[thisWidget.V1] =
         Pointer
           .withSelf[AppliedWidget[thisWidget.V1]] { ptr =>
             val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w1.convert(rh, stateVar))
+            Pointer(thisWidget.w1.convert(rh, getState))
           }
           .value
       val w2: AppliedWidget[thisWidget.V1 => V] =
         Pointer
           .withSelf[AppliedWidget[thisWidget.V1 => V]] { ptr =>
             val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w2.convert(rh, stateVar))
+            Pointer(thisWidget.w2.convert(rh, getState))
           }
           .value
 
@@ -453,19 +411,12 @@ object Widget {
     private[pye] val w1: Widget[V1, S, A]
     private[pye] val w2: V1 => Widget[V, S, A]
 
-    override final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
-      new Widget.FlatMap[V, S2, A] {
-        override private[pye] final type V1 = thisWidget.V1
-        override private[pye] final val w1: Widget[V1, S2, A] = thisWidget.w1.zoomOut(s2Lens)
-        override private[pye] final val w2: V1 => Widget[V, S2, A] = thisWidget.w2(_).zoomOut(s2Lens)
-      }
-
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V] = {
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       def makeW2(v1: thisWidget.V1): AppliedWidget[V] =
         Pointer
           .withSelf[AppliedWidget[V]] { ptr =>
             val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w2(v1).convert(rh, stateVar))
+            Pointer(thisWidget.w2(v1).convert(rh, getState))
           }
           .value
 
@@ -478,7 +429,7 @@ object Widget {
                 parentRaiseHandler,
                 w2.reRender.map { _ => },
               )
-            Pointer(thisWidget.w1.convert(rh, stateVar))
+            Pointer(thisWidget.w1.convert(rh, getState))
           }
           .value
 
@@ -562,22 +513,22 @@ object Widget {
 
   }
 
+  sealed trait ZoomOut[V, S, +A] extends Widget[V, S, A] { thisWidget =>
+    private[pye] type S1
+    private[pye] val w: Widget[V, S1, A]
+    private[pye] val lens: Lens[S, S1]
+  }
+
   sealed trait Wrapped[V, S, +A] extends Widget[V, S, A] { thisWidget =>
     private[pye] val w: Widget[V, S, A]
     private[pye] val f: Modifier => Widget.ElementT
 
-    override final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
-      new Widget.Wrapped[V, S2, A] {
-        override private[pye] final val w: Widget[V, S2, A] = thisWidget.w.zoomOut(s2Lens)
-        override private[pye] final val f: JsDom.all.Modifier => ElementT = thisWidget.f
-      }
-
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], stateVar: Var[S]): AppliedWidget[V] = {
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val child: AppliedWidget[V] =
         Pointer
           .withSelf[AppliedWidget[V]] { ptr =>
             val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w.convert(rh, stateVar))
+            Pointer(thisWidget.w.convert(rh, getState))
           }
           .value
 
