@@ -70,7 +70,6 @@ trait Widget[V, S, +A] { thisWidget =>
 
   // =====|  |=====
 
-  // TODO (KR) : Possibly make more efficient
   final def mapValue_?[V2](
       mapF: ?[V] => ?[V2],
   ): Widget[V2, S, A] =
@@ -80,17 +79,27 @@ trait Widget[V, S, +A] { thisWidget =>
       override final val f: ?[V1] => ?[V2] = mapF
     }
 
-  // TODO (KR) : Possibly make more efficient
-  final def mapAction[A0 >: A, A2](
-      mapF: (S, ?[V], A0) => AsyncIO[List[Raise[S, A2]]],
+  final def mapRaise[A0 >: A, A2](
+      mapF: (S, ?[V], Raise[S, A0]) => AsyncIO[List[Raise[S, A2]]],
   ): Widget[V, S, A2] =
     new Widget.MapA[V, S, A2] {
       override final type A1 = A0
       override final val w: Widget[V, S, A1] = thisWidget
-      override final val f: (S, ?[V], A0) => AsyncIO[List[Raise[S, A2]]] = mapF
+      override final val f: (S, ?[V], Raise[S, A0]) => AsyncIO[List[Raise[S, A2]]] = mapF
     }
 
-  // TODO (KR) : Possibly make more efficient
+  final def mapAction[A0 >: A, A2](
+      mapF: (S, ?[V], A0) => AsyncIO[List[Raise[S, A2]]],
+  ): Widget[V, S, A2] =
+    mapRaise[A0, A2] { (s, v, r) =>
+      r match {
+        case soh: Raise.StandardOrUpdate[S] =>
+          List(soh).pure[AsyncIO]
+        case action: Raise.Action[A0] =>
+          mapF(s, v, action.action)
+      }
+    }
+
   private final def _apply[A0 >: A, V2](
       w: Widget[V => V2, S, A0],
   ): Widget[V2, S, A0] =
@@ -100,7 +109,6 @@ trait Widget[V, S, +A] { thisWidget =>
       override final val w2: Widget[V1 => V2, S, A0] = w
     }
 
-  // TODO (KR) : Possibly make more efficient
   private final def _flatMap[A0 >: A, V2](
       wF: V => Widget[V2, S, A0],
   ): Widget[V2, S, A0] =
@@ -335,20 +343,14 @@ object Widget {
   sealed trait MapA[V, S, +A] extends Widget[V, S, A] { thisWidget =>
     private[pye] type A1
     private[pye] val w: Widget[V, S, A1]
-    private[pye] val f: (S, ?[V], A1) => AsyncIO[List[Raise[S, A]]]
+    private[pye] val f: (S, ?[V], Raise[S, A1]) => AsyncIO[List[Raise[S, A]]]
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
       Pointer
         .withSelf[AppliedWidget[V]] { ptr =>
-          val mappedRH: RaiseHandler[S, thisWidget.A1] = {
-            case sou: Raise.StandardOrUpdate[S] =>
-              parentRaiseHandler._handleRaise(sou)
-            case action: Raise.Action[thisWidget.A1] =>
-              for {
-                raises <- thisWidget.f(getState(), ptr.value.value.runSync, action.action)
-                _ <- parentRaiseHandler._handleRaises(raises)
-              } yield ()
-          }
+          val mappedRH: RaiseHandler[S, thisWidget.A1] =
+            f(getState(), ptr.value.value.runSync, _)
+              .flatMap(parentRaiseHandler._handleRaises)
 
           Pointer(thisWidget.w.convert(mappedRH, getState))
         }
