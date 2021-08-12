@@ -16,13 +16,8 @@ trait Implicits {
 
   }
 
-  implicit class NoActionWidgetOps[V, S](widget: Widget.NoAction[V, S]) {
-
-    def renderNoAction(initialState: S): Modifier =
-      widget.render { _ => Nil.pure[AsyncIO] }(initialState)
-
-  }
-
+  // TODO (KR) : Make builder.
+  //           : Scala is having an un-acceptable level type inference here
   implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
 
     def toFormMapO[R, A](
@@ -64,41 +59,6 @@ trait Implicits {
       )
 
   }
-
-  /*
-  implicit class SubmitWidgetOps[V, S](widget: Widget[V, S, CommonRaise.Submit.type]) {
-
-    def toForm[A](
-    ): Widget[V, S, A] = {
-      // TODO (KR) :
-      ???
-    }
-
-    def toFormNoRaise(
-    ): Widget[V, S, Nothing] = {
-      // TODO (KR) :
-      ???
-    }
-
-  }
-
-  implicit class SubmitOrWidgetOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
-
-    def toFormOr(
-    ): Widget[V, S, O] = {
-      // TODO (KR) :
-      ???
-    }
-
-    def toFormMapOr[A](
-        mapOr: O => A,
-    ): Widget[V, S, A] = {
-      // TODO (KR) :
-      ???
-    }
-
-  }
-   */
 
   implicit class AsyncIOOps[T](asyncIO: AsyncIO[T]) {
 

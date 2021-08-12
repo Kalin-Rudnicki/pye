@@ -11,56 +11,6 @@ import pye.{Widget => _, _}
 
 trait containers {
 
-  @deprecated(message = "Use new Widget", since = "3.0.0")
-  final case class FormDecorators(
-      saveButtonModifiers: Seq[Modifier] = Seq.empty,
-      containerModifiers: Seq[Modifier] = Seq.empty,
-  )
-
-  @deprecated(message = "Use new Widget", since = "3.0.0")
-  def form[V, S, R](
-      wb: Widget.Builder[V, S],
-      endpoint: V => AsyncIO[R],
-      submitButtonLabel: String = "Submit",
-      decorators: FormDecorators = FormDecorators(),
-  )(
-      onSuccess: R => Unit,
-  )(implicit errorHandler: ErrorHandler): Widget.Builder[V, S] =
-    Widget.Builder[V, S] { s =>
-      val w = wb(s)
-      Widget(w.value) {
-        val container =
-          div(`class` := "kws:form-container")(
-            w.render(),
-            br, {
-              val btn = button(submitButtonLabel, `class` := "kws:form-button")(decorators.saveButtonModifiers).render
-              btn.onclick = _ => btn.dispatchEvent(events.submitEvent)
-              btn
-            },
-          ).render
-
-        container.addEventListener(
-          "submit",
-          { (e: Event) =>
-            e.stopPropagation()
-            w.value match {
-              case Alive(v) =>
-                endpoint(v).runASyncGlobal {
-                  case Alive(r) =>
-                    onSuccess(r)
-                  case Dead(errors) =>
-                    errors.foreach(errorHandler)
-                }
-              case Dead(errors) =>
-                errors.foreach(errorHandler)
-            }
-          },
-        )
-
-        container
-      }
-    }
-
   // =====|  |=====
 
   sealed trait ModalBackgroundClickAction
@@ -83,7 +33,7 @@ trait containers {
 
     val outerModal =
       div(
-        `class` := Page.Standard.names.Modal,
+        `class` := Page.names.Modal,
         zIndex := z,
       )(innerModal).render
 
@@ -99,7 +49,9 @@ trait containers {
         case Some(action) =>
           action match {
             case ModalBackgroundClickAction.Close =>
-              outerModal.dispatchEvent(events.closeModalEvent)
+              // outerModal.dispatchEvent(events.closeModalEvent)
+              // TODO (KR) :
+              ???
             case ModalBackgroundClickAction.Custom(action) =>
               action(outerModal)
           }

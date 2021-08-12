@@ -3,23 +3,20 @@ package pye
 import scala.annotation.tailrec
 
 import org.scalajs.dom._
-import org.scalajs.dom.raw.HTMLElement
 
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils.InfiniteSet
 
-import scala.scalajs.js
-
-final class KeyMap(
-    val onDownKeys: List[KeyMap.Key],
-    val onPressKeys: List[KeyMap.Key],
-    val onUpKeys: List[KeyMap.Key],
+final class KeyMap[S, +A](
+    val onDownKeys: List[KeyMap.Key[S, A]],
+    val onPressKeys: List[KeyMap.Key[S, A]],
+    val onUpKeys: List[KeyMap.Key[S, A]],
 ) {
 
-  private def buildListener(lb: List[KeyMap.Key]): js.Function1[KeyboardEvent, _] = { e =>
+  private def buildListener[A2 >: A](rh: RaiseHandler[S, A2], lb: List[KeyMap.Key[S, A2]]): KeyboardEvent => Unit = { e =>
     @tailrec
-    def loop(keys: List[KeyMap.Key]): Unit =
+    def loop(keys: List[KeyMap.Key[S, A2]]): Unit =
       keys match {
         case head :: tail =>
           if (head.matches(e)) {
@@ -28,7 +25,7 @@ final class KeyMap(
             if (head.stopsPropagation)
               e.stopPropagation()
 
-            head.action(e)
+            rh.raises(head.action(e))
           } else
             loop(tail)
         case Nil =>
@@ -37,20 +34,14 @@ final class KeyMap(
     loop(lb.reverse)
   }
 
-  private[pye] def bindToWindow(): Unit = {
-    window.onkeydown = buildListener(onDownKeys)
-    window.onkeypress = buildListener(onPressKeys)
-    window.onkeyup = buildListener(onUpKeys)
-  }
+  def withRaiseHandler[A2 >: A](rh: RaiseHandler[S, A2]): BindableKeyMap =
+    new BindableKeyMap {
+      override private[pye] val onKeyDown: KeyboardEvent => Unit = buildListener(rh, onDownKeys)
+      override private[pye] val onKeyPress: KeyboardEvent => Unit = buildListener(rh, onPressKeys)
+      override private[pye] val onKeyUp: KeyboardEvent => Unit = buildListener(rh, onUpKeys)
+    }
 
-  // TODO (KR) : Not sure this is working very well...
-  def bindToElement(element: HTMLElement): Unit = {
-    element.onkeydown = buildListener(onDownKeys)
-    element.onkeypress = buildListener(onPressKeys)
-    element.onkeyup = buildListener(onUpKeys)
-  }
-
-  def on(key: KeyMap.Key): KeyMap =
+  def on[A2 >: A](key: KeyMap.Key[S, A2]): KeyMap[S, A2] =
     key.on match {
       case KeyMap.On.KeyDown =>
         new KeyMap(
@@ -72,13 +63,17 @@ final class KeyMap(
         )
     }
 
-  def onDown(keyCodes: KeyMap.KeyCode*)(
+  def onDown[A2 >: A](
+      action: KeyboardEvent => List[Raise[S, A2]],
+  )(
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
       stopsPropagation: Boolean = true,
-  )(action: KeyboardEvent => Unit): KeyMap =
+  )(
+      keyCodes: KeyMap.KeyCode*,
+  ): KeyMap[S, A2] =
     on(
       KeyMap.Key(
         keys = InfiniteSet.Inclusive(keyCodes.toSet),
@@ -92,13 +87,17 @@ final class KeyMap(
       ),
     )
 
-  def onPress(keyCodes: KeyMap.KeyCode*)(
+  def onPress[A2 >: A](
+      action: KeyboardEvent => List[Raise[S, A2]],
+  )(
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
       stopsPropagation: Boolean = true,
-  )(action: KeyboardEvent => Unit): KeyMap =
+  )(
+      keyCodes: KeyMap.KeyCode*,
+  ): KeyMap[S, A2] =
     on(
       KeyMap.Key(
         keys = InfiniteSet.Inclusive(keyCodes.toSet),
@@ -112,13 +111,17 @@ final class KeyMap(
       ),
     )
 
-  def onUp(keyCodes: KeyMap.KeyCode*)(
+  def onUp[A2 >: A](
+      action: KeyboardEvent => List[Raise[S, A2]],
+  )(
       name: String,
       ctrl: Maybe[Boolean] = false.some,
       shift: Maybe[Boolean] = false.some,
       preventsDefault: Boolean = true,
       stopsPropagation: Boolean = true,
-  )(action: KeyboardEvent => Unit): KeyMap =
+  )(
+      keyCodes: KeyMap.KeyCode*,
+  ): KeyMap[S, A2] =
     on(
       KeyMap.Key(
         keys = InfiniteSet.Inclusive(keyCodes.toSet),
@@ -136,17 +139,17 @@ final class KeyMap(
 
 object KeyMap {
 
-  def empty: KeyMap =
+  def empty[S]: KeyMap[S, Nothing] =
     new KeyMap(
       onDownKeys = Nil,
       onPressKeys = Nil,
       onUpKeys = Nil,
     )
 
-  final case class Key(
+  final case class Key[S, +A](
       keys: InfiniteSet[KeyCode],
       name: String,
-      action: KeyboardEvent => Unit,
+      action: KeyboardEvent => List[Raise[S, A]],
       ctrl: Maybe[Boolean],
       shift: Maybe[Boolean],
       preventsDefault: Boolean,
@@ -243,6 +246,40 @@ object KeyMap {
     val F11:       KeyCode = KeyCode("F11", 122)
     val F12:       KeyCode = KeyCode("F12", 123)
     // format: on
+  }
+
+  // =====|  |=====
+
+}
+
+sealed trait BindableKeyMap {
+  private[pye] val onKeyDown: KeyboardEvent => Unit
+  private[pye] val onKeyPress: KeyboardEvent => Unit
+  private[pye] val onKeyUp: KeyboardEvent => Unit
+
+  def bindTo[N](n: N)(implicit bindTo: BindableKeyMap.BindTo[N]): Unit = {
+    bindTo.setKeyDown(n, onKeyDown)
+    bindTo.setKeyPress(n, onKeyPress)
+    bindTo.setKeyUp(n, onKeyUp)
+  }
+
+}
+object BindableKeyMap {
+
+  trait BindTo[N] {
+    def setKeyDown(n: N, f: KeyboardEvent => Unit): Unit
+    def setKeyPress(n: N, f: KeyboardEvent => Unit): Unit
+    def setKeyUp(n: N, f: KeyboardEvent => Unit): Unit
+  }
+  object BindTo {
+
+    implicit val bindToWindow: BindTo[Window] =
+      new BindTo[Window] {
+        override def setKeyDown(n: Window, f: KeyboardEvent => Unit): Unit = n.onkeydown = f
+        override def setKeyPress(n: Window, f: KeyboardEvent => Unit): Unit = n.onkeypress = f
+        override def setKeyUp(n: Window, f: KeyboardEvent => Unit): Unit = n.onkeyup = f
+      }
+
   }
 
 }

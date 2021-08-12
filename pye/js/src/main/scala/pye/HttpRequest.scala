@@ -24,7 +24,7 @@ object HttpRequest {
       new Stage1(
         method = method,
         baseUrl = baseUrl,
-        params = Nil,
+        paramList = Nil,
         headers = Nil,
       )
 
@@ -37,17 +37,20 @@ object HttpRequest {
   final class Stage1 private[HttpRequest] (
       method: String,
       baseUrl: String,
-      params: List[(String, String)],
+      paramList: List[(String, String)],
       headers: List[(String, String)],
   ) {
 
-    def param(p: String, v: String): Stage1 =
+    def params(params: (String, String)*): Stage1 =
       new Stage1(
         method = method,
         baseUrl = baseUrl,
-        params = (p, v) :: params,
+        paramList = params.toList ::: paramList,
         headers = headers,
       )
+
+    def param(p: String, v: String): Stage1 =
+      params(p -> v)
 
     def mParam(p: String, v: Maybe[String]): Stage1 =
       v match {
@@ -61,7 +64,7 @@ object HttpRequest {
       new Stage1(
         method = method,
         baseUrl = baseUrl,
-        params = params,
+        paramList = paramList,
         headers = (header, value) :: headers,
       )
 
@@ -69,7 +72,7 @@ object HttpRequest {
       new Stage1(
         method = method,
         baseUrl = baseUrl,
-        params = params,
+        paramList = paramList,
         headers = (header, encoder.apply(value).toString) :: headers,
       )
 
@@ -78,7 +81,7 @@ object HttpRequest {
         method = method,
         baseUrl = baseUrl,
         body = None,
-        params = params,
+        params = paramList,
         headers = headers,
       )
 
@@ -87,7 +90,7 @@ object HttpRequest {
         method = method,
         baseUrl = baseUrl,
         body = body.some,
-        params = params,
+        params = paramList,
         headers = headers,
       )
 
@@ -96,7 +99,7 @@ object HttpRequest {
         method = method,
         baseUrl = baseUrl,
         body = Some(jsonToString(encoder.apply(body))),
-        params = params,
+        params = paramList,
         headers = headers,
       )
 

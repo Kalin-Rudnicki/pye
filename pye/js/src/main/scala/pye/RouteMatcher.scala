@@ -12,10 +12,10 @@ import klib.utils._
 
 sealed trait RouteMatcher {
 
-  def /:(const: String): RouteMatcher =
+  final def /:(const: String): RouteMatcher =
     RouteMatcher.const(const)(this)
 
-  def toIdtString: IndentedString = {
+  final def toIdtString: IndentedString = {
     import IndentedString._
 
     this match {
@@ -45,22 +45,20 @@ sealed trait RouteMatcher {
     }
   }
 
-  def attemptToLoadPage(): Unit = {
+  final def attemptToLoadPage(): Unit = {
     val paths =
       window.location.pathname
         .split("/")
         .toList
         .filter(_.nonEmpty)
     val params =
-      new URLSearchParams(window.location.search).toList
-        .map { t =>
-          (t._1, t._2)
-        }
-        .sortBy(_._1)
+      RouteMatcher.Params {
+        new URLSearchParams(window.location.search).toList.map { t => (t._1, t._2) }.toMap
+      }
 
-    def oneOfMatch(paths: List[String], oneOf: RouteMatcher.OneOf): Maybe[Page[_]] = {
+    def oneOfMatch(paths: List[String], oneOf: RouteMatcher.OneOf): Maybe[Page] = {
       @tailrec
-      def loop(children: List[RouteMatcher]): Maybe[Page[_]] =
+      def loop(children: List[RouteMatcher]): Maybe[Page] =
         children match {
           case cHead :: cTail =>
             attemptMatch(paths, cHead) match {
@@ -74,11 +72,12 @@ sealed trait RouteMatcher {
       loop(oneOf.children)
     }
 
+    // TODO (KR) :
     @tailrec
     def attemptMatch(
         paths: List[String],
         routeMatcher: RouteMatcher,
-    ): Maybe[Page[_]] =
+    ): Maybe[Page] =
       paths match {
         case pHead :: pTail =>
           routeMatcher match {
@@ -105,7 +104,11 @@ sealed trait RouteMatcher {
             case oneOf: RouteMatcher.OneOf =>
               oneOfMatch(paths, oneOf)
             case complete: RouteMatcher.Complete =>
-              complete.paramMatch.lift(params).toMaybe
+              // TODO (KR) : Possibly change how this works...
+              complete.paramMatch(params) match {
+                case Alive(r) => r.some
+                case Dead(_)  => None
+              }
             case _: RouteMatcher.Const =>
               None
             case _: RouteMatcher.PathArg[_] =>
@@ -115,7 +118,9 @@ sealed trait RouteMatcher {
 
     attemptMatch(paths.tail, this) match {
       case Some(page) =>
-        page.replaceNoTrace()
+        // TODO (KR) :
+        ???
+      // page.replaceNoTrace
       case None =>
         window.alert("Unable to resolve URL")
     }
@@ -131,12 +136,27 @@ sealed trait RouteMatcher {
 
 object RouteMatcher {
 
+  final case class Params(paramMap: Map[String, String]) {
+
+    def param[P: DecodeString](name: String): ?[P] = ???
+    def mParam[P: DecodeString](name: String): ?[Maybe[P]] = ???
+
+    def withParams(params: (String, String)*): Params =
+      Params(paramMap ++ params)
+
+    def withParam(key: String, value: String): Params =
+      withParams(key -> value)
+
+    def withMParam(key: String, value: Maybe[String]): Params =
+      value.cata(withParam(key, _), this)
+
+  }
+
   // =====|  |=====
 
   final class OneOf private[RouteMatcher] (val children: List[RouteMatcher]) extends RouteMatcher
   final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
-  final class Complete private[RouteMatcher] (val paramMatch: PartialFunction[List[(String, String)], Page[_]])
-      extends RouteMatcher
+  final class Complete private[RouteMatcher] (val paramMatch: Params => ?[Page]) extends RouteMatcher
   final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeString[A], val child: A => RouteMatcher)
       extends RouteMatcher {
     type Type = A
@@ -150,7 +170,7 @@ object RouteMatcher {
   def const(const: String)(child: RouteMatcher): RouteMatcher =
     new Const(const, child)
 
-  def complete(paramMatch: PartialFunction[List[(String, String)], Page[_]]): RouteMatcher =
+  def complete(paramMatch: Params => ?[Page]): RouteMatcher =
     new Complete(paramMatch)
 
   def pathArg[A: DecodeString](child: A => RouteMatcher): RouteMatcher =

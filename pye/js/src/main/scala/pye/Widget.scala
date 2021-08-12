@@ -4,8 +4,6 @@ import java.util.UUID
 
 import monocle.Lens
 import org.scalajs.dom._
-import scalatags.JsDom
-import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import klib.Implicits._
@@ -19,6 +17,8 @@ import pye.widgets.modifiers.PyeS
 
 trait Widget[V, S, +A] { thisWidget =>
 
+  // REMOVE : ...
+  /*
   final def render(
       handleActions: A => AsyncIO[List[Raise.StandardOrUpdate[S]]],
   )(
@@ -35,13 +35,15 @@ trait Widget[V, S, +A] { thisWidget =>
                 case standard: Raise.Standard =>
                   standard match {
                     case msg: Raise.DisplayMessage =>
-                      AsyncIO { displayMessage2(msg) }
+                      AsyncIO { displayMessage(msg) }
                     case history: Raise.History =>
                       history match {
                         case Raise.History.Push(page)    => page._push()
                         case Raise.History.Replace(page) => page._replace()
                         case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
                       }
+                    case Raise.RefreshPage =>
+                      AsyncIO.wrapIO { ptr.value.reRender }.map { _ => Nil }
                   }
                 case Raise.UpdateState(update, reRender) =>
                   for {
@@ -67,6 +69,7 @@ trait Widget[V, S, +A] { thisWidget =>
 
     appliedWidget.reRender.runSyncOrThrow(None).toList
   }
+   */
 
   // =====|  |=====
 
@@ -93,8 +96,8 @@ trait Widget[V, S, +A] { thisWidget =>
   ): Widget[V, S, A2] =
     mapRaise[A0, A2] { (s, v, r) =>
       r match {
-        case soh: Raise.StandardOrUpdate[S] =>
-          List(soh).pure[AsyncIO]
+        case sou: Raise.StandardOrUpdate[S] =>
+          List(sou).pure[AsyncIO]
         case action: Raise.Action[A0] =>
           mapF(s, v, action.action)
       }
@@ -120,37 +123,20 @@ trait Widget[V, S, +A] { thisWidget =>
 
   final def wrapped(withElements: Modifier => Widget.ElementT): Widget[V, S, A] =
     new Widget.Wrapped[V, S, A] {
-      override private[pye] final val w: Widget[V, S, A] = this
-      override private[pye] final val f: JsDom.all.Modifier => ElementT = withElements
+      override protected final val w: Widget[V, S, A] = this
+      override protected final val f: Modifier => ElementT = withElements
     }
 
   // =====|  |=====
 
   final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
     new Widget.ZoomOut[V, S2, A] {
-      override private[pye] final type S1 = S
-      override private[pye] final val w: Widget[V, S1, A] = thisWidget
-      override private[pye] final val lens: Lens[S2, S1] = s2Lens
-
-      override protected def convert(parentRaiseHandler: RaiseHandler[S2, A], getState: () => S2): AppliedWidget[V] = {
-        val rh: RaiseHandler[S, A] = {
-          case soh: Raise.StandardOrUpdate[S] =>
-            soh match {
-              case update: Raise.UpdateState[S] =>
-                parentRaiseHandler._handleRaise(Raise.UpdateState[S2](lens.modify(update.update), update.reRender))
-              case standard: Raise.Standard =>
-                parentRaiseHandler._handleRaise(standard)
-            }
-          case action: Raise.Action[A] =>
-            parentRaiseHandler._handleRaise(action)
-        }
-
-        w.convert(rh, () => lens.get(getState()))
-      }
-
+      override protected final type S1 = S
+      override protected final val w: Widget[V, S1, A] = thisWidget
+      override protected final val lens: Lens[S2, S1] = s2Lens
     }
 
-  protected def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
+  def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
 
   // =====|  |=====
 
@@ -249,8 +235,8 @@ object Widget {
       val _valueF = valueF
 
       new Widget.Leaf[V, S, A] {
-        override private[pye] final val elementF: RaiseHandler[S, A] => S => ElementT = _elementF
-        override private[pye] final val valueF: S => ?[V] = _valueF
+        override protected final val elementF: RaiseHandler[S, A] => S => ElementT = _elementF
+        override protected final val valueF: S => ?[V] = _valueF
       }
     }
 
@@ -299,18 +285,18 @@ object Widget {
   // =====|  |=====
 
   sealed trait Leaf[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] val elementF: RaiseHandler[S, A] => S => Widget.ElementT
-    private[pye] val valueF: S => ?[V]
+    protected val elementF: RaiseHandler[S, A] => S => Widget.ElementT
+    protected val valueF: S => ?[V]
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
-        override private[pye] final val value: IO[V] =
+        override final val value: IO[V] =
           IO.wrapEffect { thisWidget.valueF(getState()) }
-        override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
+        override final val current: IO[Maybe[Widget.ElementT]] =
           IO { elems.value }
-        override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdate: IO[Widget.ElementT] =
           for {
             newElems <- IO { thisWidget.elementF(parentRaiseHandler)(getState()) }
             _ <- elems.value = newElems.some
@@ -321,19 +307,19 @@ object Widget {
   }
 
   sealed trait MapV[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] type V1
-    private[pye] val w: Widget[V1, S, A]
-    private[pye] val f: ?[V1] => ?[V]
+    protected type V1
+    protected val w: Widget[V1, S, A]
+    protected val f: ?[V1] => ?[V]
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convert(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
-        override private[pye] final val value: IO[V] =
+        override final val value: IO[V] =
           IO.wrapEffect { thisWidget.f(child.value.runSync) }
-        override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
+        override final val current: IO[Maybe[Widget.ElementT]] =
           child.current
-        override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdate: IO[Widget.ElementT] =
           child.getElementsAndUpdate
       }
     }
@@ -341,9 +327,9 @@ object Widget {
   }
 
   sealed trait MapA[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] type A1
-    private[pye] val w: Widget[V, S, A1]
-    private[pye] val f: (S, ?[V], Raise[S, A1]) => AsyncIO[List[Raise[S, A]]]
+    protected type A1
+    protected val w: Widget[V, S, A1]
+    protected val f: (S, ?[V], Raise[S, A1]) => AsyncIO[List[Raise[S, A]]]
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
       Pointer
@@ -359,9 +345,9 @@ object Widget {
   }
 
   sealed trait Apply[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] type V1
-    private[pye] val w1: Widget[V1, S, A]
-    private[pye] val w2: Widget[V1 => V, S, A]
+    protected type V1
+    protected val w1: Widget[V1, S, A]
+    protected val w2: Widget[V1 => V, S, A]
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val w1: AppliedWidget[thisWidget.V1] =
@@ -380,9 +366,9 @@ object Widget {
           .value
 
       new AppliedWidget[V] {
-        override private[pye] final val value: IO[V] =
+        override final val value: IO[V] =
           w1.value.apply(w2.value)
-        override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
+        override final val current: IO[Maybe[Widget.ElementT]] =
           ado[MaybeMonad.Projection[IO]#P]
             .join(
               w1.current.toMaybeMonad,
@@ -393,7 +379,7 @@ object Widget {
                 NonEmptyList.nel(w1E, w2E).flatten
             }
             .wrapped
-        override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdate: IO[Widget.ElementT] =
           ado[IO]
             .join(
               w1.getElementsAndUpdate,
@@ -409,9 +395,9 @@ object Widget {
   }
 
   sealed trait FlatMap[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] type V1
-    private[pye] val w1: Widget[V1, S, A]
-    private[pye] val w2: V1 => Widget[V, S, A]
+    protected type V1
+    protected val w1: Widget[V1, S, A]
+    protected val w2: V1 => Widget[V, S, A]
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       def makeW2(v1: thisWidget.V1): AppliedWidget[V] =
@@ -439,7 +425,7 @@ object Widget {
         new AppliedWidget[V] {
           private val inner: Var[Maybe[Widget.ElementT] \/ AppliedWidget[V]] = Var(None.left)
 
-          override private[pye] final val value: IO[V] = {
+          override final val value: IO[V] = {
             for {
               // TODO (KR) : There is a bug here...
               //           : Somehow adding this blank `IO {}` fixes it
@@ -451,7 +437,7 @@ object Widget {
               v2 <- _w2.value
             } yield v2
           }
-          override private[pye] final val current: IO[Maybe[Widget.ElementT]] = {
+          override final val current: IO[Maybe[Widget.ElementT]] = {
             for {
               evalInner <- IO { inner.value }
               elems <- evalInner match {
@@ -460,7 +446,7 @@ object Widget {
               }
             } yield elems
           }
-          override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] = {
+          override final val getElementsAndUpdate: IO[Widget.ElementT] = {
             for {
               v1_? <- IO { w1.value.runSync }
               elems <- v1_? match {
@@ -487,7 +473,7 @@ object Widget {
        */
 
       new AppliedWidget[V] {
-        override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
+        override final val current: IO[Maybe[Widget.ElementT]] =
           ado[MaybeMonad.Projection[IO]#P]
             .join(
               w1.current.toMaybeMonad,
@@ -498,9 +484,9 @@ object Widget {
                 NonEmptyList.nel(w1E, w2E).flatten
             }
             .wrapped
-        override private[pye] final val value: IO[V] =
+        override final val value: IO[V] =
           w2.value
-        override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdate: IO[Widget.ElementT] =
           ado[IO]
             .join(
               w1.getElementsAndUpdate,
@@ -515,15 +501,33 @@ object Widget {
 
   }
 
+  // TODO (KR) : Implement convert here...
   sealed trait ZoomOut[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] type S1
-    private[pye] val w: Widget[V, S1, A]
-    private[pye] val lens: Lens[S, S1]
+    protected type S1
+    protected val w: Widget[V, S1, A]
+    protected val lens: Lens[S, S1]
+
+    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+      val rh: RaiseHandler[S1, A] = {
+        case sou: Raise.StandardOrUpdate[S1] =>
+          sou match {
+            case update: Raise.UpdateState[S1] =>
+              parentRaiseHandler._handleRaise(Raise.UpdateState[S](lens.modify(update.update), update.reRender))
+            case standard: Raise.Standard =>
+              parentRaiseHandler._handleRaise(standard)
+          }
+        case action: Raise.Action[A] =>
+          parentRaiseHandler._handleRaise(action)
+      }
+
+      w.convert(rh, () => lens.get(getState()))
+    }
+
   }
 
   sealed trait Wrapped[V, S, +A] extends Widget[V, S, A] { thisWidget =>
-    private[pye] val w: Widget[V, S, A]
-    private[pye] val f: Modifier => Widget.ElementT
+    protected val w: Widget[V, S, A]
+    protected val f: Modifier => Widget.ElementT
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val child: AppliedWidget[V] =
@@ -537,11 +541,11 @@ object Widget {
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
-        override private[pye] final val value: IO[V] =
+        override final val value: IO[V] =
           child.value
-        override private[pye] final val current: IO[Maybe[Widget.ElementT]] =
+        override final val current: IO[Maybe[Widget.ElementT]] =
           IO { elems.value }
-        override private[pye] final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdate: IO[Widget.ElementT] =
           for {
             childElems <- child.getElementsAndUpdate
             myElems = thisWidget.f(childElems.toList)
@@ -589,9 +593,9 @@ object Widget {
 
 sealed trait AppliedWidget[V] {
 
-  private[pye] val current: IO[Maybe[Widget.ElementT]]
-  private[pye] val value: IO[V]
-  private[pye] val getElementsAndUpdate: IO[Widget.ElementT]
+  val current: IO[Maybe[Widget.ElementT]]
+  val value: IO[V]
+  val getElementsAndUpdate: IO[Widget.ElementT]
 
   private[pye] final val reRender: IO[Widget.ElementT] =
     for {

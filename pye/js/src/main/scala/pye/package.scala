@@ -11,9 +11,6 @@ import klib.utils._
 
 package object pye {
 
-  // REMOVE : ...
-  type ErrorHandler = Throwable => Unit
-
   def throwableSourceMapReference(throwable: Throwable): IndentedString = {
     import IndentedString._
 
@@ -60,7 +57,7 @@ package object pye {
 
   def displayMessage(msg: Raise.DisplayMessage): Unit = {
     def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
-    def globalMessages: Maybe[Element] = getElement(Page.Standard.names.PageMessages)
+    def globalMessages: Maybe[Element] = getElement(Page.names.PageMessages)
 
     msg.causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
       case Some(messagesElement) =>
@@ -89,11 +86,6 @@ package object pye {
         // TODO (KR) :
         window.alert(msg.message)
     }
-  }
-
-  def displayMessage2(msg: Raise.DisplayMessage): Unit = {
-    // TODO (KR) :
-    ???
   }
 
 }
