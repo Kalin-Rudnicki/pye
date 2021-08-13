@@ -26,14 +26,14 @@ trait inputs {
       filterSubmit: KeyboardEvent => Boolean,
   )(
       updateOn: UpdateOn,
-      decorators: Seq[Modifier],
+      decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Maybe[V], String] =
     Widget.builder
       .withState[String]
       .submitAction
       .rsElement { rh => s =>
         var savedTimeout: Maybe[Int] = None
-        val _input = inputTag(decorators).render
+        val _input = inputTag(decorator).render
 
         // TODO (KR) : Make sure state is updated before re-rendering
         def updateStateRaise(): Raise.UpdateState[String] =
@@ -85,30 +85,32 @@ trait inputs {
 
   def inputW[V: DecodeString](
       updateOn: UpdateOn = UpdateOn.Blur,
-      decorators: Seq[Modifier] = Seq.empty,
+      decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Maybe[V], String] =
     genInputW[V](
       inputTag = input,
       filterSubmit = e => e.keyCode == KeyMap.KeyCode.Enter.keyCode,
     )(
       updateOn = updateOn,
-      decorators = Seq[Modifier](
+      decorator = Seq[Modifier](
         PyeS.`pye:input`,
-      ) ++ decorators,
+        decorator,
+      ),
     )
 
   def textAreaW[V: DecodeString](
       updateOn: UpdateOn = UpdateOn.Blur,
-      decorators: Seq[Modifier] = Seq.empty,
+      decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Maybe[V], String] =
     genInputW[V](
       inputTag = textarea.asInstanceOf,
       filterSubmit = e => e.keyCode == KeyMap.KeyCode.Enter.keyCode && e.ctrlKey,
     )(
       updateOn = updateOn,
-      decorators = Seq[Modifier](
+      decorator = Seq[Modifier](
         PyeS.`pye:text-area`,
-      ) ++ decorators,
+        decorator,
+      ),
     )
 
   // ---  ---
@@ -270,7 +272,7 @@ trait inputs {
 
   def toggleButtonW(
       buttonLabel: String,
-      buttonDecorators: Seq[Modifier] = Seq.empty,
+      buttonDecorator: Modifier = Seq.empty[Modifier],
   ): Widget[Boolean, Boolean, Nothing] =
     Widget.builder
       .withState[Boolean]
@@ -284,7 +286,7 @@ trait inputs {
           onclick := { (_: Event) =>
             rh.setState(!s)
           },
-        )(buttonLabel)(buttonDecorators).render
+        )(buttonLabel)(buttonDecorator).render
       }
       .withValue(_.pure[?])
 
@@ -293,10 +295,10 @@ trait inputs {
   def radioGroupW[T](
       options: Array[(String, T)],
       allowUnset: Boolean = false,
-      decorators: Seq[Modifier] = Seq.empty,
-      elementDecorators: Seq[Modifier] = Seq.empty,
+      decorator: Modifier = Seq.empty[Modifier],
+      elementDecorator: Modifier = Seq.empty[Modifier],
   ): Widget[Maybe[T], Maybe[T], Nothing] = {
-    val actualDecorators = Seq[Modifier](PyeS.`pye:radio-group`) ++ decorators
+    val actualDecorators = Seq[Modifier](PyeS.`pye:radio-group`, decorator)
 
     Widget.builder
       .withState[Maybe[T]]
@@ -322,7 +324,7 @@ trait inputs {
                   } else
                     rh.raise(Raise.UpdateState[Maybe[T]](_ => t.some))
                 },
-              )(_label)(elementDecorators)
+              )(_label)(elementDecorator)
           }
 
         span(optionNodes)(actualDecorators).render

@@ -6,6 +6,9 @@ import pye.Implicits._
 
 trait RaiseHandler[S, -A] {
 
+  // TODO (KR) : def _handleRaise(raise, childrenThatRequestedReRender)
+  //           : - then, only reRender at the end
+  //           : - this should be more efficient than possibly reRendering sub-trees multiple times
   private[pye] def _handleRaise(raise: Raise[S, A]): AsyncIO[Unit]
   private[pye] def _handleRaises(raises: List[Raise[S, A]]): AsyncIO[Unit] =
     AsyncIO.runSequentially(raises.map(_handleRaise)).map { _ => }

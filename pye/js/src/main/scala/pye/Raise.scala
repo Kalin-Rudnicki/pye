@@ -21,7 +21,7 @@ object Raise {
   sealed trait Standard extends Raise.StandardOrUpdate[Nothing]
   final case class DisplayMessage(
       message: String,
-      modifiers: Seq[Modifier],
+      modifier: Modifier,
       timeout: Maybe[Int],
       causeId: Maybe[String],
   ) extends Standard
@@ -31,35 +31,35 @@ object Raise {
       def apply(
           message: String,
           timeout: Maybe[Int] = None,
-          modifiers: List[Modifier] = Nil,
+          modifier: Modifier = Seq.empty[Modifier],
       ): DisplayMessage =
         DisplayMessage(
           message = message,
           timeout = timeout,
-          modifiers = modifiers,
+          modifier = modifier,
           causeId = causeId,
         )
 
       def info(
           message: String,
           timeout: Maybe[Int] = None,
-          modifiers: List[Modifier] = Nil,
+          decorator: Modifier = Seq.empty[Modifier],
       ): DisplayMessage =
         apply(
           message = message,
           timeout = timeout,
-          modifiers = (PyeS.message.m(_.info): Modifier) :: modifiers,
+          modifier = Seq[Modifier](PyeS.message.m(_.info), decorator),
         )
 
       def error(
           message: String,
           timeout: Maybe[Int] = None,
-          modifiers: List[Modifier] = Nil,
+          decorator: Modifier = Seq.empty[Modifier],
       ): DisplayMessage =
         apply(
           message = message,
           timeout = timeout,
-          modifiers = (PyeS.message.m(_.error): Modifier) :: modifiers,
+          modifier = Seq[Modifier](PyeS.message.m(_.error), decorator),
         )
 
     }
@@ -67,7 +67,7 @@ object Raise {
     def fromThrowable(throwable: Throwable): DisplayMessage =
       global.error(
         throwable.toString,
-        modifiers = List(
+        decorator = Seq(
           oncontextmenu := { (e: Event) =>
             e.preventDefault()
             console.log(throwableSourceMapReference(throwable).toString("    "))

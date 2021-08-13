@@ -50,7 +50,9 @@ sealed trait Page { page =>
                       case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
                     }
                   case Raise.RefreshPage =>
-                    AsyncIO.wrapIO { ptr.value._1.reRender }.map { _ => Nil }
+                    AsyncIO.wrapIO { ptr.value._1.reRender }.map { _ => }
+                  case raw: Raise.Raw =>
+                    raw.action
                 }
               case update: Raise.UpdateState[Env] =>
                 for {
@@ -240,13 +242,16 @@ object Page {
         titleF: String \/ (Env => String),
     ) {
 
-      def widget[A](widget: Widget[Unit, Env, A]): Builder4[Env, A] =
+      def body[A](widget: Widget[Unit, Env, A]): Builder4[Env, A] =
         new Builder4[Env, A](
           url = url,
           getEnv = getEnv,
           titleF = titleF,
           widget = widget,
         )
+
+      def standardBody[A](makeStandard: StandardBuilder1[Env] => StandardBuilder2[Env, A]): Builder4[Env, A] =
+        body(makeStandard(new StandardBuilder1[Env]).toWidget)
 
     }
 
@@ -274,7 +279,8 @@ object Page {
         titleF: String \/ (Env => String),
         widget: Widget[Unit, Env, A],
         keyMap: KeyMap[Env, A],
-    ) { builder =>
+    ) {
+      builder =>
       private type _Env = Env
 
       def handleA[A2 >: A](_handleA: A2 => AsyncIO[List[Raise.StandardOrUpdate[Env]]]): Page =
@@ -291,7 +297,277 @@ object Page {
 
     }
 
-    /*
+    // ---  ---
+
+    final class StandardBuilder1[Env] private[Page] {
+
+      def pageCenterMiddle[A](
+          widget: Widget[Unit, Env, A],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A] =
+        new StandardBuilder2[Env, A](
+          _pageCenterMiddle = (widget, modifier),
+          _pageTop = None,
+          _pageBottom = None,
+          _pageLeft = None,
+          _pageRight = None,
+          _pageCenterTop = None,
+          _pageCenterBottom = None,
+        )
+
+    }
+
+    final class StandardBuilder2[Env, +A] private[Page] (
+        _pageCenterMiddle: (Widget[Unit, Env, A], Modifier),
+        _pageTop: Maybe[(String, Widget[Unit, Env, A], Modifier)],
+        _pageBottom: Maybe[(String, Widget[Unit, Env, A], Modifier)],
+        _pageLeft: Maybe[(Widget[Unit, Env, A], Modifier)],
+        _pageRight: Maybe[(Widget[Unit, Env, A], Modifier)],
+        _pageCenterTop: Maybe[(Widget[Unit, Env, A], Modifier)],
+        _pageCenterBottom: Maybe[(Widget[Unit, Env, A], Modifier)],
+        // TODO (KR) : Modals
+    ) {
+
+      private def copy[A2 >: A](
+          _pageCenterMiddle: (Widget[Unit, Env, A2], Modifier) = this._pageCenterMiddle,
+          _pageTop: Maybe[(String, Widget[Unit, Env, A2], Modifier)] = this._pageTop,
+          _pageBottom: Maybe[(String, Widget[Unit, Env, A2], Modifier)] = this._pageBottom,
+          _pageLeft: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageLeft,
+          _pageRight: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageRight,
+          _pageCenterTop: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageCenterTop,
+          _pageCenterBottom: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageCenterBottom,
+      ): StandardBuilder2[Env, A2] =
+        new StandardBuilder2[Env, A2](
+          _pageCenterMiddle = _pageCenterMiddle,
+          _pageTop = _pageTop,
+          _pageBottom = _pageBottom,
+          _pageLeft = _pageLeft,
+          _pageRight = _pageRight,
+          _pageCenterTop = _pageCenterTop,
+          _pageCenterBottom = _pageCenterBottom,
+        )
+
+      def noPageTop: StandardBuilder2[Env, A] = copy(_pageTop = None)
+
+      def pageTop[A2 >: A](
+          height: String,
+          widget: Widget[Unit, Env, A2],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] =
+        copy(_pageTop = (height, widget, modifier).some)
+
+      def noPageBottom: StandardBuilder2[Env, A] = copy(_pageBottom = None)
+
+      def pageBottom[A2 >: A](
+          height: String,
+          widget: Widget[Unit, Env, A2],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] =
+        copy(_pageBottom = (height, widget, modifier).some)
+
+      def noPageLeft: StandardBuilder2[Env, A] = copy(_pageLeft = None)
+
+      def pageLeft[A2 >: A](
+          widget: Widget[Unit, Env, A2],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] =
+        copy(_pageLeft = (widget, modifier).some)
+
+      def noPageRight: StandardBuilder2[Env, A] = copy(_pageRight = None)
+
+      def pageRight[A2 >: A](
+          widget: Widget[Unit, Env, A2],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] =
+        copy(_pageRight = (widget, modifier).some)
+
+      def noPageCenterTop: StandardBuilder2[Env, A] = copy(_pageCenterTop = None)
+
+      def pageCenterTop[A2 >: A](
+          widget: Widget[Unit, Env, A2],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] =
+        copy(_pageCenterTop = (widget, modifier).some)
+
+      def noPageCenterBottom: StandardBuilder2[Env, A] = copy(_pageCenterBottom = None)
+
+      def pageCenterBottom[A2 >: A](
+          widget: Widget[Unit, Env, A2],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] =
+        copy(_pageCenterBottom = (widget, modifier).some)
+
+      // TODO (KR) : Modals
+
+      // =====|  |=====
+
+      private[Page] def toWidget: Widget[Unit, Env, A] = {
+        def mapSection(
+            _id: String,
+            height: Maybe[String],
+            widget: Widget[Unit, Env, A],
+            modifier: Modifier,
+        ): Widget[Unit, Env, A] =
+          widget.wrapped { elems =>
+            // TODO (KR) :
+            ???
+          }
+
+        def map1(
+            _id: String,
+            m: Maybe[(String, Widget[Unit, Env, A], Modifier)],
+            extraModifier: Modifier,
+        ): Maybe[Widget[Unit, Env, A]] =
+          m.map { case (height, widget, modifier) => mapSection(_id, height.some, widget, Seq(modifier, extraModifier)) }
+
+        def map2(
+            _id: String,
+            m: Maybe[(Widget[Unit, Env, A], Modifier)],
+            extraModifier: Modifier,
+        ): Maybe[Widget[Unit, Env, A]] =
+          m.map { case (widget, modifier) => mapSection(_id, None, widget, Seq(modifier, extraModifier)) }
+
+        // ---  ---
+
+        val pageTop =
+          map1(
+            Page.names.PageTop,
+            _pageTop,
+            Seq.empty[Modifier],
+          ) // TODO (KR) :
+        val pageBottom =
+          map1(
+            Page.names.PageBottom,
+            _pageBottom,
+            Seq.empty[Modifier],
+          ) // TODO (KR) :
+
+        val pageLeft =
+          map2(
+            Page.names.PageLeft,
+            _pageLeft,
+            Seq.empty[Modifier],
+          ) // TODO (KR) :
+        val pageRight =
+          map2(
+            Page.names.PageRight,
+            _pageRight,
+            Seq.empty[Modifier],
+          ) // TODO (KR) :
+
+        val pageCenterTop =
+          map2(
+            Page.names.PageCenterTop,
+            _pageCenterTop,
+            Seq.empty[Modifier],
+          ) // TODO (KR) :
+        val pageCenterBottom =
+          map2(
+            Page.names.PageCenterBottom,
+            _pageCenterBottom,
+            Seq.empty[Modifier],
+          ) // TODO (KR) :
+
+        val pageCenterMiddle =
+          mapSection(
+            Page.names.PageCenterMiddle,
+            List(
+              _pageTop.map(_._1),
+              _pageBottom.map(_._1),
+            ).flatMap(_.toOption).toNel match {
+              case Some(edges) =>
+                ("100vh" :: edges.toList).mkString("calc(", " - ", ")").some
+              case None =>
+                "100vh".some
+            },
+            _pageCenterMiddle._1,
+            Seq[Modifier](
+              // TODO (KR) : Style
+              _pageCenterMiddle._2,
+            ),
+          )
+
+        // ---  ---
+
+        type PageWidget[V] = Widget[V, Env, A]
+
+        // TODO (KR) :
+        val pageMessages: Widget[Unit, Env, A] =
+          Widget.builder.element {
+            div(id := Page.names.PageMessages).render
+          }
+
+        val pageCenter: PageWidget[Unit] =
+          NonEmptyList
+            .nelJoin[PageWidget[Unit]](pageCenterTop, pageMessages.some)(pageCenterMiddle)(pageCenterBottom)
+            .traverse
+            .mapValue { _ => }
+            .wrapped { elems =>
+              // TODO (KR) :
+              ???
+            }
+
+        val pageMiddle: PageWidget[Unit] =
+          NonEmptyList
+            .nelJoin[PageWidget[Unit]](pageLeft)(pageCenter)(pageRight)
+            .traverse
+            .mapValue { _ => }
+            .wrapped { elems =>
+              // TODO (KR) :
+              ???
+            }
+
+        val page: PageWidget[Unit] =
+          NonEmptyList
+            .nelJoin[PageWidget[Unit]](pageTop)(pageMiddle)(pageBottom)
+            .traverse
+            .mapValue { _ => }
+            .wrapped { elems =>
+              // TODO (KR) :
+              ???
+            }
+
+        page
+      }
+
+      /*
+    // --- Style ---
+          val pageTopHeight = pageTop.cata(_._1, "0px")
+          val pageBottomHeight = pageBottom.cata(_._1, "0px")
+
+          val currentStyles = document.head.getElementsByClassName(N.PyeStandardStyle)
+          0.until(currentStyles.length).foreach { i =>
+            document.head.removeChild(currentStyles(i))
+          }
+          document.head.insertBefore(
+            tags2
+              .style(`class` := N.PyeStandardStyle)(
+                s"""
+                   | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
+                   | body { margin: 0; padding: 0; }
+                   |
+                   | #${N.Page} { height: 100vh; }
+                   | #${N.PageTop} { height: var(--page-top-height); }
+                   | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
+                   | #${N.PageBottom} { height: var(--page-bottom-height); }
+                   | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
+                   | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
+                   | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
+                   | #${N.PageMessages} { flex-shrink: 0; }
+                   | #${N.PageCenterTop} { flex-shrink: 0; }
+                   | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
+                   | #${N.PageCenterBottom} { flex-shrink: 0; }
+                   |
+                   | .${N.Modal} { display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0.75); }
+                   |""".stripMargin,
+              )
+              .render,
+            document.head.children(0),
+          )
+       */
+
+      // REMOVE : ...
+      /*
     final class StandardBuilder1[Env] private[Page] {
 
     def pageCenterMiddle(build: Widget[Unit, Env, PlaceHolderA]): StandardBuilder2[Env] =
@@ -432,39 +708,7 @@ object Page {
           pageCenterMiddle.id = N.PageCenterMiddle; pageCenterMiddle.classList.add(N.PageBody)
           pageCenterBottom.foreach { n => n.id = N.PageCenterBottom; n.classList.add(N.PageBar) }
 
-          // --- Style ---
-          val pageTopHeight = pageTop.cata(_._1, "0px")
-          val pageBottomHeight = pageBottom.cata(_._1, "0px")
 
-          val currentStyles = document.head.getElementsByClassName(N.PyeStandardStyle)
-          0.until(currentStyles.length).foreach { i =>
-            document.head.removeChild(currentStyles(i))
-          }
-          document.head.insertBefore(
-            tags2
-              .style(`class` := N.PyeStandardStyle)(
-                s"""
-                   | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
-                   | body { margin: 0; padding: 0; }
-                   |
-                   | #${N.Page} { height: 100vh; }
-                   | #${N.PageTop} { height: var(--page-top-height); }
-                   | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
-                   | #${N.PageBottom} { height: var(--page-bottom-height); }
-                   | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
-                   | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
-                   | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
-                   | #${N.PageMessages} { flex-shrink: 0; }
-                   | #${N.PageCenterTop} { flex-shrink: 0; }
-                   | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
-                   | #${N.PageCenterBottom} { flex-shrink: 0; }
-                   |
-                   | .${N.Modal} { display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0.75); }
-                   |""".stripMargin,
-              )
-              .render,
-            document.head.children(0),
-          )
 
           // --- Body ---
           body(
@@ -491,8 +735,9 @@ object Page {
         keyMap = KeyMap.empty,
       )
     }
-     */
+       */
 
+    }
   }
 
 }

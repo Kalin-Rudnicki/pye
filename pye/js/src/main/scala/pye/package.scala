@@ -64,7 +64,7 @@ package object pye {
         val messageElement =
           div(
             msg.message,
-            msg.modifiers,
+            msg.modifier,
           ).render
 
         messagesElement.appendChild(messageElement)

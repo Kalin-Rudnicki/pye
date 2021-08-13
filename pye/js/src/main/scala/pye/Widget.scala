@@ -152,12 +152,12 @@ trait Widget[V, S, +A] { thisWidget =>
 
   final def labelled(
       labelText: String,
-      decorators: Seq[Modifier] = Seq.empty,
+      decorator: Modifier = Seq.empty[Modifier],
   ): Widget[V, S, A] =
     ado[Widget.Projection[S, A]#P]
       .join(
         Widget.builder.element[S, A] {
-          label(PyeS.`pye:label`)(labelText)(decorators).render
+          label(PyeS.`pye:label`)(labelText)(decorator).render
         },
         this,
       )
@@ -265,6 +265,18 @@ object Widget {
     case action: Raise.Action[A] =>
       parentRH._handleRaise(action)
   }
+  def simpleRhCaptureReRender[V, S, A](
+      w: Widget[V, S, A],
+      getState: () => S,
+      parentRH: RaiseHandler[S, A],
+      afterUpdate: IO[Unit] = IO {},
+  ): AppliedWidget[V] =
+    Pointer
+      .withSelf[AppliedWidget[V]] { ptr =>
+        val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRH, afterUpdate)
+        Pointer(w.convert(rh, getState))
+      }
+      .value
 
   private[pye] def replaceNodes(oldElems: Widget.ElementT, newElems: Widget.ElementT): IO[Unit] = {
     val parent = oldElems.head.parentNode
@@ -580,14 +592,23 @@ object Widget {
 
     }
 
-  /*
-  implicit def widgetTraverseList[S, A]: Traverse[List, Widget.Projection[S, A]#P] =
-    new Traverse[List, Widget.Projection[S, A]#P] {
+  implicit def widgetTraverseNonEmptyList[S, A]: Traverse[NonEmptyList, Widget.Projection[S, A]#P] =
+    new Traverse[NonEmptyList, Widget.Projection[S, A]#P] {
 
-      override def traverse[T](t: List[Widget[T, S, A]]): Widget[List[T], S, A] = ???
+      override def traverse[T](t: NonEmptyList[Widget[T, S, A]]): Widget[NonEmptyList[T], S, A] = { (rh, getState) =>
+        val children: NonEmptyList[AppliedWidget[T]] =
+          t.map { w =>
+            Widget.rhCaptureReRender()
+          }
+
+        new AppliedWidget[NonEmptyList[T]] {
+          override val current: IO[Maybe[ElementT]] = ??? // TODO (KR) :
+          override val value: IO[NonEmptyList[T]] = ??? // TODO (KR) :
+          override val getElementsAndUpdate: IO[ElementT] = ??? // TODO (KR) :
+        }
+      }
 
     }
-   */
 
 }
 

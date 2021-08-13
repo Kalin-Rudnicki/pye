@@ -25,7 +25,7 @@ trait containers {
       vh: Int,
       z: Int = 1,
       clickOffModalAction: Maybe[ModalBackgroundClickAction] = ModalBackgroundClickAction.Close.some,
-      modalMods: Seq[Modifier] = Seq.empty,
+      modalMods: Modifier = Seq.empty[Modifier],
   )(innerModal: HTMLElement): Div = {
     innerModal.style.width = s"${vw}vw"
     innerModal.style.height = s"${vh}vh"
@@ -75,7 +75,7 @@ trait containers {
       vh: Int,
       z: Int = 1,
       clickOffModalAction: Maybe[ModalBackgroundClickAction] = ModalBackgroundClickAction.Close.some,
-      modalMods: Seq[Modifier] = Seq.empty,
+      modalMods: Modifier = Seq.empty[Modifier],
   )(innerModal: HTMLElement): Unit =
     document.body.appendChild(
       makeModal(

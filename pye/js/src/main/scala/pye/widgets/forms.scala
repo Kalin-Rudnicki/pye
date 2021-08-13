@@ -11,14 +11,14 @@ trait forms {
 
   def submitButton[S](
       label: String = "Submit",
-      decorators: Seq[Modifier] = Seq.empty,
+      decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Unit, S] =
     Widget.builder.withState.submitAction.rElement { (rh: RaiseHandler[S, CommonRaise.Submit.type]) =>
       button(PyeS.`pye:form-button`)(
         onclick := { (_: Event) =>
           rh.raiseAction(CommonRaise.Submit)
         },
-      )(label)(decorators).render
+      )(label)(decorator).render
     }.noValue
 
 }
