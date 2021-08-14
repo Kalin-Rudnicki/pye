@@ -155,6 +155,9 @@ object RouteMatcher {
       value.cata(withParam(key, _), this)
 
   }
+  object Params {
+    val empty: Params = Params(Map.empty)
+  }
 
   // =====|  |=====
 

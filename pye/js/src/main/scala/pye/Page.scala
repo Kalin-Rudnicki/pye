@@ -178,12 +178,17 @@ object Page {
 
   object builder {
 
-    def apply(paths: String*)(params: RouteMatcher.Params): Builder1 = {
+    def apply(
+        paths: String*,
+    )(
+        paramF: RouteMatcher.Params => RouteMatcher.Params = identity,
+    ): Builder1 = {
       val pathStr =
         ("pages" :: paths.toList)
           .map(URIUtils.encodeURIComponent)
           .mkString("/", "/", "")
 
+      val params = paramF(RouteMatcher.Params.empty)
       val paramStr =
         if (params.paramMap.isEmpty)
           ""
