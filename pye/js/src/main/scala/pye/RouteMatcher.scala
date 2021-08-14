@@ -9,6 +9,7 @@ import klib.Implicits._
 import klib.fp.typeclass.DecodeString
 import klib.fp.types._
 import klib.utils._
+import pye.Implicits._
 
 sealed trait RouteMatcher {
 
@@ -118,9 +119,7 @@ sealed trait RouteMatcher {
 
     attemptMatch(paths.tail, this) match {
       case Some(page) =>
-        // TODO (KR) :
-        ???
-      // page.replaceNoTrace
+        page.replaceNoTrace.runAndShowErrors()
       case None =>
         window.alert("Unable to resolve URL")
     }
@@ -138,8 +137,13 @@ object RouteMatcher {
 
   final case class Params(paramMap: Map[String, String]) {
 
-    def param[P: DecodeString](name: String): ?[P] = ???
-    def mParam[P: DecodeString](name: String): ?[Maybe[P]] = ???
+    def param[P: DecodeString](name: String): ?[P] =
+      for {
+        mValue <- mParam[P](name)
+        value <- mValue.toEA(Message(s"Missing param: $name"))
+      } yield value
+    def mParam[P: DecodeString](name: String): ?[Maybe[P]] =
+      paramMap.get(name).toMaybe.map(implicitly[DecodeString[P]].decode).traverse
 
     def withParams(params: (String, String)*): Params =
       Params(paramMap ++ params)

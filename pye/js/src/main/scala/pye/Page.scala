@@ -78,7 +78,7 @@ sealed trait Page { page =>
             Pointer {
               (
                 widget
-                  .wrapped { elems => NonEmptyList(body(elems).render, Nil) }
+                  .wrapped { elems => body(elems).render }
                   .convert(rh, () => stateVar.value),
                 rh,
               )
@@ -313,18 +313,27 @@ object Page {
           _pageRight = None,
           _pageCenterTop = None,
           _pageCenterBottom = None,
+          _pageCenterModifier = Seq.empty[Modifier],
+          _pageMiddleModifier = Seq.empty[Modifier],
+          _pageModifier = Seq.empty[Modifier],
         )
 
     }
 
     final class StandardBuilder2[Env, +A] private[Page] (
+        // Required Widget
         _pageCenterMiddle: (Widget[Unit, Env, A], Modifier),
+        // Optional Widgets
         _pageTop: Maybe[(String, Widget[Unit, Env, A], Modifier)],
         _pageBottom: Maybe[(String, Widget[Unit, Env, A], Modifier)],
         _pageLeft: Maybe[(Widget[Unit, Env, A], Modifier)],
         _pageRight: Maybe[(Widget[Unit, Env, A], Modifier)],
         _pageCenterTop: Maybe[(Widget[Unit, Env, A], Modifier)],
         _pageCenterBottom: Maybe[(Widget[Unit, Env, A], Modifier)],
+        // Section Modifiers
+        _pageCenterModifier: Modifier,
+        _pageMiddleModifier: Modifier,
+        _pageModifier: Modifier,
         // TODO (KR) : Modals
     ) {
 
@@ -336,6 +345,9 @@ object Page {
           _pageRight: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageRight,
           _pageCenterTop: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageCenterTop,
           _pageCenterBottom: Maybe[(Widget[Unit, Env, A2], Modifier)] = this._pageCenterBottom,
+          _pageCenterModifier: Modifier = this._pageCenterModifier,
+          _pageMiddleModifier: Modifier = this._pageMiddleModifier,
+          _pageModifier: Modifier = this._pageModifier,
       ): StandardBuilder2[Env, A2] =
         new StandardBuilder2[Env, A2](
           _pageCenterMiddle = _pageCenterMiddle,
@@ -345,6 +357,9 @@ object Page {
           _pageRight = _pageRight,
           _pageCenterTop = _pageCenterTop,
           _pageCenterBottom = _pageCenterBottom,
+          _pageCenterModifier = _pageCenterModifier,
+          _pageMiddleModifier = _pageMiddleModifier,
+          _pageModifier = _pageModifier,
         )
 
       def noPageTop: StandardBuilder2[Env, A] = copy(_pageTop = None)
@@ -397,6 +412,17 @@ object Page {
       ): StandardBuilder2[Env, A2] =
         copy(_pageCenterBottom = (widget, modifier).some)
 
+      // ---  ---
+
+      def modifyPageCenter(mods: Modifier*): StandardBuilder2[Env, A] =
+        copy(_pageCenterModifier = Seq[Modifier](this._pageCenterModifier, mods))
+
+      def modifyPageMiddle(mods: Modifier*): StandardBuilder2[Env, A] =
+        copy(_pageMiddleModifier = Seq[Modifier](this._pageMiddleModifier, mods))
+
+      def modifyPage(mods: Modifier*): StandardBuilder2[Env, A] =
+        copy(_pageModifier = Seq[Modifier](this._pageModifier, mods))
+
       // TODO (KR) : Modals
 
       // =====|  |=====
@@ -404,13 +430,12 @@ object Page {
       private[Page] def toWidget: Widget[Unit, Env, A] = {
         def mapSection(
             _id: String,
-            height: Maybe[String],
+            _height: Maybe[String],
             widget: Widget[Unit, Env, A],
             modifier: Modifier,
         ): Widget[Unit, Env, A] =
           widget.wrapped { elems =>
-            // TODO (KR) :
-            ???
+            div(id := _id, _height.map(height := _).toOption)(elems)(modifier).render
           }
 
         def map1(
@@ -503,8 +528,7 @@ object Page {
             .traverse
             .mapValue { _ => }
             .wrapped { elems =>
-              // TODO (KR) :
-              ???
+              div(id := Page.names.PageCenter)(elems)(_pageCenterModifier).render
             }
 
         val pageMiddle: PageWidget[Unit] =
@@ -513,8 +537,7 @@ object Page {
             .traverse
             .mapValue { _ => }
             .wrapped { elems =>
-              // TODO (KR) :
-              ???
+              div(id := Page.names.PageMiddle)(elems)(_pageMiddleModifier).render
             }
 
         val page: PageWidget[Unit] =
@@ -523,8 +546,7 @@ object Page {
             .traverse
             .mapValue { _ => }
             .wrapped { elems =>
-              // TODO (KR) :
-              ???
+              div(id := Page.names.Page)(elems)(_pageModifier).render
             }
 
         page

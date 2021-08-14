@@ -12,7 +12,6 @@ import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
 import pye.Implicits._
-import pye.Widget.ElementT
 import pye.widgets.modifiers.PyeS
 
 trait Widget[V, S, +A] { thisWidget =>
@@ -121,10 +120,12 @@ trait Widget[V, S, +A] { thisWidget =>
       override final val w2: V => Widget[V2, S, A0] = wF
     }
 
-  final def wrapped(withElements: Modifier => Widget.ElementT): Widget[V, S, A] =
+  final def wrapped(inElement: Modifier => Widget.ElemT): Widget[V, S, A] =
+    wrappedElems(elems => NonEmptyList.nel(inElement(elems)))
+  final def wrappedElems(inElements: Modifier => Widget.ElementT): Widget[V, S, A] =
     new Widget.Wrapped[V, S, A] {
       override protected final val w: Widget[V, S, A] = this
-      override protected final val f: Modifier => ElementT = withElements
+      override protected final val f: Modifier => Widget.ElementT = inElements
     }
 
   // =====|  |=====
@@ -246,6 +247,8 @@ object Widget {
 
   // =====|  |=====
 
+  def placeholderSpan: Widget.ElemT = span(id := UUID.randomUUID.toString).render
+
   def rhCaptureReRender[V, S, A](
       w: Pointer[AppliedWidget[V]],
       parentRH: RaiseHandler[S, A],
@@ -363,19 +366,9 @@ object Widget {
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val w1: AppliedWidget[thisWidget.V1] =
-        Pointer
-          .withSelf[AppliedWidget[thisWidget.V1]] { ptr =>
-            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w1.convert(rh, getState))
-          }
-          .value
+        Widget.simpleRhCaptureReRender(thisWidget.w1, getState, parentRaiseHandler)
       val w2: AppliedWidget[thisWidget.V1 => V] =
-        Pointer
-          .withSelf[AppliedWidget[thisWidget.V1 => V]] { ptr =>
-            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w2.convert(rh, getState))
-          }
-          .value
+        Widget.simpleRhCaptureReRender(thisWidget.w2, getState, parentRaiseHandler)
 
       new AppliedWidget[V] {
         override final val value: IO[V] =
@@ -413,25 +406,15 @@ object Widget {
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       def makeW2(v1: thisWidget.V1): AppliedWidget[V] =
-        Pointer
-          .withSelf[AppliedWidget[V]] { ptr =>
-            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w2(v1).convert(rh, getState))
-          }
-          .value
+        Widget.simpleRhCaptureReRender(thisWidget.w2(v1), getState, parentRaiseHandler)
 
       lazy val w1: AppliedWidget[thisWidget.V1] =
-        Pointer
-          .withSelf[AppliedWidget[thisWidget.V1]] { ptr =>
-            val rh: RaiseHandler[S, A] =
-              Widget.rhCaptureReRender(
-                ptr,
-                parentRaiseHandler,
-                w2.reRender.map { _ => },
-              )
-            Pointer(thisWidget.w1.convert(rh, getState))
-          }
-          .value
+        Widget.simpleRhCaptureReRender(
+          thisWidget.w1,
+          getState,
+          parentRaiseHandler,
+          w2.reRender.map { _ => },
+        )
 
       lazy val w2: AppliedWidget[V] =
         new AppliedWidget[V] {
@@ -470,7 +453,7 @@ object Widget {
                   } yield newElems
                 case Dead(_) =>
                   for {
-                    newElem <- IO { span(id := UUID.randomUUID.toString).render }
+                    newElem <- IO { Widget.placeholderSpan }
                     newElems = NonEmptyList.nel(newElem)
                     _ <- inner.value = newElems.some.left
                   } yield newElems
@@ -543,12 +526,7 @@ object Widget {
 
     override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val child: AppliedWidget[V] =
-        Pointer
-          .withSelf[AppliedWidget[V]] { ptr =>
-            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler)
-            Pointer(thisWidget.w.convert(rh, getState))
-          }
-          .value
+        Widget.simpleRhCaptureReRender(thisWidget.w, getState, parentRaiseHandler)
 
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
@@ -592,19 +570,50 @@ object Widget {
 
     }
 
+  implicit def widgetTraverseList[S, A]: Traverse[List, Widget.Projection[S, A]#P] =
+    new Traverse[List, Widget.Projection[S, A]#P] {
+
+      override def traverse[T](t: List[Widget[T, S, A]]): Widget[List[T], S, A] = { (parentRH, getState) =>
+        t.toNel match {
+          case Some(nel) =>
+            type MyT[V] = Widget[V, S, A]
+            (nel: NonEmptyList[MyT[T]]).traverse.map(_.toList).convert(parentRH, getState)
+          case None =>
+            new AppliedWidget[List[T]] {
+              private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
+
+              override final val current: IO[Maybe[Widget.ElementT]] = IO { elems.value }
+              override final val value: IO[List[T]] = IO { Nil }
+              override final val getElementsAndUpdate: IO[ElementT] =
+                for {
+                  newElems <- IO { NonEmptyList.nel(Widget.placeholderSpan) }
+                  _ <- elems.value = newElems.some
+                } yield newElems
+            }
+        }
+      }
+
+    }
+
   implicit def widgetTraverseNonEmptyList[S, A]: Traverse[NonEmptyList, Widget.Projection[S, A]#P] =
     new Traverse[NonEmptyList, Widget.Projection[S, A]#P] {
 
-      override def traverse[T](t: NonEmptyList[Widget[T, S, A]]): Widget[NonEmptyList[T], S, A] = { (rh, getState) =>
+      override def traverse[T](t: NonEmptyList[Widget[T, S, A]]): Widget[NonEmptyList[T], S, A] = { (parentRH, getState) =>
         val children: NonEmptyList[AppliedWidget[T]] =
-          t.map { w =>
-            Widget.rhCaptureReRender()
-          }
+          t.map(Widget.simpleRhCaptureReRender(_, getState, parentRH))
 
         new AppliedWidget[NonEmptyList[T]] {
-          override val current: IO[Maybe[ElementT]] = ??? // TODO (KR) :
-          override val value: IO[NonEmptyList[T]] = ??? // TODO (KR) :
-          override val getElementsAndUpdate: IO[ElementT] = ??? // TODO (KR) :
+          override final val current: IO[Maybe[ElementT]] =
+            children
+              .map(_.current)
+              .traverse
+              .map {
+                _.traverse
+                  .map(_.flatten)
+              }
+          override final val value: IO[NonEmptyList[T]] = children.map(_.value).traverse
+          override final val getElementsAndUpdate: IO[ElementT] =
+            children.map(_.getElementsAndUpdate).traverse.map(_.flatten)
         }
       }
 
