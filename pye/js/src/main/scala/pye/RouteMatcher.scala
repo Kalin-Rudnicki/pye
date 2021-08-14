@@ -46,7 +46,7 @@ sealed trait RouteMatcher {
     }
   }
 
-  final def attemptToLoadPage(): Unit = {
+  private[pye] final def attemptToLoadPage(): Unit = {
     val paths =
       window.location.pathname
         .split("/")
@@ -125,7 +125,7 @@ sealed trait RouteMatcher {
     }
   }
 
-  def bindToWindow(): Unit = {
+  private[pye] def bindToWindow(): Unit = {
     window.onpopstate = _ => {
       attemptToLoadPage()
     }
