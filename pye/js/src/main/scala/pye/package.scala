@@ -9,6 +9,7 @@ import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
 import pye.Implicits._
+import pye.Raise.History
 
 package object pye {
 
@@ -90,20 +91,43 @@ package object pye {
   }
 
   def makeWebPage(
-      onLoad: AsyncIO[Maybe[Page]],
+      onLoad: AsyncIO[List[Raise.Standard]],
       routeMatcher: RouteMatcher,
   ): Unit = {
+    def handle(raises: List[Raise.Standard]): AsyncIO[Boolean] =
+      raises match {
+        case head :: tail =>
+          for {
+            r1 <- head match {
+              case msg: Raise.DisplayMessage =>
+                AsyncIO { displayMessage(msg); false }
+              case history: Raise.History =>
+                history match {
+                  case History.Push(page) =>
+                    page.push.map { _ => true }
+                  case History.Replace(page) =>
+                    page.replace.map { _ => true }
+                  case History.Go(_) =>
+                    // Ignore (?)
+                    AsyncIO { false }
+                }
+              case Raise.RefreshPage =>
+                // Ignore (?)
+                AsyncIO { false }
+              case Raise.Raw(action) =>
+                action.map { _ => false }
+            }
+            r2 <- handle(tail)
+          } yield r1 || r2
+        case Nil =>
+          AsyncIO { false }
+      }
+
     for {
       _ <- AsyncIO { routeMatcher.bindToWindow() }
-      mRedirect <- onLoad
-      _ <- mRedirect match {
-        case Some(redirect) =>
-          // TODO (KR) :
-          redirect.replace
-        case None =>
-          // TODO (KR) :
-          AsyncIO { routeMatcher.attemptToLoadPage() }
-      }
+      raises <- onLoad
+      redirected <- handle(raises)
+      _ <- redirected ? AsyncIO {} | AsyncIO { routeMatcher.attemptToLoadPage() }
     } yield ()
   }.runAndShowErrors()
 
