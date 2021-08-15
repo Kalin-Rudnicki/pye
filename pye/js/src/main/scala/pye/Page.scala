@@ -277,6 +277,9 @@ object Page {
           keyMap = keyMap,
         )
 
+      def noKeyMap: Builder5[Env, A] =
+        keyMap[A](KeyMap.empty)
+
     }
 
     final class Builder5[Env, +A] private[builder] (
@@ -300,6 +303,8 @@ object Page {
           override final val keyMap: KeyMap[Env, A] = builder.keyMap
           override val handleA: A => AsyncIO[List[Raise.StandardOrUpdate[_Env]]] = _handleA
         }
+
+      def ignoreA: Page = handleA[A] { _ => Nil.pure[AsyncIO] }
 
     }
 
