@@ -61,32 +61,36 @@ package object pye {
     def getElement(id: String): Maybe[Element] = Maybe(document.getElementById(id))
     def globalMessages: Maybe[Element] = getElement(Page.names.PageMessages)
 
-    msg.causeId.cata(causeId => getElement(s"$causeId-messages"), globalMessages) match {
-      case Some(messagesElement) =>
-        val messageElement =
-          div(
-            msg.message,
-            msg.modifier,
-          ).render
+    // TODO (KR) : Could possibly use some improvement
 
-        messagesElement.appendChild(messageElement)
-        val timeoutId =
-          msg.timeout.map {
-            window.setTimeout(
-              () => {
-                messagesElement.removeChild(messageElement)
-              },
-              _,
-            )
-          }
+    val messagesElement =
+      msg.causeId
+        .cata(causeId => getElement(s"$causeId-messages"), globalMessages)
+        .getOrElse(document.body)
 
-        messageElement.onclick = { _ =>
-          timeoutId.foreach(window.clearTimeout)
-          messagesElement.removeChild(messageElement)
-        }
-      case None =>
-        // TODO (KR) :
-        window.alert(msg.message)
+    val messageElement =
+      div(
+        msg.message,
+        msg.modifier,
+      ).render
+
+    if (messagesElement.children.length == 0)
+      messagesElement.appendChild(messageElement)
+    else
+      messagesElement.insertBefore(messageElement, messagesElement.children(0))
+    val timeoutId =
+      msg.timeout.map {
+        window.setTimeout(
+          () => {
+            messagesElement.removeChild(messageElement)
+          },
+          _,
+        )
+      }
+
+    messageElement.onclick = { _ =>
+      timeoutId.foreach(window.clearTimeout)
+      messagesElement.removeChild(messageElement)
     }
   }
 
