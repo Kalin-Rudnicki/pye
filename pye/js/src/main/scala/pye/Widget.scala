@@ -125,7 +125,7 @@ trait Widget[V, S, +A] { thisWidget =>
     wrappedElems(elems => NonEmptyList.nel(inElement(elems)))
   final def wrappedElems(inElements: Modifier => Widget.ElementT): Widget[V, S, A] =
     new Widget.Wrapped[V, S, A] {
-      override protected final val w: Widget[V, S, A] = this
+      override protected final val w: Widget[V, S, A] = thisWidget
       override protected final val f: Modifier => Widget.ElementT = inElements
     }
 
@@ -144,7 +144,9 @@ trait Widget[V, S, +A] { thisWidget =>
 
   def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
     PyeLogger.unsafeLog(L.log.debug(s"convert[$widgetName]"))
-    convertImpl(parentRaiseHandler, getState)
+    val res = convertImpl(parentRaiseHandler, getState)
+    res.widgetName = widgetName
+    res
   }
 
   // =====|  |=====
@@ -317,11 +319,11 @@ object Widget {
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
-        override final val value: IO[V] =
+        override final val valueImpl: IO[V] =
           IO.wrapEffect { thisWidget.valueF(getState()) }
-        override final val current: IO[Maybe[Widget.ElementT]] =
+        override final val currentImpl: IO[Maybe[Widget.ElementT]] =
           IO { elems.value }
-        override final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           for {
             newElems <- IO { thisWidget.elementF(parentRaiseHandler)(getState()) }
             _ <- elems.value = newElems.some
@@ -342,11 +344,11 @@ object Widget {
       val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convertImpl(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
-        override final val value: IO[V] =
+        override final val valueImpl: IO[V] =
           IO.wrapEffect { thisWidget.f(child.value.runSync) }
-        override final val current: IO[Maybe[Widget.ElementT]] =
+        override final val currentImpl: IO[Maybe[Widget.ElementT]] =
           child.current
-        override final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           child.getElementsAndUpdate
       }
     }
@@ -387,9 +389,9 @@ object Widget {
         Widget.simpleRhCaptureReRender(thisWidget.w2, getState, parentRaiseHandler)
 
       new AppliedWidget[V] {
-        override final val value: IO[V] =
+        override final val valueImpl: IO[V] =
           w1.value.apply(w2.value)
-        override final val current: IO[Maybe[Widget.ElementT]] =
+        override final val currentImpl: IO[Maybe[Widget.ElementT]] =
           ado[MaybeMonad.Projection[IO]#P]
             .join(
               w1.current.toMaybeMonad,
@@ -400,7 +402,7 @@ object Widget {
                 NonEmptyList.nel(w1E, w2E).flatten
             }
             .wrapped
-        override final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           ado[IO]
             .join(
               w1.getElementsAndUpdate,
@@ -438,7 +440,7 @@ object Widget {
         new AppliedWidget[V] {
           private val inner: Var[Maybe[Widget.ElementT] \/ AppliedWidget[V]] = Var(None.left)
 
-          override final val value: IO[V] = {
+          override final val valueImpl: IO[V] = {
             for {
               // TODO (KR) : There is a bug here...
               //           : Somehow adding this blank `IO {}` fixes it
@@ -450,7 +452,7 @@ object Widget {
               v2 <- _w2.value
             } yield v2
           }
-          override final val current: IO[Maybe[Widget.ElementT]] = {
+          override final val currentImpl: IO[Maybe[Widget.ElementT]] = {
             for {
               evalInner <- IO { inner.value }
               elems <- evalInner match {
@@ -459,7 +461,7 @@ object Widget {
               }
             } yield elems
           }
-          override final val getElementsAndUpdate: IO[Widget.ElementT] = {
+          override final val getElementsAndUpdateImpl: IO[Widget.ElementT] = {
             for {
               v1_? <- IO { w1.value.runSync }
               elems <- v1_? match {
@@ -486,7 +488,9 @@ object Widget {
        */
 
       new AppliedWidget[V] {
-        override final val current: IO[Maybe[Widget.ElementT]] =
+        override final val valueImpl: IO[V] =
+          w2.value
+        override final val currentImpl: IO[Maybe[Widget.ElementT]] =
           ado[MaybeMonad.Projection[IO]#P]
             .join(
               w1.current.toMaybeMonad,
@@ -497,9 +501,7 @@ object Widget {
                 NonEmptyList.nel(w1E, w2E).flatten
             }
             .wrapped
-        override final val value: IO[V] =
-          w2.value
-        override final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           ado[IO]
             .join(
               w1.getElementsAndUpdate,
@@ -553,11 +555,11 @@ object Widget {
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
-        override final val value: IO[V] =
+        override final val valueImpl: IO[V] =
           child.value
-        override final val current: IO[Maybe[Widget.ElementT]] =
+        override final val currentImpl: IO[Maybe[Widget.ElementT]] =
           IO { elems.value }
-        override final val getElementsAndUpdate: IO[Widget.ElementT] =
+        override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           for {
             childElems <- child.getElementsAndUpdate
             myElems = thisWidget.f(childElems.toList)
@@ -611,9 +613,9 @@ object Widget {
                 new AppliedWidget[List[T]] {
                   private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
-                  override final val current: IO[Maybe[Widget.ElementT]] = IO { elems.value }
-                  override final val value: IO[List[T]] = IO { Nil }
-                  override final val getElementsAndUpdate: IO[ElementT] =
+                  override final val valueImpl: IO[List[T]] = IO { Nil }
+                  override final val currentImpl: IO[Maybe[Widget.ElementT]] = IO { elems.value }
+                  override final val getElementsAndUpdateImpl: IO[ElementT] =
                     for {
                       newElems <- IO { NonEmptyList.nel(Widget.placeholderSpan) }
                       _ <- elems.value = newElems.some
@@ -639,7 +641,9 @@ object Widget {
               t.map(Widget.simpleRhCaptureReRender(_, getState, parentRaiseHandler))
 
             new AppliedWidget[NonEmptyList[T]] {
-              override final val current: IO[Maybe[ElementT]] =
+
+              override final val valueImpl: IO[NonEmptyList[T]] = children.map(_.value).traverse
+              override final val currentImpl: IO[Maybe[ElementT]] =
                 children
                   .map(_.current)
                   .traverse
@@ -647,8 +651,7 @@ object Widget {
                     _.traverse
                       .map(_.flatten)
                   }
-              override final val value: IO[NonEmptyList[T]] = children.map(_.value).traverse
-              override final val getElementsAndUpdate: IO[ElementT] =
+              override final val getElementsAndUpdateImpl: IO[ElementT] =
                 children.map(_.getElementsAndUpdate).traverse.map(_.flatten)
             }
           }
@@ -660,9 +663,28 @@ object Widget {
 
 sealed trait AppliedWidget[V] {
 
-  val current: IO[Maybe[Widget.ElementT]]
-  val value: IO[V]
-  val getElementsAndUpdate: IO[Widget.ElementT]
+  private[pye] var widgetName: String = _
+  protected val valueImpl: IO[V]
+  protected val currentImpl: IO[Maybe[Widget.ElementT]]
+  protected val getElementsAndUpdateImpl: IO[Widget.ElementT]
+
+  final val value: IO[V] =
+    for {
+      _ <- PyeLogger(L.log.debug(s"value[$widgetName]"))
+      v <- valueImpl
+    } yield v
+
+  final val current: IO[Maybe[Widget.ElementT]] =
+    for {
+      _ <- PyeLogger(L.log.debug(s"current[$widgetName]"))
+      c <- currentImpl
+    } yield c
+
+  final val getElementsAndUpdate: IO[Widget.ElementT] =
+    for {
+      _ <- PyeLogger(L.log.debug(s"getElementsAndUpdate[$widgetName]"))
+      e <- getElementsAndUpdateImpl
+    } yield e
 
   private[pye] final val reRender: IO[Widget.ElementT] =
     for {

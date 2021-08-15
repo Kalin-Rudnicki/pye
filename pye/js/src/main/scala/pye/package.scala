@@ -100,7 +100,7 @@ package object pye {
   def makeWebPage(
       onLoad: AsyncIO[List[Raise.Standard]],
       routeMatcher: RouteMatcher,
-      defaultLogTolerance: Logger.LogLevel with Logger.LogLevel.Tolerance = Logger.LogLevel.Info,
+      logger: Logger = Logger(Logger.LogLevel.Info),
   ): Unit = {
     def handle(raises: List[Raise.Standard]): AsyncIO[Boolean] =
       raises match {
@@ -132,12 +132,7 @@ package object pye {
       }
 
     for {
-      _ <- AsyncIO {
-        _PyeLogger = Logger(
-          defaultLogTolerance = defaultLogTolerance,
-          defaultColorMode = Logger.ColorMode.Simple,
-        )
-      }
+      _ <- AsyncIO { _PyeLogger = logger.withColorMode(Logger.ColorMode.Simple) }
       _ <- AsyncIO { routeMatcher.bindToWindow() }
       raises <- onLoad
       redirected <- handle(raises)

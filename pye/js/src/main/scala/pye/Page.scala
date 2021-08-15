@@ -11,6 +11,7 @@ import klib.Implicits._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
+import klib.utils.Logger.{helpers => L}
 import pye.Implicits._
 import pye.widgets.modifiers.PyeS
 
@@ -28,22 +29,17 @@ sealed trait Page { page =>
 
   private final def renderAnd(and: String => IO[Unit]): AsyncIO[Unit] =
     for {
-      _ <- AsyncIO { console.log("2.1") }
       env <- getEnv
-      _ <- AsyncIO { console.log("2.2") }
       stateVar = Var(env)
 
-      _ <- AsyncIO { console.log("2.3") }
       title = titleF match {
         case Right(f) => f(env)
         case Left(s)  => s
       }
 
-      _ <- AsyncIO { console.log("2.4") }
       (appliedWidget, rh) =
         Pointer
           .withSelf[(AppliedWidget[Unit], RaiseHandler[Env, A])] { ptr =>
-            console.log("2.4.1")
             val handleSOU: Raise.StandardOrUpdate[Env] => AsyncIO[Unit] = {
               case standard: Raise.Standard =>
                 standard match {
@@ -70,7 +66,6 @@ sealed trait Page { page =>
                   }
                 } yield ()
             }
-            console.log("2.4.2")
             val rh: RaiseHandler[Env, A] = {
               case sou: Raise.StandardOrUpdate[Env] =>
                 handleSOU(sou)
@@ -81,26 +76,20 @@ sealed trait Page { page =>
                 } yield ()
             }
 
-            console.log("2.4.3")
             // TODO (KR) : Fit modals in there somewhere
-            Pointer {
-              console.log(s"2.4.3.1: $widget")
-              val p1 = widget.wrapped { elems => body(elems).render }
-              console.log(s"2.4.3.2: $p1")
-              val p2 = p1.convert(rh, () => stateVar.value)
-              console.log(s"2.4.3.3: $p2")
 
+            Pointer {
               (
-                p2,
+                widget
+                  .wrapped { elems => body(elems).render }
+                  .convert(rh, () => stateVar.value),
                 rh,
               )
             }
           }
           .value
 
-      _ <- AsyncIO { console.log("2.5") }
       bindableKeyMap = keyMap.withRaiseHandler(rh)
-      _ <- AsyncIO { console.log("2.6") }
       _ <- AsyncIO.wrapIO {
         for {
           bodyElems <- appliedWidget.reRender
@@ -111,7 +100,6 @@ sealed trait Page { page =>
         } yield ()
 
       }
-      _ <- AsyncIO { console.log("2.7") }
     } yield ()
 
   private[pye] final def push: AsyncIO[Unit] =
@@ -199,14 +187,10 @@ object Page {
     )(
         paramF: RouteMatcher.Params => RouteMatcher.Params = identity,
     ): Builder1 = {
-      console.log("1.1")
-
       val pathStr =
         ("pages" :: paths.toList)
           .map(URIUtils.encodeURIComponent)
           .mkString("/", "/", "")
-
-      console.log("1.2")
 
       val params = paramF(RouteMatcher.Params.empty)
       val paramStr =
@@ -219,8 +203,6 @@ object Page {
                 s"${URIUtils.encodeURIComponent(key)}=${URIUtils.encodeURIComponent(value)}"
             }
             .mkString("?", "&", "")
-
-      console.log("1.3")
 
       new Builder1(
         url = pathStr + paramStr,
@@ -451,7 +433,10 @@ object Page {
               Widget.builder.element(div(PyeS.`pye:nav-bar`.e(_.section).m(_.expand)).render),
               convertItems(rightItems),
             )
-            .mapValue { _ => },
+            .mapValue { _ => }
+            .wrapped { elems =>
+              div(PyeS.`pye:nav-bar`)(elems).render
+            },
           modifier,
         )
       }
