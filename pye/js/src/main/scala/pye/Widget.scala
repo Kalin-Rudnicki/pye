@@ -11,6 +11,7 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
+import klib.utils.Logger.{helpers => L}
 import pye.Implicits._
 import pye.widgets.modifiers.PyeS
 
@@ -128,8 +129,6 @@ trait Widget[V, S, +A] { thisWidget =>
       override protected final val f: Modifier => Widget.ElementT = inElements
     }
 
-  // =====|  |=====
-
   final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
     new Widget.ZoomOut[V, S2, A] {
       override protected final type S1 = S
@@ -137,7 +136,16 @@ trait Widget[V, S, +A] { thisWidget =>
       override protected final val lens: Lens[S2, S1] = s2Lens
     }
 
-  def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
+  // =====|  |=====
+
+  val widgetName: String
+
+  protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
+
+  def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+    PyeLogger.unsafeLog(L.log.debug(s"convert[$widgetName]"))
+    convertImpl(parentRaiseHandler, getState)
+  }
 
   // =====|  |=====
 
@@ -277,7 +285,7 @@ object Widget {
     Pointer
       .withSelf[AppliedWidget[V]] { ptr =>
         val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRH, afterUpdate)
-        Pointer(w.convert(rh, getState))
+        Pointer(w.convertImpl(rh, getState))
       }
       .value
 
@@ -303,7 +311,9 @@ object Widget {
     protected val elementF: RaiseHandler[S, A] => S => Widget.ElementT
     protected val valueF: S => ?[V]
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+    override final val widgetName: String = "Leaf"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
@@ -326,8 +336,10 @@ object Widget {
     protected val w: Widget[V1, S, A]
     protected val f: ?[V1] => ?[V]
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
-      val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convert(parentRaiseHandler, getState)
+    override final val widgetName: String = "MapV"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+      val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convertImpl(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
         override final val value: IO[V] =
@@ -346,14 +358,16 @@ object Widget {
     protected val w: Widget[V, S, A1]
     protected val f: (S, ?[V], Raise[S, A1]) => AsyncIO[List[Raise[S, A]]]
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
+    override final val widgetName: String = "MapA"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
       Pointer
         .withSelf[AppliedWidget[V]] { ptr =>
           val mappedRH: RaiseHandler[S, thisWidget.A1] =
             f(getState(), ptr.value.value.runSync, _)
               .flatMap(parentRaiseHandler._handleRaises)
 
-          Pointer(thisWidget.w.convert(mappedRH, getState))
+          Pointer(thisWidget.w.convertImpl(mappedRH, getState))
         }
         .value
 
@@ -364,7 +378,9 @@ object Widget {
     protected val w1: Widget[V1, S, A]
     protected val w2: Widget[V1 => V, S, A]
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+    override final val widgetName: String = "Apply"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val w1: AppliedWidget[thisWidget.V1] =
         Widget.simpleRhCaptureReRender(thisWidget.w1, getState, parentRaiseHandler)
       val w2: AppliedWidget[thisWidget.V1 => V] =
@@ -404,7 +420,9 @@ object Widget {
     protected val w1: Widget[V1, S, A]
     protected val w2: V1 => Widget[V, S, A]
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+    override final val widgetName: String = "FlatMap"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       def makeW2(v1: thisWidget.V1): AppliedWidget[V] =
         Widget.simpleRhCaptureReRender(thisWidget.w2(v1), getState, parentRaiseHandler)
 
@@ -502,7 +520,9 @@ object Widget {
     protected val w: Widget[V, S1, A]
     protected val lens: Lens[S, S1]
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+    override final val widgetName: String = "ZoomOut"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val rh: RaiseHandler[S1, A] = {
         case sou: Raise.StandardOrUpdate[S1] =>
           sou match {
@@ -515,7 +535,7 @@ object Widget {
           parentRaiseHandler._handleRaise(action)
       }
 
-      w.convert(rh, () => lens.get(getState()))
+      w.convertImpl(rh, () => lens.get(getState()))
     }
 
   }
@@ -524,7 +544,9 @@ object Widget {
     protected val w: Widget[V, S, A]
     protected val f: Modifier => Widget.ElementT
 
-    override final def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
+    override final val widgetName: String = "Wrapped"
+
+    override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val child: AppliedWidget[V] =
         Widget.simpleRhCaptureReRender(thisWidget.w, getState, parentRaiseHandler)
 
@@ -573,49 +595,64 @@ object Widget {
   implicit def widgetTraverseList[S, A]: Traverse[List, Widget.Projection[S, A]#P] =
     new Traverse[List, Widget.Projection[S, A]#P] {
 
-      override def traverse[T](t: List[Widget[T, S, A]]): Widget[List[T], S, A] = { (parentRH, getState) =>
-        t.toNel match {
-          case Some(nel) =>
-            type MyT[V] = Widget[V, S, A]
-            (nel: NonEmptyList[MyT[T]]).traverse.map(_.toList).convert(parentRH, getState)
-          case None =>
-            new AppliedWidget[List[T]] {
-              private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
+      override def traverse[T](t: List[Widget[T, S, A]]): Widget[List[T], S, A] =
+        new Widget[List[T], S, A] {
+          override final val widgetName: String = "TraverseList"
 
-              override final val current: IO[Maybe[Widget.ElementT]] = IO { elems.value }
-              override final val value: IO[List[T]] = IO { Nil }
-              override final val getElementsAndUpdate: IO[ElementT] =
-                for {
-                  newElems <- IO { NonEmptyList.nel(Widget.placeholderSpan) }
-                  _ <- elems.value = newElems.some
-                } yield newElems
+          override protected def convertImpl(
+              parentRaiseHandler: RaiseHandler[S, A],
+              getState: () => S,
+          ): AppliedWidget[List[T]] =
+            t.toNel match {
+              case Some(nel) =>
+                type MyT[V] = Widget[V, S, A]
+                (nel: NonEmptyList[MyT[T]]).traverse.map(_.toList).convertImpl(parentRaiseHandler, getState)
+              case None =>
+                new AppliedWidget[List[T]] {
+                  private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
+
+                  override final val current: IO[Maybe[Widget.ElementT]] = IO { elems.value }
+                  override final val value: IO[List[T]] = IO { Nil }
+                  override final val getElementsAndUpdate: IO[ElementT] =
+                    for {
+                      newElems <- IO { NonEmptyList.nel(Widget.placeholderSpan) }
+                      _ <- elems.value = newElems.some
+                    } yield newElems
+                }
             }
         }
-      }
 
     }
 
   implicit def widgetTraverseNonEmptyList[S, A]: Traverse[NonEmptyList, Widget.Projection[S, A]#P] =
     new Traverse[NonEmptyList, Widget.Projection[S, A]#P] {
 
-      override def traverse[T](t: NonEmptyList[Widget[T, S, A]]): Widget[NonEmptyList[T], S, A] = { (parentRH, getState) =>
-        val children: NonEmptyList[AppliedWidget[T]] =
-          t.map(Widget.simpleRhCaptureReRender(_, getState, parentRH))
+      override def traverse[T](t: NonEmptyList[Widget[T, S, A]]): Widget[NonEmptyList[T], S, A] =
+        new Widget[NonEmptyList[T], S, A] {
+          override final val widgetName: String = "TraverseNonEmptyList"
 
-        new AppliedWidget[NonEmptyList[T]] {
-          override final val current: IO[Maybe[ElementT]] =
-            children
-              .map(_.current)
-              .traverse
-              .map {
-                _.traverse
-                  .map(_.flatten)
-              }
-          override final val value: IO[NonEmptyList[T]] = children.map(_.value).traverse
-          override final val getElementsAndUpdate: IO[ElementT] =
-            children.map(_.getElementsAndUpdate).traverse.map(_.flatten)
+          override protected final def convertImpl(
+              parentRaiseHandler: RaiseHandler[S, A],
+              getState: () => S,
+          ): AppliedWidget[NonEmptyList[T]] = {
+            val children: NonEmptyList[AppliedWidget[T]] =
+              t.map(Widget.simpleRhCaptureReRender(_, getState, parentRaiseHandler))
+
+            new AppliedWidget[NonEmptyList[T]] {
+              override final val current: IO[Maybe[ElementT]] =
+                children
+                  .map(_.current)
+                  .traverse
+                  .map {
+                    _.traverse
+                      .map(_.flatten)
+                  }
+              override final val value: IO[NonEmptyList[T]] = children.map(_.value).traverse
+              override final val getElementsAndUpdate: IO[ElementT] =
+                children.map(_.getElementsAndUpdate).traverse.map(_.flatten)
+            }
+          }
         }
-      }
 
     }
 
