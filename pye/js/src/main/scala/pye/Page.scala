@@ -5,13 +5,11 @@ import scala.scalajs.js.URIUtils
 import org.scalajs.dom._
 import org.scalajs.dom.{html => H}
 import scalatags.JsDom.all._
-import scalatags.JsDom.tags2
 
 import klib.Implicits._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
-import klib.utils.Logger.{helpers => L}
 import pye.Implicits._
 import pye.widgets.modifiers.PyeS
 
@@ -534,43 +532,46 @@ object Page {
           map2(
             Page.names.PageLeft,
             _pageLeft,
-            Seq.empty[Modifier],
-          ) // TODO (KR) :
+            Seq[Modifier](
+              overflowY.auto,
+              flexShrink := 0,
+            ),
+          )
         val pageRight =
           map2(
             Page.names.PageRight,
             _pageRight,
-            Seq.empty[Modifier],
-          ) // TODO (KR) :
+            Seq[Modifier](
+              overflowY.auto,
+              flexShrink := 0,
+            ),
+          )
 
         val pageCenterTop =
           map2(
             Page.names.PageCenterTop,
             _pageCenterTop,
-            Seq.empty[Modifier],
-          ) // TODO (KR) :
+            Seq[Modifier](
+              flexShrink := 0,
+            ),
+          )
         val pageCenterBottom =
           map2(
             Page.names.PageCenterBottom,
             _pageCenterBottom,
-            Seq.empty[Modifier],
-          ) // TODO (KR) :
+            Seq[Modifier](
+              flexShrink := 0,
+            ),
+          )
 
         val pageCenterMiddle =
           mapSection(
             Page.names.PageCenterMiddle,
-            List(
-              _pageTop.map(_._1),
-              _pageBottom.map(_._1),
-            ).flatMap(_.toOption).toNel match {
-              case Some(edges) =>
-                ("100vh" :: edges.toList).mkString("calc(", " - ", ")").some
-              case None =>
-                "100vh".some
-            },
+            None,
             _pageCenterMiddle._1,
             Seq[Modifier](
-              // TODO (KR) : Style
+              flexGrow := 1,
+              overflowY.auto,
               _pageCenterMiddle._2,
             ),
           )
@@ -579,10 +580,12 @@ object Page {
 
         type PageWidget[V] = Widget[V, Env, A]
 
-        // TODO (KR) :
         val pageMessages: Widget[Unit, Env, A] =
           Widget.builder.element {
-            div(id := Page.names.PageMessages).render
+            div(
+              id := Page.names.PageMessages,
+              flexShrink := 0,
+            ).render
           }
 
         val pageCenter: PageWidget[Unit] =
@@ -591,7 +594,12 @@ object Page {
             .traverse
             .mapValue { _ => }
             .wrapped { elems =>
-              div(id := Page.names.PageCenter)(elems)(_pageCenterModifier).render
+              div(
+                id := Page.names.PageCenter,
+                display.flex,
+                flexDirection.column,
+                flexGrow := 1,
+              )(elems)(_pageCenterModifier).render
             }
 
         val pageMiddle: PageWidget[Unit] =
@@ -600,7 +608,21 @@ object Page {
             .traverse
             .mapValue { _ => }
             .wrapped { elems =>
-              div(id := Page.names.PageMiddle)(elems)(_pageMiddleModifier).render
+              div(
+                id := Page.names.PageMiddle,
+                display.flex,
+                height := {
+                  List(
+                    _pageTop.map(_._1),
+                    _pageBottom.map(_._1),
+                  ).flatMap(_.toOption).toNel match {
+                    case Some(edges) =>
+                      ("100vh" :: edges.toList).mkString("calc(", " - ", ")")
+                    case None =>
+                      "100vh"
+                  }
+                },
+              )(elems)(_pageMiddleModifier).render
             }
 
         val page: PageWidget[Unit] =
@@ -609,8 +631,38 @@ object Page {
             .traverse
             .mapValue { _ => }
             .wrapped { elems =>
-              div(id := Page.names.Page)(elems)(_pageModifier).render
+              div(
+                id := Page.names.Page,
+                height := "100vh",
+              )(elems)(_pageModifier).render
             }
+
+        /*
+// --- Style ---
+    val pageTopHeight = pageTop.cata(_._1, "0px")
+    val pageBottomHeight = pageBottom.cata(_._1, "0px")
+
+    val currentStyles = document.head.getElementsByClassName(N.PyeStandardStyle)
+    0.until(currentStyles.length).foreach { i =>
+      document.head.removeChild(currentStyles(i))
+    }
+    document.head.insertBefore(
+      tags2
+        .style(`class` := N.PyeStandardStyle)(
+          s"""
+             | body { margin: 0; padding: 0; }
+             |
+             | #${N.PageTop} { height: var(--page-top-height); }
+             | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
+             | #${N.PageBottom} { height: var(--page-bottom-height); }
+             |
+             | .${N.Modal} { display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0.75); }
+             |""".stripMargin,
+        )
+        .render,
+      document.head.children(0),
+    )
+         */
 
         page
       }
@@ -681,42 +733,6 @@ object Page {
            node
          }
        }
- */
-
-/*
-// --- Style ---
-    val pageTopHeight = pageTop.cata(_._1, "0px")
-    val pageBottomHeight = pageBottom.cata(_._1, "0px")
-
-    val currentStyles = document.head.getElementsByClassName(N.PyeStandardStyle)
-    0.until(currentStyles.length).foreach { i =>
-      document.head.removeChild(currentStyles(i))
-    }
-    document.head.insertBefore(
-      tags2
-        .style(`class` := N.PyeStandardStyle)(
-          s"""
-             | :root { ${N.PageTopHeight}: $pageTopHeight; ${N.PageBottomHeight}: $pageBottomHeight; }
-             | body { margin: 0; padding: 0; }
-             |
-             | #${N.Page} { height: 100vh; }
-             | #${N.PageTop} { height: var(--page-top-height); }
-             | #${N.PageMiddle} { display: flex; height: calc(100vh - var(--page-top-height) - var(--page-bottom-height)); }
-             | #${N.PageBottom} { height: var(--page-bottom-height); }
-             | #${N.PageLeft} { overflow-y: auto; flex-shrink: 0; }
-             | #${N.PageCenter} { display: flex; flex-direction: column; flex-grow: 1; }
-             | #${N.PageRight} { overflow-y: auto; flex-shrink: 0; }
-             | #${N.PageMessages} { flex-shrink: 0; }
-             | #${N.PageCenterTop} { flex-shrink: 0; }
-             | #${N.PageCenterMiddle} { flex-grow: 1; overflow-y: auto; }
-             | #${N.PageCenterBottom} { flex-shrink: 0; }
-             |
-             | .${N.Modal} { display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0.75); }
-             |""".stripMargin,
-        )
-        .render,
-      document.head.children(0),
-    )
  */
 
 // REMOVE : ...
