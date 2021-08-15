@@ -9,6 +9,7 @@ import scalatags.JsDom.tags2
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.fp.utils._
 import klib.utils._
 import pye.Implicits._
 import pye.widgets.modifiers.PyeS
@@ -171,7 +172,7 @@ object Page {
   sealed trait NavBarAction[+A]
   object NavBarAction {
     final case class PushPage(page: Page) extends NavBarAction[Nothing]
-    final case class Custom[+A](onClick: MouseEvent => List[A]) extends NavBarAction[A]
+    final case class Custom[+A](onClick: MouseEvent => List[Raise[Nothing, A]]) extends NavBarAction[A]
   }
 
   // =====|  |=====
@@ -368,16 +369,65 @@ object Page {
         )
 
       def noPageTop: StandardBuilder2[Env, A] = copy(_pageTop = None)
-
       def pageTop[A2 >: A](
           height: String,
           widget: Widget[Unit, Env, A2],
           modifier: Modifier = Seq.empty[Modifier],
       ): StandardBuilder2[Env, A2] =
         copy(_pageTop = (height, widget, modifier).some)
+      def navBarTop[A2 >: A]( // TODO (KR) : Env (?)
+          height: String,
+          leftItems: List[NavBarItem[A2]],
+          rightItems: List[NavBarItem[A2]],
+          modifier: Modifier = Seq.empty[Modifier],
+      ): StandardBuilder2[Env, A2] = {
+        type WidgetT[V] = Widget[V, Env, A2]
+
+        def convertItems(items: List[NavBarItem[A2]]): WidgetT[Unit] = {
+          def convertItem(item: NavBarItem[A2]): WidgetT[Unit] =
+            item match {
+              case NavBarItem.Button(action, modifier) =>
+                Widget.builder
+                  .withState[Env]
+                  .withAction[A2]
+                  .rElement { rh =>
+                    div(PyeS.`pye:nav-bar`.item)(
+                      onclick := { (e: MouseEvent) =>
+                        action match {
+                          case NavBarAction.PushPage(page) =>
+                            rh.raise(page.history.push)
+                          case NavBarAction.Custom(onClick) =>
+                            rh.raises(onClick(e))
+                        }
+                      },
+                    )(modifier).render
+                  }
+                  .noValue
+            }
+
+          items
+            .map(convertItem)
+            .traverse
+            .mapValue { _ => }
+            .wrapped { elems =>
+              div(PyeS.`pye:nav-bar`.e(_.section).m(_.wrap))(elems).render
+            }
+        }
+
+        pageTop(
+          height,
+          ado[WidgetT]
+            .join(
+              convertItems(leftItems),
+              Widget.builder.element(div(PyeS.`pye:nav-bar`.e(_.section).m(_.expand)).render),
+              convertItems(rightItems),
+            )
+            .mapValue { _ => },
+          modifier,
+        )
+      }
 
       def noPageBottom: StandardBuilder2[Env, A] = copy(_pageBottom = None)
-
       def pageBottom[A2 >: A](
           height: String,
           widget: Widget[Unit, Env, A2],
@@ -386,7 +436,6 @@ object Page {
         copy(_pageBottom = (height, widget, modifier).some)
 
       def noPageLeft: StandardBuilder2[Env, A] = copy(_pageLeft = None)
-
       def pageLeft[A2 >: A](
           widget: Widget[Unit, Env, A2],
           modifier: Modifier = Seq.empty[Modifier],
@@ -394,7 +443,6 @@ object Page {
         copy(_pageLeft = (widget, modifier).some)
 
       def noPageRight: StandardBuilder2[Env, A] = copy(_pageRight = None)
-
       def pageRight[A2 >: A](
           widget: Widget[Unit, Env, A2],
           modifier: Modifier = Seq.empty[Modifier],
@@ -402,7 +450,6 @@ object Page {
         copy(_pageRight = (widget, modifier).some)
 
       def noPageCenterTop: StandardBuilder2[Env, A] = copy(_pageCenterTop = None)
-
       def pageCenterTop[A2 >: A](
           widget: Widget[Unit, Env, A2],
           modifier: Modifier = Seq.empty[Modifier],
@@ -410,7 +457,6 @@ object Page {
         copy(_pageCenterTop = (widget, modifier).some)
 
       def noPageCenterBottom: StandardBuilder2[Env, A] = copy(_pageCenterBottom = None)
-
       def pageCenterBottom[A2 >: A](
           widget: Widget[Unit, Env, A2],
           modifier: Modifier = Seq.empty[Modifier],
@@ -421,10 +467,8 @@ object Page {
 
       def modifyPageCenter(mods: Modifier*): StandardBuilder2[Env, A] =
         copy(_pageCenterModifier = Seq[Modifier](this._pageCenterModifier, mods))
-
       def modifyPageMiddle(mods: Modifier*): StandardBuilder2[Env, A] =
         copy(_pageMiddleModifier = Seq[Modifier](this._pageMiddleModifier, mods))
-
       def modifyPage(mods: Modifier*): StandardBuilder2[Env, A] =
         copy(_pageModifier = Seq[Modifier](this._pageModifier, mods))
 
