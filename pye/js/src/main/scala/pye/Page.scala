@@ -210,14 +210,17 @@ object Page {
         url: String,
     ) {
 
-      def withEnv[Env](getEnv: AsyncIO[Env]): Builder2[Env] =
+      def constEnv[Env](envF: => Env): Builder2[Env] =
+        env(envF.pure[AsyncIO])
+
+      def env[Env](getEnv: AsyncIO[Env]): Builder2[Env] =
         new Builder2[Env](
           url = url,
           getEnv = getEnv,
         )
 
       def noEnv: Builder2[Unit] =
-        withEnv(().pure[AsyncIO])
+        env(().pure[AsyncIO])
 
     }
 
