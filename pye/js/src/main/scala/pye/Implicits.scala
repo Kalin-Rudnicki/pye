@@ -20,9 +20,8 @@ trait Implicits {
   //           : Scala is having an un-acceptable level type inference here
   implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
 
-    def toFormMapO[R, A](
-        endpoint: V => AsyncIO[R],
-        thenRaise: R => AsyncIO[List[Raise[S, A]]],
+    def toFormMapO[A](
+        endpoint: V => AsyncIO[List[Raise[S, A]]],
         mapO: O => AsyncIO[List[Raise[S, A]]],
         submitButtonLabel: String = "Submit",
     ): Widget[V, S, A] =
@@ -39,21 +38,18 @@ trait Implicits {
               for {
                 aliveV <- AsyncIO.wrapEffect(v)
                 endpointRes <- endpoint(aliveV)
-                thenRaiseRes <- thenRaise(endpointRes)
-              } yield thenRaiseRes
+              } yield endpointRes
             case SubmitOr.Or(or) =>
               mapO(or)
           }
         }
 
-    def toForm[R, A >: O](
-        endpoint: V => AsyncIO[R],
-        thenRaise: R => AsyncIO[List[Raise[S, A]]],
+    def toForm[A >: O](
+        endpoint: V => AsyncIO[List[Raise[S, A]]],
         submitButtonLabel: String = "Submit",
     ): Widget[V, S, A] =
       toFormMapO(
         endpoint = endpoint,
-        thenRaise = thenRaise,
         submitButtonLabel = submitButtonLabel,
         mapO = o => AsyncIO(Raise.Action(o) :: Nil),
       )

@@ -27,7 +27,17 @@ trait misc {
     ): (OS => Boolean, AppliedWidget[V]) =
       (
         lens.getOption(_).nonEmpty, {
-          val rh: RaiseHandler[IS, A] = ??? // TODO (KR) :
+          val rh: RaiseHandler[IS, A] = {
+            case sou: Raise.StandardOrUpdate[IS] =>
+              sou match {
+                case update: Raise.UpdateState[IS] =>
+                  parentRH._handleRaise(Raise.UpdateState[OS](lens.modify(update.update), update.reRender))
+                case standard: Raise.Standard =>
+                  parentRH._handleRaise(standard)
+              }
+            case action: Raise.Action[A] =>
+              parentRH._handleRaise(action)
+          }
           val unsafeGetter: () => IS = () => lens.getOption(getState()).get
           Widget.simpleRhCaptureReRender(iWidget, unsafeGetter, rh)
         },
