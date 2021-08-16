@@ -122,11 +122,16 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   final def wrapped(inElement: Modifier => Widget.ElemT): Widget[V, S, A] =
-    wrappedElems(elems => NonEmptyList.nel(inElement(elems)))
+    sWrapped(_ => inElement)
   final def wrappedElems(inElements: Modifier => Widget.ElementT): Widget[V, S, A] =
+    sWrappedElems(_ => inElements)
+
+  final def sWrapped(inElement: S => Modifier => Widget.ElemT): Widget[V, S, A] =
+    sWrappedElems(s => elems => NonEmptyList.nel(inElement(s)(elems)))
+  final def sWrappedElems(inElements: S => Modifier => Widget.ElementT): Widget[V, S, A] =
     new Widget.Wrapped[V, S, A] {
       override protected final val w: Widget[V, S, A] = thisWidget
-      override protected final val f: Modifier => Widget.ElementT = inElements
+      override protected final val f: S => Modifier => Widget.ElementT = inElements
     }
 
   final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
@@ -257,7 +262,7 @@ object Widget {
 
   // =====|  |=====
 
-  def placeholderSpan: Widget.ElemT = span(id := UUID.randomUUID.toString).render
+  def placeholderSpan: Widget.ElemT = span(id := UUID.randomUUID.toString, display.none).render
 
   def rhCaptureReRender[V, S, A](
       w: Pointer[AppliedWidget[V]],
@@ -544,7 +549,7 @@ object Widget {
 
   sealed trait Wrapped[V, S, +A] extends Widget[V, S, A] { thisWidget =>
     protected val w: Widget[V, S, A]
-    protected val f: Modifier => Widget.ElementT
+    protected val f: S => Modifier => Widget.ElementT
 
     override final val widgetName: String = "Wrapped"
 
@@ -562,7 +567,7 @@ object Widget {
         override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           for {
             childElems <- child.getElementsAndUpdate
-            myElems = thisWidget.f(childElems.toList)
+            myElems = thisWidget.f(getState())(childElems.toList)
             _ <- elems.value = myElems.some
           } yield myElems
       }
@@ -661,7 +666,7 @@ object Widget {
 
 }
 
-sealed trait AppliedWidget[V] {
+trait AppliedWidget[V] {
 
   private[pye] var widgetName: String = _
   protected val valueImpl: IO[V]
