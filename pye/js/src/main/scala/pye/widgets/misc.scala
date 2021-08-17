@@ -95,6 +95,7 @@ trait misc {
             for {
               s <- IO { getState() }
               newInner <- IO.wrapEffect { firstSubMatch(s) }
+              _ <- inner.value = newInner.some
               e <- newInner.getElementsAndUpdate
             } yield e
         }
