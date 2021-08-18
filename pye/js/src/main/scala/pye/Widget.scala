@@ -370,9 +370,10 @@ object Widget {
     override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
       Pointer
         .withSelf[AppliedWidget[V]] { ptr =>
-          val mappedRH: RaiseHandler[S, thisWidget.A1] =
-            f(getState(), ptr.value.value.runSync, _)
+          val mappedRH: RaiseHandler[S, thisWidget.A1] = { raise =>
+            f(getState(), ptr.value.value.runSync, raise)
               .flatMap(parentRaiseHandler._handleRaises)
+          }
 
           Pointer(thisWidget.w.convertImpl(mappedRH, getState))
         }

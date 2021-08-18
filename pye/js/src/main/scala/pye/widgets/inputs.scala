@@ -40,7 +40,7 @@ trait inputs {
           Raise.UpdateState[String](_ => _input.value, reRender = false)
 
         def updateState(): Unit =
-          rh._handleRaise(updateStateRaise())
+          rh.raise(updateStateRaise())
 
         _input.value = s
         _input.onkeypress = { e =>
@@ -81,7 +81,11 @@ trait inputs {
 
         _input
       }
-      .withValue(_.ensure(_.nonEmpty).map(implicitly[DecodeString[V]].decode).traverse)
+      .withValue {
+        _.ensure(_.nonEmpty)
+          .map(implicitly[DecodeString[V]].decode)
+          .traverse
+      }
 
   def inputW[V: DecodeString](
       updateOn: UpdateOn = UpdateOn.Blur,
