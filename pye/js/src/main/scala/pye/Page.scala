@@ -25,6 +25,14 @@ sealed trait Page { page =>
 
   // =====|  |=====
 
+  override def toString: String =
+    titleF match {
+      case Right(_)    => "Page(<titleF>)"
+      case Left(title) => s"Page($title)"
+    }
+
+  // =====|  |=====
+
   private final def renderAnd(and: String => IO[Unit]): AsyncIO[Unit] =
     for {
       env <- getEnv

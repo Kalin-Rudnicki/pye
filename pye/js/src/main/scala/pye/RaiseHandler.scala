@@ -2,6 +2,7 @@ package pye
 
 import klib.Implicits._
 import klib.fp.types._
+import klib.utils.Logger.{helpers => L}
 import pye.Implicits._
 
 trait RaiseHandler[S, -A] {
@@ -9,7 +10,14 @@ trait RaiseHandler[S, -A] {
   // TODO (KR) : def _handleRaise(raise, childrenThatRequestedReRender)
   //           : - then, only reRender at the end
   //           : - this should be more efficient than possibly reRendering sub-trees multiple times
-  private[pye] def _handleRaise(raise: Raise[S, A]): AsyncIO[Unit]
+
+  protected def _handleRaiseImpl(raise: Raise[S, A]): AsyncIO[Unit]
+
+  private[pye] def _handleRaise(raise: Raise[S, A]): AsyncIO[Unit] =
+    for {
+      _ <- AsyncIO.wrapIO { PyeLogger(L.log.debug(raise.toString)) }
+      _ <- _handleRaise(raise)
+    } yield ()
   private[pye] def _handleRaises(raises: List[Raise[S, A]]): AsyncIO[Unit] =
     AsyncIO.runSequentially(raises.map(_handleRaise)).map { _ => }
 

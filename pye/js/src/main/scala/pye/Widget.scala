@@ -13,6 +13,7 @@ import klib.fp.utils._
 import klib.utils._
 import klib.utils.Logger.{helpers => L}
 import pye.Implicits._
+import pye.Widget.ElementT
 import pye.widgets.modifiers.PyeS
 
 trait Widget[V, S, +A] { thisWidget =>
@@ -139,6 +140,20 @@ trait Widget[V, S, +A] { thisWidget =>
       override protected final type S1 = S
       override protected final val w: Widget[V, S1, A] = thisWidget
       override protected final val lens: Lens[S2, S1] = s2Lens
+    }
+
+  // TODO (KR) : Change `afterUpdate` to something like `reRendersOther: Widget/AppliedWidget`
+  final def captureReRender: Widget[V, S, A] = captureReRender(IO {})
+  final def captureReRender(afterUpdate: IO[Unit]): Widget[V, S, A] =
+    new Widget[V, S, A] {
+      override val widgetName: String = s"${thisWidget.widgetName}-captureReRender"
+      override protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
+        Pointer
+          .withSelf[AppliedWidget[V]] { ptr =>
+            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler, afterUpdate)
+            Pointer(thisWidget.convert(rh, getState))
+          }
+          .value
     }
 
   // =====|  |=====
@@ -283,18 +298,6 @@ object Widget {
     case action: Raise.Action[A] =>
       parentRH._handleRaise(action)
   }
-  def simpleRhCaptureReRender[V, S, A](
-      w: Widget[V, S, A],
-      getState: () => S,
-      parentRH: RaiseHandler[S, A],
-      afterUpdate: IO[Unit] = IO {},
-  ): AppliedWidget[V] =
-    Pointer
-      .withSelf[AppliedWidget[V]] { ptr =>
-        val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRH, afterUpdate)
-        Pointer(w.convertImpl(rh, getState))
-      }
-      .value
 
   private[pye] def replaceNodes(oldElems: Widget.ElementT, newElems: Widget.ElementT): IO[Unit] = {
     val parent = oldElems.head.parentNode
@@ -346,7 +349,7 @@ object Widget {
     override final val widgetName: String = "MapV"
 
     override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
-      val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convertImpl(parentRaiseHandler, getState)
+      val child: AppliedWidget[thisWidget.V1] = thisWidget.w.convert(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
         override final val valueImpl: IO[V] =
@@ -378,7 +381,7 @@ object Widget {
             } yield ()
           }
 
-          Pointer(thisWidget.w.convertImpl(mappedRH, getState))
+          Pointer(thisWidget.w.convert(mappedRH, getState))
         }
         .value
 
@@ -393,9 +396,9 @@ object Widget {
 
     override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val w1: AppliedWidget[thisWidget.V1] =
-        Widget.simpleRhCaptureReRender(thisWidget.w1, getState, parentRaiseHandler)
+        thisWidget.w1.captureReRender.convert(parentRaiseHandler, getState)
       val w2: AppliedWidget[thisWidget.V1 => V] =
-        Widget.simpleRhCaptureReRender(thisWidget.w2, getState, parentRaiseHandler)
+        thisWidget.w2.captureReRender.convert(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
         override final val valueImpl: IO[V] =
@@ -435,15 +438,10 @@ object Widget {
 
     override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       def makeW2(v1: thisWidget.V1): AppliedWidget[V] =
-        Widget.simpleRhCaptureReRender(thisWidget.w2(v1), getState, parentRaiseHandler)
+        thisWidget.w2(v1).captureReRender.convert(parentRaiseHandler, getState)
 
       lazy val w1: AppliedWidget[thisWidget.V1] =
-        Widget.simpleRhCaptureReRender(
-          thisWidget.w1,
-          getState,
-          parentRaiseHandler,
-          w2.reRender.map { _ => },
-        )
+        thisWidget.w1.captureReRender { w2.reRender.map { _ => } }.convert(parentRaiseHandler, getState)
 
       lazy val w2: AppliedWidget[V] =
         new AppliedWidget[V] {
@@ -546,7 +544,7 @@ object Widget {
           parentRaiseHandler._handleRaise(action)
       }
 
-      w.convertImpl(rh, () => lens.get(getState()))
+      w.convert(rh, () => lens.get(getState()))
     }
 
   }
@@ -559,7 +557,7 @@ object Widget {
 
     override protected final def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
       val child: AppliedWidget[V] =
-        Widget.simpleRhCaptureReRender(thisWidget.w, getState, parentRaiseHandler)
+        thisWidget.w.captureReRender.convert(parentRaiseHandler, getState)
 
       new AppliedWidget[V] {
         private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
@@ -617,7 +615,7 @@ object Widget {
             t.toNel match {
               case Some(nel) =>
                 type MyT[V] = Widget[V, S, A]
-                (nel: NonEmptyList[MyT[T]]).traverse.map(_.toList).convertImpl(parentRaiseHandler, getState)
+                (nel: NonEmptyList[MyT[T]]).traverse.map(_.toList).convert(parentRaiseHandler, getState)
               case None =>
                 new AppliedWidget[List[T]] {
                   private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
@@ -647,7 +645,7 @@ object Widget {
               getState: () => S,
           ): AppliedWidget[NonEmptyList[T]] = {
             val children: NonEmptyList[AppliedWidget[T]] =
-              t.map(Widget.simpleRhCaptureReRender(_, getState, parentRaiseHandler))
+              t.map(_.captureReRender.convert(parentRaiseHandler, getState))
 
             new AppliedWidget[NonEmptyList[T]] {
 

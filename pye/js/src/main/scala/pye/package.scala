@@ -122,7 +122,7 @@ package object pye {
               case Raise.RefreshPage =>
                 // Ignore (?)
                 AsyncIO { false }
-              case Raise.Raw(action) =>
+              case Raise.Raw(action, _) =>
                 action.map { _ => false }
             }
             r2 <- handle(tail)
@@ -136,6 +136,7 @@ package object pye {
       _ <- AsyncIO { routeMatcher.bindToWindow() }
       raises <- onLoad
       redirected <- handle(raises)
+      // TODO (KR) : Is this the issue (?)
       _ <- redirected ? AsyncIO {} | AsyncIO { routeMatcher.attemptToLoadPage() }
     } yield ()
   }.runAndShowErrors()

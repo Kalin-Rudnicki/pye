@@ -39,7 +39,7 @@ trait misc {
               parentRH._handleRaise(action)
           }
           val unsafeGetter: () => IS = () => lens.getOption(getState()).get
-          Widget.simpleRhCaptureReRender(iWidget, unsafeGetter, rh)
+          iWidget.captureReRender.convert(rh, unsafeGetter)
         },
       )
 

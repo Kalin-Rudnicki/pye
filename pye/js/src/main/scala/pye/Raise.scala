@@ -5,7 +5,6 @@ import scalatags.JsDom.all._
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils._
 import pye.Implicits._
 import pye.widgets.modifiers._
 
@@ -88,7 +87,10 @@ object Raise {
     val Back: Go = Go(-1)
   }
   case object RefreshPage extends Standard
-  final case class Raw(action: AsyncIO[Unit]) extends Standard
+  final case class Raw(action: AsyncIO[Unit], hint: Maybe[String] = None) extends Standard {
+    def withHint(hint: String): Raw = Raw(action, hint.some)
+    override def toString: String = s"Raw(${hint.cata(identity, "")})"
+  }
 
   final case class Action[+A](action: A) extends Raise[Nothing, A]
 }
