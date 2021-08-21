@@ -11,7 +11,6 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
-import klib.utils.Logger.{helpers => L}
 import pye.Implicits._
 import pye.Widget.ElementT
 import pye.widgets.modifiers.PyeS
@@ -163,7 +162,7 @@ trait Widget[V, S, +A] { thisWidget =>
   protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
 
   def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
-    PyeLogger.unsafeLog(L.log.debug(s"convert[$widgetName]"))
+    PyeLogger.unsafeLog(L.log.debug(s"convert[$widgetName]", "convert"))
     val res = convertImpl(parentRaiseHandler, getState)
     res.widgetName = widgetName
     res
@@ -291,8 +290,8 @@ object Widget {
         case update: Raise.UpdateState[S] =>
           for {
             _ <- parentRH._handleRaise(Raise.UpdateState[S](update.update, false))
-            _ <- update.reRender ? AsyncIO.wrapIO(w.value.reRender).map { _ => } | AsyncIO {}
-            _ <- AsyncIO.wrapIO(afterUpdate)
+            _ <- update.reRender ? w.value.reRender.map { _ => }.toAsyncIO | AsyncIO {}
+            _ <- afterUpdate.toAsyncIO
           } yield ()
       }
     case action: Raise.Action[A] =>
@@ -375,7 +374,7 @@ object Widget {
         .withSelf[AppliedWidget[V]] { ptr =>
           val mappedRH: RaiseHandler[S, thisWidget.A1] = { raise =>
             for {
-              _ <- AsyncIO.wrapIO { PyeLogger(L.log.info(s"getState = ${getState()}")) }
+              _ <- PyeLogger.log.debug(s"getState = ${getState()}", "getState").toAsyncIO
               raises <- f(getState(), ptr.value.value.runSync, raise)
               _ <- parentRaiseHandler._handleRaises(raises)
             } yield ()
@@ -677,19 +676,19 @@ trait AppliedWidget[V] {
 
   final val value: IO[V] =
     for {
-      _ <- PyeLogger(L.log.debug(s"value[$widgetName]"))
+      _ <- PyeLogger.log.debug(s"value[$widgetName]", "value")
       v <- valueImpl
     } yield v
 
   final val current: IO[Maybe[Widget.ElementT]] =
     for {
-      _ <- PyeLogger(L.log.debug(s"current[$widgetName]"))
+      _ <- PyeLogger.log.debug(s"current[$widgetName]", "current")
       c <- currentImpl
     } yield c
 
   final val getElementsAndUpdate: IO[Widget.ElementT] =
     for {
-      _ <- PyeLogger(L.log.debug(s"getElementsAndUpdate[$widgetName]"))
+      _ <- PyeLogger.log.debug(s"getElementsAndUpdate[$widgetName]", "getElementsAndUpdate")
       e <- getElementsAndUpdateImpl
     } yield e
 

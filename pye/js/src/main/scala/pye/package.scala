@@ -97,6 +97,20 @@ package object pye {
   private var _PyeLogger: Logger = _
   def PyeLogger: Logger = _PyeLogger
 
+  // NOTE : This is for usage in the javascript console
+  @js.annotation.JSExportTopLevel("setLogTolerance")
+  def setLogTolerance(name: String): Unit =
+    Logger.LogLevel.AllTolerance.find(_.name == name).toMaybe match {
+      case Some(logTolerance) =>
+        _PyeLogger = _PyeLogger.withDefaultLogTolerance(logTolerance)
+      case None =>
+        displayMessage(Raise.DisplayMessage.global.error(s"Invalid LogLevel: $name"))
+    }
+
+  @js.annotation.JSExportTopLevel("addLoggerFlags")
+  def addLoggerFlags(flags: String*): Unit =
+    _PyeLogger = _PyeLogger.includingDefaultFlags(flags: _*)
+
   def makeWebPage(
       onLoad: AsyncIO[List[Raise.Standard]],
       routeMatcher: RouteMatcher,
@@ -132,7 +146,17 @@ package object pye {
       }
 
     for {
-      _ <- AsyncIO { _PyeLogger = logger.withColorMode(Logger.ColorMode.Simple) }
+      _ <- AsyncIO {
+        _PyeLogger = logger
+          .withDefaultColorMode(Logger.ColorMode.Simple)
+          .withFlagMap(
+            Map(
+              "all" -> InfiniteSet.Exclusive(),
+              "applied-widget" -> InfiniteSet.Inclusive("value", "current", "getElementsAndUpdate"),
+              "widget" -> InfiniteSet.Inclusive("convert", "getState"),
+            ),
+          )
+      }
       _ <- AsyncIO { routeMatcher.bindToWindow() }
       raises <- onLoad
       redirected <- handle(raises)

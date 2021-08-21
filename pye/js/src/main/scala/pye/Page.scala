@@ -58,14 +58,14 @@ sealed trait Page { page =>
                       case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
                     }
                   case Raise.RefreshPage =>
-                    AsyncIO.wrapIO { ptr.value._1.reRender }.map { _ => }
+                    ptr.value._1.reRender.map { _ => }.toAsyncIO
                   case raw: Raise.Raw =>
                     raw.action
                 }
               case update: Raise.UpdateState[Env] =>
                 for {
-                  _ <- AsyncIO.wrapIO { stateVar.value = update.update(stateVar.value) }
-                  _ <- AsyncIO.wrapIO { update.reRender.maybe(ptr.value._1.reRender).traverse }
+                  _ <- { stateVar.value = update.update(stateVar.value) }.toAsyncIO
+                  _ <- update.reRender.maybe(ptr.value._1.reRender).traverse.toAsyncIO
                   _ <- titleF match {
                     case Right(f) => AsyncIO { window.document.title = f(stateVar.value) }
                     case Left(_)  => AsyncIO {}
@@ -96,7 +96,7 @@ sealed trait Page { page =>
           .value
 
       bindableKeyMap = keyMap.withRaiseHandler(rh)
-      _ <- AsyncIO.wrapIO {
+      _ <- {
         for {
           bodyElems <- appliedWidget.reRender
           _ <- IO { bindableKeyMap.bindTo(window) }
@@ -104,8 +104,7 @@ sealed trait Page { page =>
           _ <- IO { window.document.body = bodyElems.head.asInstanceOf[H.Body] }
           _ <- and(title)
         } yield ()
-
-      }
+      }.toAsyncIO
     } yield ()
 
   private[pye] final def push: AsyncIO[Unit] =

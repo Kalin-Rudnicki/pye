@@ -2,7 +2,7 @@ package pye
 
 import klib.Implicits._
 import klib.fp.types._
-import klib.utils.Logger.{helpers => L}
+import klib.utils._
 import pye.Implicits._
 
 trait RaiseHandler[S, -A] {
@@ -15,7 +15,7 @@ trait RaiseHandler[S, -A] {
 
   private[pye] def _handleRaise(raise: Raise[S, A]): AsyncIO[Unit] =
     for {
-      _ <- AsyncIO.wrapIO { PyeLogger(L.log.debug(raise.toString)) }
+      _ <- PyeLogger.log.debug(raise.toString, "raise").toAsyncIO
       _ <- _handleRaise(raise)
     } yield ()
   private[pye] def _handleRaises(raises: List[Raise[S, A]]): AsyncIO[Unit] =

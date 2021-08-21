@@ -4,7 +4,7 @@ val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
 val CirceVersion = "0.14.0-M4"
 val MonocleVersion = "3.0.0-M6"
-val KlibVersion = "1.4.8"
+val KlibVersion = "1.5.4"
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
@@ -64,7 +64,7 @@ lazy val pye =
       scalaVersion := Scala_2_13,
       sonatypeCredentialHost := "s01.oss.sonatype.org",
       // TODO (KR) :
-      version := "4.2.2-SNAP-8",
+      version := "4.2.2-SNAP-9",
     )
     .jsSettings(
       libraryDependencies ++= Seq(

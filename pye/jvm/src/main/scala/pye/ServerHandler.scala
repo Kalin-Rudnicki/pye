@@ -11,7 +11,6 @@ import scalatags.Text.all.{body => htmlBody, _}
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
-import klib.utils.Logger.{helpers => L}
 import pye.db.ConnectionFactory
 
 final class ServerHandler(
@@ -231,7 +230,7 @@ final class ServerHandler(
         }
 
       for {
-        _ <- logger(forceResult._1.map(L.log.throwable(_)))
+        _ <- logger.log(forceResult._1.map(L.log.throwable(_)))
         _ <- writeResult(forceResult._2)
       } yield ()
     }
@@ -240,7 +239,7 @@ final class ServerHandler(
     val matchResult: ?[Maybe[Response]] = {
       for {
         params <- paramMap.toIO
-        _ <- logger(
+        _ <- logger.log(
           L(
             L.break(),
             L.log.debug("--- Request ---"),

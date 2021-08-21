@@ -10,7 +10,6 @@ import org.squeryl.Schema
 import klib.Implicits._
 import klib.fp.types._
 import klib.utils._
-import klib.utils.Logger.{helpers => L}
 import pye.db._
 
 package object pye {
@@ -45,7 +44,7 @@ package object pye {
               val remainingJoined = remaining.mkString("/")
 
               for {
-                _ <- md.logger(L.log.debug(s"attempting to fetch resource: $remainingJoined"))
+                _ <- md.logger.log.debug(s"attempting to fetch resource: $remainingJoined")
                 f <-
                   if (remaining.contains(".."))
                     IO.error(Message("Found '..' in resources path"))
@@ -98,7 +97,7 @@ package object pye {
       )
 
       for {
-        _ <- logger(
+        _ <- logger.log(
           L(
             L.log.info(s"Starting server on port: $port"),
             L.log.info(s"Database path: $dbFile"),
@@ -112,10 +111,10 @@ package object pye {
             val lb = mutable.ListBuffer[String]()
 
             for {
-              _ <- logger(L.log.info(s"Database already exists at: $dbFile"))
+              _ <- logger.log.info(s"Database already exists at: $dbFile")
               _ <- connectionFactory.openRunClose(schema.printDdl(s => if (!s.startsWith("--")) lb.append(s)).pure[Query])
               list = lb.toList
-              _ <- logger(L.requireFlags("schema")(list.map(L.log.info)))
+              _ <- logger.log(L.requireFlags("schema")(list.map(L.log.info)))
               rbFileBytes <- getClass.getClassLoader.getResourceAsStream("ruby/db_diff.rb").readAllBytes.pure[IO]
               _ <-
                 new File(s"${UUID.randomUUID}.rb")
@@ -129,7 +128,7 @@ package object pye {
             } yield ()
           } else
             for {
-              _ <- logger(L.log.info(s"Creating database: $dbFile"))
+              _ <- logger.log.info(s"Creating database: $dbFile")
               _ <- connectionFactory.openRunClose(schema.create.pure[Query])
             } yield ()
         }
