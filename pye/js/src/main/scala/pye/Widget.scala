@@ -371,8 +371,11 @@ object Widget {
       Pointer
         .withSelf[AppliedWidget[V]] { ptr =>
           val mappedRH: RaiseHandler[S, thisWidget.A1] = { raise =>
-            f(getState(), ptr.value.value.runSync, raise)
-              .flatMap(parentRaiseHandler._handleRaises)
+            for {
+              _ <- AsyncIO.wrapIO { PyeLogger(L.log.info(s"getState = ${getState()}")) }
+              raises <- f(getState(), ptr.value.value.runSync, raise)
+              _ <- parentRaiseHandler._handleRaises(raises)
+            } yield ()
           }
 
           Pointer(thisWidget.w.convertImpl(mappedRH, getState))
