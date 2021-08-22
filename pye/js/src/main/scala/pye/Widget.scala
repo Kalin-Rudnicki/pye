@@ -667,15 +667,19 @@ trait AppliedWidget[+V] {
       _ <- IO {}
 
       mOldElements <- current
+      /*
       _ <- IO {
         console.log("--- oldElements ---")
         mOldElements.toList.flatMap(_.toList).foreach(console.log(_))
       }
+       */
       newElements <- getElementsAndUpdate
+      /*
       _ <- IO {
         console.log("--- newElements ---")
         newElements.foreach(console.log(_))
       }
+       */
       _ <- mOldElements.map(Widget.replaceNodes(_, newElements)).traverse
     } yield newElements
 
