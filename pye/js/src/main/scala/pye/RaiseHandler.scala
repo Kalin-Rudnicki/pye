@@ -16,7 +16,7 @@ trait RaiseHandler[S, -A] {
   private[pye] def _handleRaise(raise: Raise[S, A]): AsyncIO[Unit] =
     for {
       _ <- PyeLogger.log.debug(raise.toString, "raise").toAsyncIO
-      _ <- _handleRaise(raise)
+      _ <- _handleRaiseImpl(raise)
     } yield ()
   private[pye] def _handleRaises(raises: List[Raise[S, A]]): AsyncIO[Unit] =
     AsyncIO.runSequentially(raises.map(_handleRaise)).map { _ => }

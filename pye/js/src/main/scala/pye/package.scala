@@ -94,22 +94,31 @@ package object pye {
     }
   }
 
+  private val toleranceMap: Map[String, Logger.LogLevel with Logger.LogLevel.Tolerance] =
+    Logger.LogLevel.AllTolerance.flatMap { l =>
+      List(l.name, l.displayName).map { n => (n.toUpperCase, l) }
+    }.toMap
+
   private var _PyeLogger: Logger = _
   def PyeLogger: Logger = _PyeLogger
 
   // NOTE : This is for usage in the javascript console
   @js.annotation.JSExportTopLevel("setLogTolerance")
   def setLogTolerance(name: String): Unit =
-    Logger.LogLevel.AllTolerance.find(_.name == name).toMaybe match {
+    toleranceMap.get(name.toUpperCase).toMaybe match {
       case Some(logTolerance) =>
         _PyeLogger = _PyeLogger.withDefaultLogTolerance(logTolerance)
       case None =>
         displayMessage(Raise.DisplayMessage.global.error(s"Invalid LogLevel: $name"))
     }
 
-  @js.annotation.JSExportTopLevel("addLoggerFlags")
-  def addLoggerFlags(flags: String*): Unit =
+  @js.annotation.JSExportTopLevel("includeLoggerFlags")
+  def includeLoggerFlags(flags: String*): Unit =
     _PyeLogger = _PyeLogger.includingDefaultFlags(flags: _*)
+
+  @js.annotation.JSExportTopLevel("excludeLoggerFlags")
+  def excludeLoggerFlags(flags: String*): Unit =
+    _PyeLogger = _PyeLogger.excludingDefaultFlags(flags: _*)
 
   def makeWebPage(
       onLoad: AsyncIO[List[Raise.Standard]],

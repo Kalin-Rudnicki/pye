@@ -162,7 +162,7 @@ trait Widget[V, S, +A] { thisWidget =>
   protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V]
 
   def convert(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] = {
-    PyeLogger.unsafeLog(L.log.debug(s"convert[$widgetName]", "convert"))
+    PyeLogger.unsafeLog.debug(s"convert[$widgetName]", "convert")
     val res = convertImpl(parentRaiseHandler, getState)
     res.widgetName = widgetName
     res
