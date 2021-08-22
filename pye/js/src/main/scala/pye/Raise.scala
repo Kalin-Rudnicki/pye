@@ -79,12 +79,15 @@ object Raise {
   }
   sealed trait History extends Standard
   object History {
-    final case class Push(page: Page) extends History
-    final case class Replace(page: Page) extends History
+    final case class Push(page: () => Page) extends History
+    final case class Replace(page: () => Page) extends History
     final case class Go(delta: Int) extends History
 
-    val Forward: Go = Go(1)
-    val Back: Go = Go(-1)
+    def push(page: => Page): Push = Push(() => page)
+    def replace(page: => Page): Replace = Replace(() => page)
+
+    val forward: Go = Go(1)
+    val back: Go = Go(-1)
   }
   case object RefreshPage extends Standard
   final case class Raw(action: AsyncIO[Unit], hint: Maybe[String] = None) extends Standard {

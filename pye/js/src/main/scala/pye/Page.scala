@@ -53,8 +53,8 @@ sealed trait Page { page =>
                     AsyncIO { displayMessage(msg) }
                   case history: Raise.History =>
                     history match {
-                      case Raise.History.Push(page)    => page.push
-                      case Raise.History.Replace(page) => page.replace
+                      case Raise.History.Push(page)    => page().push
+                      case Raise.History.Replace(page) => page().replace
                       case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
                     }
                   case Raise.RefreshPage =>
@@ -65,6 +65,7 @@ sealed trait Page { page =>
               case update: Raise.UpdateState[Env] =>
                 for {
                   _ <- { stateVar.value = update.update(stateVar.value) }.toAsyncIO
+                  _ <- PyeLogger.log.debug(s"env: ${stateVar.value}", "env").toAsyncIO
                   _ <- update.reRender.maybe(ptr.value._1.reRender).traverse.toAsyncIO
                   _ <- titleF match {
                     case Right(f) => AsyncIO { window.document.title = f(stateVar.value) }
@@ -119,13 +120,6 @@ sealed trait Page { page =>
 
   private[pye] final def replaceNoTrace: AsyncIO[Unit] =
     renderAnd { _ => IO {} }
-
-  // =====|  |=====
-
-  object history {
-    def push: Raise.History.Push = Raise.History.Push(page)
-    def replace: Raise.History.Replace = Raise.History.Replace(page)
-  }
 
 }
 

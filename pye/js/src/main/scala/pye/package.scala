@@ -135,9 +135,9 @@ package object pye {
               case history: Raise.History =>
                 history match {
                   case History.Push(page) =>
-                    page.push.map { _ => true }
+                    page().push.map { _ => true }
                   case History.Replace(page) =>
-                    page.replace.map { _ => true }
+                    page().replace.map { _ => true }
                   case History.Go(_) =>
                     // Ignore (?)
                     AsyncIO { false }

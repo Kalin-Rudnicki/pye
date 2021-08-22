@@ -68,5 +68,14 @@ trait Implicits {
 
   }
 
+  implicit class PageOps(page: => Page) {
+
+    object history {
+      def push: Raise.History.Push = Raise.History.push(page)
+      def replace: Raise.History.Replace = Raise.History.replace(page)
+    }
+
+  }
+
 }
 object Implicits extends Implicits with CSS.Implicits
