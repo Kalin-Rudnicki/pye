@@ -405,7 +405,7 @@ object Page {
                       onclick := { (e: MouseEvent) =>
                         action match {
                           case NavBarAction.PushPage(page) =>
-                            rh.raise(page().history.push)
+                            rh.raise(Raise.History.push(page()))
                           case NavBarAction.Custom(onClick) =>
                             rh.raises(onClick(e))
                         }
