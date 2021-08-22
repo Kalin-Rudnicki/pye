@@ -33,7 +33,6 @@ trait containers {
 
     val outerModal =
       div(
-        `class` := Page.names.Modal,
         zIndex := z,
       )(innerModal).render
 

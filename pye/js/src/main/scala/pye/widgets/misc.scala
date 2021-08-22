@@ -12,7 +12,7 @@ import klib.fp.types._
 import klib.utils._
 import pye._
 import pye.Implicits._
-import pye.Widget.ElementT
+import pye.widgets.modifiers._
 
 trait misc {
 
@@ -44,15 +44,6 @@ trait misc {
       )
 
   }
-
-  // REMOVE : ...
-  /*
-  def noneOptional[T]: Optional[Maybe[T], None.type] =
-    Optional[Maybe[T], None.type] {
-      case none @ None => none.someOpt
-      case Some(_)     => scala.None
-    } { n => _ => n }
-   */
 
   def fromSumTypes[V, S, A](
       sumName: String,
@@ -86,12 +77,12 @@ trait misc {
               i2 <- IO.wrapEffect { i1.toEA(Message("No inner")) }
               v <- i2.value
             } yield v
-          override protected final val currentImpl: IO[Maybe[ElementT]] =
+          override protected final val currentImpl: IO[Maybe[Widget.ElementT]] =
             for {
               i1 <- IO { inner.value }
               e <- i1.map(_.current).traverse.map(_.flatten)
             } yield e
-          override protected final val getElementsAndUpdateImpl: IO[ElementT] =
+          override protected final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
             for {
               s <- IO { getState() }
               newInner <- IO.wrapEffect { firstSubMatch(s) }
@@ -124,26 +115,69 @@ trait misc {
       ),
     )
 
-  def formModalW[V, S, A](
-      widget: Widget[V, S, CommonRaise.Submit.type],
-      onSubmit: V => AsyncIO[List[Raise[S, A]]],
-      modalModifier: Modifier = Seq.empty[Modifier],
-      containerModifier: Modifier = Seq.empty[Modifier],
-  ): Widget[Unit, Maybe[S], A] =
-    new Widget[Unit, Maybe[S], A] {
-      override final val widgetName: String = "FormModal"
-      override final protected def convertImpl(
-          parentRaiseHandler: RaiseHandler[Maybe[S], A],
-          getState: () => Maybe[S],
-      ): AppliedWidget[Unit] =
-        new AppliedWidget[Unit] {
-          private val child: Var[Maybe[AppliedWidget[V]]] = Var(None)
-          private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
+  sealed trait ModalAction[+A]
+  object ModalAction {
+    case object Close extends ModalAction[Nothing]
+    final case class Action[A](raise: A) extends ModalAction[A]
+  }
 
-          override protected val valueImpl: IO[Unit] = ().pure[IO]
-          override protected val currentImpl: IO[Maybe[ElementT]] = IO { elems.value }
-          override protected val getElementsAndUpdateImpl: IO[ElementT] = ???
+  def modalW[V, S, A](
+      widget: Widget[V, S, A],
+      marginT: String,
+      marginLR: String,
+      marginB: Maybe[String] = None,
+      z: Int = 1,
+      modalDecorator: Modifier = Seq.empty[Modifier],
+      containerDecorator: Modifier = Seq.empty[Modifier],
+  ): Widget[Maybe[V], Maybe[S], A] =
+    maybeW {
+      widget
+        .mapAction[A, ModalAction[A]] { (_, _, a) => AsyncIO { List(Raise.Action(ModalAction.Action(a))) } }
+        .rWrapped[ModalAction[A]] { rh => elems =>
+          div(
+            PyeS.`pye:modal`,
+            display.block,
+            position.fixed,
+            left := 0,
+            top := 0,
+            width := "100vw",
+            height := "100vh",
+            zIndex := z,
+            backgroundColor := "rgba(0, 0, 0, 0.75)",
+            onclick := { (_: Event) =>
+              rh.raiseAction(ModalAction.Close)
+            },
+          )(
+            div(
+              PyeS.`pye:modal`.container,
+              width := s"calc(100vw - 2 * ($marginLR))",
+              height := {
+                marginB match {
+                  case Some(marginB) => s"calc(100vh - (($marginT) + ($marginB)))"
+                  case None          => s"calc(100vh - 2 * ($marginT))"
+                }
+              },
+              marginTop := marginT,
+              marginBottom := marginB.getOrElse(marginT),
+              marginLeft := marginLR,
+              marginRight := marginLR,
+              onclick := { (e: Event) =>
+                e.stopPropagation()
+              },
+            )(
+              elems,
+            )(containerDecorator),
+          )(modalDecorator).render
         }
+    }.mapAction[ModalAction[A], A] { (_, _, a) =>
+      AsyncIO {
+        List(
+          a match {
+            case ModalAction.Close         => Raise.UpdateState[Maybe[S]](_ => None)
+            case ModalAction.Action(raise) => Raise.Action(raise)
+          },
+        )
+      }
     }
 
 }

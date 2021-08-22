@@ -45,7 +45,7 @@ trait inputs {
           rh.raise(updateStateRaise())
 
         _input.value = s
-        _input.onkeypress = { e =>
+        _input.onkeyup = { e =>
           if (filterSubmit(e)) {
             e.preventDefault()
             rh.raise(

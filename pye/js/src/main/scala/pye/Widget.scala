@@ -12,66 +12,9 @@ import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
 import pye.Implicits._
-import pye.Widget.ElementT
 import pye.widgets.modifiers.PyeS
 
 trait Widget[V, S, +A] { thisWidget =>
-
-  // REMOVE : ...
-  /*
-  final def render(
-      handleActions: A => AsyncIO[List[Raise.StandardOrUpdate[S]]],
-  )(
-      initialState: S,
-  ): Modifier = {
-    val stateVar: Var[S] = Var(initialState)
-
-    val appliedWidget: AppliedWidget[V] =
-      Pointer
-        .withSelf[AppliedWidget[V]] { ptr =>
-          val rh: RaiseHandler[S, A] = { raise =>
-            def handleStandardOrUpdate(sou: Raise.StandardOrUpdate[S]): AsyncIO[Unit] =
-              sou match {
-                case standard: Raise.Standard =>
-                  standard match {
-                    case msg: Raise.DisplayMessage =>
-                      AsyncIO { displayMessage(msg) }
-                    case history: Raise.History =>
-                      history match {
-                        case Raise.History.Push(page)    => page._push()
-                        case Raise.History.Replace(page) => page._replace()
-                        case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
-                      }
-                    case Raise.RefreshPage =>
-                      AsyncIO.wrapIO { ptr.value.reRender }.map { _ => Nil }
-                  }
-                case Raise.UpdateState(update, reRender) =>
-                  for {
-                    _ <- AsyncIO.wrapIO(stateVar.value = update(stateVar.value))
-                    _ <- AsyncIO.wrapIO { reRender.maybe(ptr.value.reRender).traverse }
-                  } yield ()
-              }
-
-            raise match {
-              case sou: Raise.StandardOrUpdate[S] =>
-                handleStandardOrUpdate(sou)
-              case Raise.Action(action) =>
-                for {
-                  sous <- handleActions(action)
-                  _ <- AsyncIO.runSequentially(sous.map(handleStandardOrUpdate))
-                } yield ()
-            }
-          }
-
-          Pointer(thisWidget.convert(rh, () => stateVar.value))
-        }
-        .value
-
-    appliedWidget.reRender.runSyncOrThrow(None).toList
-  }
-   */
-
-  // =====|  |=====
 
   final def mapValue_?[V2](
       mapF: ?[V] => ?[V2],
@@ -122,16 +65,26 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   final def wrapped(inElement: Modifier => Widget.ElemT): Widget[V, S, A] =
-    sWrapped(_ => inElement)
+    rsWrapped[A](_ => _ => inElement)
   final def wrappedElems(inElements: Modifier => Widget.ElementT): Widget[V, S, A] =
-    sWrappedElems(_ => inElements)
+    rsWrappedElems[A](_ => _ => inElements)
+
+  def rWrapped[A0 >: A](inElement: RaiseHandler[S, A0] => Modifier => Widget.ElemT): Widget[V, S, A0] =
+    rsWrapped[A0](rh => _ => inElement(rh))
+  def rWrappedElems[A0 >: A](inElement: RaiseHandler[S, A0] => Modifier => Widget.ElementT): Widget[V, S, A0] =
+    rsWrappedElems[A0](rh => _ => inElement(rh))
 
   final def sWrapped(inElement: S => Modifier => Widget.ElemT): Widget[V, S, A] =
-    sWrappedElems(s => elems => NonEmptyList.nel(inElement(s)(elems)))
-  final def sWrappedElems(inElements: S => Modifier => Widget.ElementT): Widget[V, S, A] =
-    new Widget.Wrapped[V, S, A] {
-      override protected final val w: Widget[V, S, A] = thisWidget
-      override protected final val f: S => Modifier => Widget.ElementT = inElements
+    rsWrapped[A](_ => inElement)
+  final def sWrappedElems(inElement: S => Modifier => Widget.ElementT): Widget[V, S, A] =
+    rsWrappedElems[A](_ => inElement)
+
+  final def rsWrapped[A0 >: A](inElement: RaiseHandler[S, A0] => S => Modifier => Widget.ElemT): Widget[V, S, A0] =
+    rsWrappedElems[A0](rh => s => elems => NonEmptyList.nel(inElement(rh)(s)(elems)))
+  final def rsWrappedElems[A0 >: A](inElements: RaiseHandler[S, A0] => S => Modifier => Widget.ElementT): Widget[V, S, A0] =
+    new Widget.Wrapped[V, S, A0] {
+      override protected final val w: Widget[V, S, A0] = thisWidget
+      override protected final val f: RaiseHandler[S, A0] => S => Modifier => Widget.ElementT = inElements
     }
 
   final def zoomOut[S2](s2Lens: Lens[S2, S]): Widget[V, S2, A] =
@@ -550,7 +503,7 @@ object Widget {
 
   sealed trait Wrapped[V, S, +A] extends Widget[V, S, A] { thisWidget =>
     protected val w: Widget[V, S, A]
-    protected val f: S => Modifier => Widget.ElementT
+    protected val f: RaiseHandler[S, A] => S => Modifier => Widget.ElementT
 
     override final val widgetName: String = "Wrapped"
 
@@ -568,7 +521,7 @@ object Widget {
         override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
           for {
             childElems <- child.getElementsAndUpdate
-            myElems = thisWidget.f(getState())(childElems.toList)
+            myElems = thisWidget.f(parentRaiseHandler)(getState())(childElems.toList)
             _ <- elems.value = myElems.some
           } yield myElems
       }
