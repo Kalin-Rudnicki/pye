@@ -35,20 +35,26 @@ trait inputs {
         var savedTimeout: Maybe[Int] = None
         val _input = inputTag(decorator).render
 
-        def updateStateRaise(): Raise.UpdateState[String] = {
-          Raise.UpdateState[String](_ => _input.value, reRender = false)
-        }
+        var lastRaised = s
+
+        def updateStateRaise(): Maybe[Raise.UpdateState[String]] =
+          (_input.value != lastRaised).maybe {
+            lastRaised = _input.value
+            Raise.UpdateState[String](_ => _input.value, reRender = false)
+          }
 
         def updateState(): Unit =
-          rh.raise(updateStateRaise())
+          updateStateRaise().foreach(rh.raise(_))
 
         _input.value = s
         _input.onkeyup = { e =>
           if (filterSubmit(e)) {
             e.preventDefault()
-            rh.raise(
-              updateStateRaise(),
-              Raise.Action(CommonRaise.Submit),
+            rh.raises(
+              List(
+                updateStateRaise(),
+                Raise.Action(CommonRaise.Submit).some,
+              ).flatMap(_.toOption),
             )
           } else
             updateOn match {

@@ -38,7 +38,15 @@ trait misc {
             case action: Raise.Action[A] =>
               parentRH._handleRaise(action)
           }
-          val unsafeGetter: () => IS = () => lens.getOption(getState()).get
+          val unsafeGetter: () => IS = { () =>
+            val state = getState()
+            lens.getOption(state).toMaybe match {
+              case Some(is) => is
+              case None =>
+                displayMessage(Raise.DisplayMessage.fromThrowable(Message(s"Invalid state: $state")))
+                throw new RuntimeException
+            }
+          }
           iWidget.captureReRender.convert(rh, unsafeGetter)
         },
       )

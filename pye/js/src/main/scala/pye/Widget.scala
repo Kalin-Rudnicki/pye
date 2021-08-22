@@ -95,7 +95,7 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Change `afterUpdate` to something like `reRendersOther: Widget/AppliedWidget`
-  final def captureReRender: Widget[V, S, A] = captureReRender(RaiseHandler.ReRender())
+  final def captureReRender: Widget[V, S, A] = captureReRender(RaiseHandler.ReRender.Nothing)
   final def captureReRender(reRenders: RaiseHandler.ReRender): Widget[V, S, A] =
     new Widget[V, S, A] {
       override val widgetName: String = s"${thisWidget.widgetName}-captureReRender"
@@ -236,7 +236,7 @@ object Widget {
   def rhCaptureReRender[V, S, A](
       w: Pointer[AppliedWidget[V]],
       parentRH: RaiseHandler[S, A],
-      reRenders: RaiseHandler.ReRender = RaiseHandler.ReRender(),
+      reRenders: RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
   ): RaiseHandler[S, A] = {
     case sou: Raise.StandardOrUpdate[S] =>
       sou match {
@@ -244,7 +244,7 @@ object Widget {
           parentRH._handleRaise(standard)
         case update: Raise.UpdateState[S] =>
           for {
-            prr <- parentRH._handleRaise(
+            rr <- parentRH._handleRaise(
               Raise.UpdateState[S](
                 update.update,
                 false,
@@ -258,14 +258,7 @@ object Widget {
                 ),
               ),
             )
-          } yield RaiseHandler.ReRender.merge(
-            List(
-              prr,
-              update.reRender ?
-                RaiseHandler.ReRender(w.value) |
-                RaiseHandler.ReRender(),
-            ),
-          )
+          } yield rr
       }
     case action: Raise.Action[A] =>
       parentRH._handleRaise(action)
@@ -674,7 +667,15 @@ trait AppliedWidget[+V] {
       _ <- IO {}
 
       mOldElements <- current
+      _ <- IO {
+        console.log("--- oldElements ---")
+        mOldElements.toList.flatMap(_.toList).foreach(console.log(_))
+      }
       newElements <- getElementsAndUpdate
+      _ <- IO {
+        console.log("--- newElements ---")
+        newElements.foreach(console.log(_))
+      }
       _ <- mOldElements.map(Widget.replaceNodes(_, newElements)).traverse
     } yield newElements
 

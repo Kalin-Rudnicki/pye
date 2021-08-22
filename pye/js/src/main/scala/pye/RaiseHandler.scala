@@ -29,7 +29,9 @@ trait RaiseHandler[S, -A] {
   def raises(raises: List[Raise[S, A]]): Unit = {
     for {
       rr <- _handleRaises(raises)
+      _ <- PyeLogger.log.debug(s"start reRender: $rr", "reRender").toAsyncIO
       _ <- rr match {
+        case RaiseHandler.ReRender.Nothing    => AsyncIO {}
         case RaiseHandler.ReRender.PageChange => AsyncIO {}
         case RaiseHandler.ReRender.Widgets(widgets) =>
           widgets.toList
@@ -42,6 +44,7 @@ trait RaiseHandler[S, -A] {
             .traverse
             .toAsyncIO
       }
+      _ <- PyeLogger.log.debug(s"end reRender", "reRender").toAsyncIO
     } yield ()
   }.runAndShowErrors()
 
@@ -62,12 +65,14 @@ object RaiseHandler {
 
   sealed trait ReRender {
 
-    def orChild(other: ReRender): ReRender =
+    def orChild(child: ReRender): ReRender =
       this match {
+        case ReRender.Nothing    => child
         case ReRender.PageChange => this
         case ReRender.Widgets(_) =>
-          other match {
-            case ReRender.PageChange => other
+          child match {
+            case ReRender.Nothing    => this
+            case ReRender.PageChange => child
             case ReRender.Widgets(_) => this
           }
       }
@@ -75,29 +80,37 @@ object RaiseHandler {
   }
   object ReRender {
 
+    case object Nothing extends ReRender
     case object PageChange extends ReRender
-    final case class Widgets(widgets: Set[AppliedWidget[_]]) extends ReRender
+    final case class Widgets(widgets: NonEmptyList[AppliedWidget[_]]) extends ReRender
 
     def apply(widgets: AppliedWidget[_]*): ReRender =
-      Widgets(widgets.toSet)
+      widgets.toList.toNel match {
+        case Some(widgets) => Widgets(widgets)
+        case None          => Nothing
+      }
 
     def merge(rrs: List[ReRender]): ReRender = {
       @tailrec
       def loop(
           queue: List[ReRender],
-          widgets: Set[AppliedWidget[_]],
+          widgets: Maybe[NonEmptyList[AppliedWidget[_]]],
       ): ReRender =
         queue match {
           case head :: tail =>
             head match {
+              case Nothing    => loop(tail, widgets)
               case PageChange => PageChange
-              case Widgets(w) => loop(tail, w | widgets)
+              case Widgets(w) => loop(tail, widgets.cata(w ::: _, w).some)
             }
           case Nil =>
-            Widgets(widgets)
+            widgets match {
+              case Some(widgets) => Widgets(widgets)
+              case None          => Nothing
+            }
         }
 
-      loop(rrs, Set.empty)
+      loop(rrs, None)
     }
 
   }

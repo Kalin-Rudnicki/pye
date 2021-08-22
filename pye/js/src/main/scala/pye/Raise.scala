@@ -15,7 +15,7 @@ object Raise {
   final case class UpdateState[S](
       update: S => S,
       reRender: Boolean = true,
-      childReRenders: RaiseHandler.ReRender = RaiseHandler.ReRender(),
+      childReRenders: RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
   ) extends Raise.StandardOrUpdate[S]
 
   sealed trait Standard extends Raise.StandardOrUpdate[Nothing]
