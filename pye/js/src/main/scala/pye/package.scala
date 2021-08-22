@@ -162,7 +162,7 @@ package object pye {
             Map(
               "all" -> InfiniteSet.Exclusive(),
               "applied-widget" -> InfiniteSet.Inclusive("value", "current", "getElementsAndUpdate"),
-              "widget" -> InfiniteSet.Inclusive("convert", "getState"),
+              "widget" -> InfiniteSet.Inclusive("convert"),
             ),
           )
       }

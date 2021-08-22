@@ -46,32 +46,38 @@ sealed trait Page { page =>
       (appliedWidget, rh) =
         Pointer
           .withSelf[(AppliedWidget[Unit], RaiseHandler[Env, A])] { ptr =>
-            val handleSOU: Raise.StandardOrUpdate[Env] => AsyncIO[Unit] = {
+            val handleSOU: Raise.StandardOrUpdate[Env] => AsyncIO[RaiseHandler.ReRender] = {
               case standard: Raise.Standard =>
                 standard match {
                   case msg: Raise.DisplayMessage =>
-                    AsyncIO { displayMessage(msg) }
+                    AsyncIO { displayMessage(msg); RaiseHandler.ReRender() }
                   case history: Raise.History =>
-                    history match {
-                      case Raise.History.Push(page)    => page().push
-                      case Raise.History.Replace(page) => page().replace
-                      case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
-                    }
+                    {
+                      history match {
+                        case Raise.History.Push(page)    => page().push
+                        case Raise.History.Replace(page) => page().replace
+                        case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
+                      }
+                    }.map { _ => RaiseHandler.ReRender.PageChange }
                   case Raise.RefreshPage =>
-                    ptr.value._1.reRender.map { _ => }.toAsyncIO
+                    AsyncIO { RaiseHandler.ReRender(ptr.value._1) }
                   case raw: Raise.Raw =>
-                    raw.action
+                    raw.action.map { _ => RaiseHandler.ReRender() }
                 }
               case update: Raise.UpdateState[Env] =>
                 for {
                   _ <- { stateVar.value = update.update(stateVar.value) }.toAsyncIO
                   _ <- PyeLogger.log.debug(s"env: ${stateVar.value}", "env").toAsyncIO
-                  _ <- update.reRender.maybe(ptr.value._1.reRender).traverse.toAsyncIO
+                  rr <- AsyncIO {
+                    update.reRender ?
+                      RaiseHandler.ReRender(ptr.value._1) |
+                      update.childReRenders
+                  }
                   _ <- titleF match {
                     case Right(f) => AsyncIO { window.document.title = f(stateVar.value) }
                     case Left(_)  => AsyncIO {}
                   }
-                } yield ()
+                } yield rr
             }
             val rh: RaiseHandler[Env, A] = {
               case sou: Raise.StandardOrUpdate[Env] =>
@@ -79,8 +85,8 @@ sealed trait Page { page =>
               case action: Raise.Action[A] =>
                 for {
                   raises <- handleA(action.action)
-                  _ <- AsyncIO.runSequentially(raises.map(handleSOU))
-                } yield ()
+                  rrs <- AsyncIO.runSequentially(raises.map(handleSOU))
+                } yield RaiseHandler.ReRender.merge(rrs)
             }
 
             // TODO (KR) : Fit modals in there somewhere

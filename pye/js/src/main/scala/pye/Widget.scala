@@ -95,14 +95,14 @@ trait Widget[V, S, +A] { thisWidget =>
     }
 
   // TODO (KR) : Change `afterUpdate` to something like `reRendersOther: Widget/AppliedWidget`
-  final def captureReRender: Widget[V, S, A] = captureReRender(IO {})
-  final def captureReRender(afterUpdate: IO[Unit]): Widget[V, S, A] =
+  final def captureReRender: Widget[V, S, A] = captureReRender(RaiseHandler.ReRender())
+  final def captureReRender(reRenders: RaiseHandler.ReRender): Widget[V, S, A] =
     new Widget[V, S, A] {
       override val widgetName: String = s"${thisWidget.widgetName}-captureReRender"
       override protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
         Pointer
           .withSelf[AppliedWidget[V]] { ptr =>
-            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler, afterUpdate)
+            val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler, reRenders)
             Pointer(thisWidget.convert(rh, getState))
           }
           .value
@@ -150,6 +150,8 @@ trait Widget[V, S, +A] { thisWidget =>
         case Dead(errors) =>
           Dead(errors.map(_.mappedMessage(msg => s"$labelText $msg")))
       }
+
+  override def toString: String = widgetName
 
 }
 
@@ -234,7 +236,7 @@ object Widget {
   def rhCaptureReRender[V, S, A](
       w: Pointer[AppliedWidget[V]],
       parentRH: RaiseHandler[S, A],
-      afterUpdate: IO[Unit] = IO {},
+      reRenders: RaiseHandler.ReRender = RaiseHandler.ReRender(),
   ): RaiseHandler[S, A] = {
     case sou: Raise.StandardOrUpdate[S] =>
       sou match {
@@ -242,10 +244,28 @@ object Widget {
           parentRH._handleRaise(standard)
         case update: Raise.UpdateState[S] =>
           for {
-            _ <- parentRH._handleRaise(Raise.UpdateState[S](update.update, false))
-            _ <- update.reRender ? w.value.reRender.map { _ => }.toAsyncIO | AsyncIO {}
-            _ <- afterUpdate.toAsyncIO
-          } yield ()
+            prr <- parentRH._handleRaise(
+              Raise.UpdateState[S](
+                update.update,
+                false,
+                RaiseHandler.ReRender.merge(
+                  List(
+                    reRenders,
+                    update.reRender ?
+                      RaiseHandler.ReRender(w.value) |
+                      update.childReRenders,
+                  ),
+                ),
+              ),
+            )
+          } yield RaiseHandler.ReRender.merge(
+            List(
+              prr,
+              update.reRender ?
+                RaiseHandler.ReRender(w.value) |
+                RaiseHandler.ReRender(),
+            ),
+          )
       }
     case action: Raise.Action[A] =>
       parentRH._handleRaise(action)
@@ -327,10 +347,9 @@ object Widget {
         .withSelf[AppliedWidget[V]] { ptr =>
           val mappedRH: RaiseHandler[S, thisWidget.A1] = { raise =>
             for {
-              _ <- PyeLogger.log.debug(s"getState = ${getState()}", "getState").toAsyncIO
               raises <- f(getState(), ptr.value.value.runSync, raise)
-              _ <- parentRaiseHandler._handleRaises(raises)
-            } yield ()
+              prr <- parentRaiseHandler._handleRaises(raises)
+            } yield prr
           }
 
           Pointer(thisWidget.w.convert(mappedRH, getState))
@@ -393,7 +412,7 @@ object Widget {
         thisWidget.w2(v1).captureReRender.convert(parentRaiseHandler, getState)
 
       lazy val w1: AppliedWidget[thisWidget.V1] =
-        thisWidget.w1.captureReRender { w2.reRender.map { _ => } }.convert(parentRaiseHandler, getState)
+        thisWidget.w1.captureReRender(RaiseHandler.ReRender(w2)).convert(parentRaiseHandler, getState)
 
       lazy val w2: AppliedWidget[V] =
         new AppliedWidget[V] {
@@ -488,7 +507,9 @@ object Widget {
         case sou: Raise.StandardOrUpdate[S1] =>
           sou match {
             case update: Raise.UpdateState[S1] =>
-              parentRaiseHandler._handleRaise(Raise.UpdateState[S](lens.modify(update.update), update.reRender))
+              parentRaiseHandler._handleRaise(
+                Raise.UpdateState[S](lens.modify(update.update), update.reRender, update.childReRenders),
+              )
             case standard: Raise.Standard =>
               parentRaiseHandler._handleRaise(standard)
           }
@@ -620,7 +641,7 @@ object Widget {
 
 }
 
-trait AppliedWidget[V] {
+trait AppliedWidget[+V] {
 
   private[pye] var widgetName: String = _
   protected val valueImpl: IO[V]

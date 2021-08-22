@@ -35,9 +35,7 @@ trait inputs {
         var savedTimeout: Maybe[Int] = None
         val _input = inputTag(decorator).render
 
-        // TODO (KR) : Make sure state is updated before re-rendering
         def updateStateRaise(): Raise.UpdateState[String] = {
-          console.log(s"Setting state: ${_input.value}")
           Raise.UpdateState[String](_ => _input.value, reRender = false)
         }
 
