@@ -128,6 +128,9 @@ trait Widget[V, S, +A] { thisWidget =>
   ): Widget[V2, S, A] =
     mapValue_?(_.map(mapF))
 
+  final def asUnit: Widget[Unit, S, A] =
+    mapValue { _ => }
+
   final def flatMapValue[V2](
       mapF: V => ?[V2],
   ): Widget[V2, S, A] =
