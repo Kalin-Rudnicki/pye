@@ -172,6 +172,8 @@ object Page {
   object NavBarAction {
     final case class PushPage(page: () => Page) extends NavBarAction[Nothing]
     final case class Custom[+A](onClick: MouseEvent => List[Raise[Nothing, A]]) extends NavBarAction[A]
+
+    def pushPage(page: => Page): PushPage = PushPage(() => page)
   }
 
   // =====|  |=====

@@ -4,7 +4,7 @@ import java.util.UUID
 
 import monocle.Lens
 import org.scalajs.dom._
-import scalatags.JsDom.all._
+import scalatags.JsDom.all.{br => domBr, _}
 
 import klib.Implicits._
 import klib.fp.typeclass._
@@ -170,6 +170,9 @@ object Widget {
   type NoAction[V, S] = Widget[V, S, Nothing]
 
   // =====|  |=====
+
+  def br[Env, A]: Widget[Unit, Env, A] =
+    Widget.builder.element(domBr.render)
 
   def builder: Builder1 = new Builder1
 
