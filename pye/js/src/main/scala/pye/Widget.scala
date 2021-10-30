@@ -4,7 +4,7 @@ import java.util.UUID
 
 import monocle.Lens
 import org.scalajs.dom._
-import scalatags.JsDom.all.{br => domBr, _}
+import scalatags.JsDom.all._
 
 import klib.Implicits._
 import klib.fp.typeclass._
@@ -155,6 +155,12 @@ trait Widget[V, S, +A] { thisWidget =>
       }
 
   override def toString: String = widgetName
+
+  // =====|  |=====
+
+  def map[V2](mapF: V => V2): Widget[V2, S, A] = mapValue(mapF)
+
+  def flatMap[V2, A2 >: A](mapF: V => Widget[V2, S, A2]): Widget[V2, S, A2] = _flatMap(mapF)
 
 }
 
