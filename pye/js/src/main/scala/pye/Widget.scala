@@ -171,9 +171,6 @@ object Widget {
 
   // =====|  |=====
 
-  def br[Env, A]: Widget[Unit, Env, A] =
-    Widget.builder.element(domBr.render)
-
   def builder: Builder1 = new Builder1
 
   final class Builder1 private[Widget] {

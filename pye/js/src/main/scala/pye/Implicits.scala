@@ -1,5 +1,6 @@
 package pye
 
+import org.scalajs.dom.Element
 import scalatags.JsDom.all._
 
 import klib.Implicits._
@@ -65,6 +66,13 @@ trait Implicits {
         case Dead(errors) =>
           errors.map(Raise.DisplayMessage.fromThrowable).foreach(displayMessage)
       }
+
+  }
+
+  implicit class HtmlTagOps(tag: ConcreteHtmlTag[_ <: Element]) {
+
+    def asWidget[Env, A]: Widget[Unit, Env, A] =
+      Widget.builder.element(tag.render)
 
   }
 
