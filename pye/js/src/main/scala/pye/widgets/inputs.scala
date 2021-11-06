@@ -167,7 +167,7 @@ trait inputs {
 
           res match {
             case Alive(res) =>
-              rh.setState(res)
+              rh.state.set(res)
             case Dead(errors) =>
               rh.raises(errors.map(Raise.DisplayMessage.fromThrowable))
           }
@@ -294,7 +294,7 @@ trait inputs {
             !s -> PyeS.`pye:toggle-button`.`false`,
           ),
           onclick := { (_: Event) =>
-            rh.setState(!s)
+            rh.state.set(!s)
           },
         )(buttonLabel)(buttonDecorator).render
       }

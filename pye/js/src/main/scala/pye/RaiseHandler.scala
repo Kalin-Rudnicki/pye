@@ -53,11 +53,25 @@ trait RaiseHandler[S, -A] {
   def raiseActions(actions: List[A]): Unit =
     raises(actions.map(Raise.Action(_)))
 
-  def updateState(update: S => S, reRender: Boolean = true): Unit =
-    raise(Raise.UpdateState[S](update, reRender))
+  object state {
 
-  def setState(newState: S, reRender: Boolean = true): Unit =
-    updateState(_ => newState, reRender)
+    def update(update: S => S, reRender: Boolean = true): Unit =
+      raise(Raise.UpdateState[S](update, reRender))
+
+    def set(newState: S, reRender: Boolean = true): Unit =
+      update(_ => newState, reRender)
+
+  }
+
+  object history {
+
+    def push(page: => Page): Unit =
+      raise(Raise.History.push(page))
+
+    def replace(page: => Page): Unit =
+      raise(Raise.History.replace(page))
+
+  }
 
 }
 
