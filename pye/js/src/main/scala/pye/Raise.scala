@@ -33,6 +33,13 @@ object Raise {
         childReRenders = childReRenders,
       )
 
+    def tagged(tag: String): UpdateState[S] =
+      UpdateState(
+        update,
+        UpdateState.ReRender.Tag(tag),
+        childReRenders,
+      )
+
   }
   object UpdateState {
 
