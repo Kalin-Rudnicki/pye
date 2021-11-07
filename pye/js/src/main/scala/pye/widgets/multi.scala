@@ -112,7 +112,7 @@ trait multi {
 
   def removableListW[V, S, A](widget: Widget[V, S, RemoveOr[A]]): Widget[List[V], List[S], KeyedAction[Int, A]] =
     listW(widget)
-      .mapAction {
+      .mapAction[KeyedAction[Int, RemoveOr[A]], KeyedAction[Int, A]] {
         case (_, _, KeyedAction(idx, action)) =>
           action match {
             case RemoveOr.Remove =>
