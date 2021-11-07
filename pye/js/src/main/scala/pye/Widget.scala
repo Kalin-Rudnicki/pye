@@ -55,15 +55,6 @@ trait Widget[V, S, +A] { thisWidget =>
       override final val w2: Widget[V1 => V2, S, A0] = w
     }
 
-  private final def _flatMap[A0 >: A, V2](
-      wF: V => Widget[V2, S, A0],
-  ): Widget[V2, S, A0] =
-    new Widget.FlatMap[V2, S, A0] {
-      override final type V1 = V
-      override final val w1: Widget[V1, S, A0] = thisWidget
-      override final val w2: V => Widget[V2, S, A0] = wF
-    }
-
   final def wrapped(inElement: Modifier => Widget.ElemT): Widget[V, S, A] =
     rsWrapped[A](_ => _ => inElement)
   final def wrappedElems(inElements: Modifier => Widget.ElementT): Widget[V, S, A] =
@@ -167,7 +158,21 @@ trait Widget[V, S, +A] { thisWidget =>
 
   def map[V2](mapF: V => V2): Widget[V2, S, A] = mapValue(mapF)
 
-  def flatMap[V2, A2 >: A](mapF: V => Widget[V2, S, A2]): Widget[V2, S, A2] = _flatMap(mapF)
+  def flatMap[V2, A0 >: A](mapF: V => Widget[V2, S, A0]): Widget[V2, S, A0] =
+    new Widget.FlatMap[V2, S, A0] {
+      override final type V1 = V
+      override final val w1: Widget[V1, S, A0] = thisWidget
+      override final val w2: V => Widget[V2, S, A0] = mapF
+      override final val w2GoesAfter: Boolean = true
+    }
+
+  def flatMapBefore[V2, A0 >: A](mapF: V => Widget[V2, S, A0]): Widget[V2, S, A0] =
+    new Widget.FlatMap[V2, S, A0] {
+      override final type V1 = V
+      override final val w1: Widget[V1, S, A0] = thisWidget
+      override final val w2: V => Widget[V2, S, A0] = mapF
+      override final val w2GoesAfter: Boolean = false
+    }
 
 }
 
@@ -413,6 +418,7 @@ object Widget {
     protected type V1
     protected val w1: Widget[V1, S, A]
     protected val w2: V1 => Widget[V, S, A]
+    protected val w2GoesAfter: Boolean
 
     override final val widgetName: String = "FlatMap"
 
@@ -496,7 +502,11 @@ object Widget {
             )
             .map {
               case (w1E, w2E) =>
-                NonEmptyList.nel(w1E, w2E).flatten
+                val (elems1, elems2) =
+                  if (w2GoesAfter) (w1E, w2E)
+                  else (w2E, w1E)
+
+                NonEmptyList.nel(elems1, elems2).flatten
             }
       }
     }
@@ -579,7 +589,7 @@ object Widget {
         Widget.builder.withState[S].withAction[A].element(span.render).withValue(_ => a.pure[?])
 
       override def flatMap[V1, V2](t: Widget[V1, S, A], f: V1 => Widget[V2, S, A]): Widget[V2, S, A] =
-        t._flatMap(f)
+        t.flatMap(f)
 
     }
 
