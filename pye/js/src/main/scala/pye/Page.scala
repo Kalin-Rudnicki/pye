@@ -308,7 +308,12 @@ object Page {
           override val handleA: A => AsyncIO[List[Raise.StandardOrUpdate[_Env]]] = _handleA
         }
 
-      def ignoreA: Page = handleA[A] { _ => Nil.pure[AsyncIO] }
+      def ignoreA: Page =
+        handleA[A] { a =>
+          for {
+            _ <- PyeLogger.log.debug(s"Page ignored action : $a").toAsyncIO
+          } yield Nil
+        }
 
     }
 

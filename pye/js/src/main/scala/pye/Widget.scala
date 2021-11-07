@@ -132,7 +132,11 @@ trait Widget[V, S, +A] { thisWidget =>
     mapValue { _ => }
 
   final def ignoreActions: Widget[V, S, Nothing] =
-    mapAction[A, Nothing] { (_, _, _) => Nil.pure[AsyncIO] }
+    mapAction[A, Nothing] { (_, _, a) =>
+      for {
+        _ <- PyeLogger.log.debug(s"Widget ignored action : $a").toAsyncIO
+      } yield Nil
+    }
 
   final def flatMapValue[V2](
       mapF: V => ?[V2],
