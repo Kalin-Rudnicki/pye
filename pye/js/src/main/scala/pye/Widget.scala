@@ -131,6 +131,9 @@ trait Widget[V, S, +A] { thisWidget =>
   final def asUnit: Widget[Unit, S, A] =
     mapValue { _ => }
 
+  final def ignoreActions: Widget[V, S, Nothing] =
+    mapAction[A, Nothing] { (_, _, _) => Nil.pure[AsyncIO] }
+
   final def flatMapValue[V2](
       mapF: V => ?[V2],
   ): Widget[V2, S, A] =
@@ -595,6 +598,7 @@ object Widget {
                 new AppliedWidget[List[T]] {
                   private val elems: Var[Maybe[Widget.ElementT]] = Var(None)
 
+                  // TODO (KR) : This seems wrong...
                   override final val valueImpl: IO[List[T]] = IO { Nil }
                   override final val currentImpl: IO[Maybe[Widget.ElementT]] = IO { elems.value }
                   override final val getElementsAndUpdateImpl: IO[ElementT] =

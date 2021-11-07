@@ -8,7 +8,15 @@ import klib.fp.types._
 import pye.Implicits._
 import pye.widgets.modifiers._
 
-sealed trait Raise[+S, +A]
+sealed trait Raise[+S, +A] {
+
+  def mapAction[A2](f: A => A2): Raise[S, A2] =
+    this match {
+      case Raise.Action(action)           => Raise.Action(f(action))
+      case sou: Raise.StandardOrUpdate[S] => sou
+    }
+
+}
 object Raise {
   sealed trait StandardOrUpdate[+S] extends Raise[S, Nothing]
 
@@ -16,9 +24,18 @@ object Raise {
       update: S => S,
       reRender: Boolean = true,
       childReRenders: RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
-  ) extends Raise.StandardOrUpdate[S]
+  ) extends StandardOrUpdate[S] {
 
-  sealed trait Standard extends Raise.StandardOrUpdate[Nothing]
+    def mapUpdate[S2](f: (S => S) => (S2 => S2)): UpdateState[S2] =
+      UpdateState[S2](
+        update = f(update),
+        reRender = reRender,
+        childReRenders = childReRenders,
+      )
+
+  }
+
+  sealed trait Standard extends StandardOrUpdate[Nothing]
   final case class DisplayMessage(
       message: String,
       modifier: Modifier,

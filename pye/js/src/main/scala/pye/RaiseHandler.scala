@@ -53,9 +53,9 @@ trait RaiseHandler[S, -A] {
   def raiseActions(actions: List[A]): Unit =
     raises(actions.map(Raise.Action(_)))
 
-  def state: RaiseHandler.State[S] = new RaiseHandler.State(this)
+  def state: RaiseHandler.RHStateH[S] = new RaiseHandler.RHStateH(this)
 
-  def history: RaiseHandler.History = new RaiseHandler.History(this)
+  def history: RaiseHandler.RHHistoryH = new RaiseHandler.RHHistoryH(this)
 
 }
 
@@ -113,7 +113,7 @@ object RaiseHandler {
 
   }
 
-  final class State[S](rh: RaiseHandler[S, _]) {
+  final class RHStateH[S](rh: RaiseHandler[S, _]) {
 
     def update(update: S => S, reRender: Boolean = true): Unit =
       rh.raise(Raise.UpdateState[S](update, reRender))
@@ -122,7 +122,7 @@ object RaiseHandler {
       update(_ => newState, reRender)
 
   }
-  final class History(rh: RaiseHandler[_, _]) {
+  final class RHHistoryH(rh: RaiseHandler[_, _]) {
 
     def push(page: => Page): Unit =
       rh.raise(Raise.History.push(page))
