@@ -22,7 +22,7 @@ object Raise {
 
   final case class UpdateState[S](
       update: S => S,
-      reRender: Boolean = true,
+      reRender: UpdateState.ReRender = UpdateState.ReRender.Force,
       childReRenders: RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
   ) extends StandardOrUpdate[S] {
 
@@ -32,6 +32,43 @@ object Raise {
         reRender = reRender,
         childReRenders = childReRenders,
       )
+
+  }
+  object UpdateState {
+
+    sealed trait ReRender {
+
+      def ifForced(
+          aw: AppliedWidget[_],
+          child: RaiseHandler.ReRender,
+      ): (Raise.UpdateState.ReRender, RaiseHandler.ReRender) =
+        this match {
+          case ReRender.Propagate => (ReRender.Propagate, child)
+          case ReRender.Force     => (ReRender.Propagate, RaiseHandler.ReRender(aw))
+          case tag: ReRender.Tag  => (tag, child)
+        }
+
+      def ifTagged(
+          tags: Set[String],
+          aw: AppliedWidget[_],
+          child: RaiseHandler.ReRender,
+      ): (Raise.UpdateState.ReRender, RaiseHandler.ReRender) =
+        this match {
+          case ReRender.Propagate =>
+            (ReRender.Propagate, child)
+          case ReRender.Force =>
+            (ReRender.Force, child)
+          case tag: ReRender.Tag =>
+            if (tags.contains(tag.tag)) (ReRender.Propagate, RaiseHandler.ReRender(aw))
+            else (tag, child)
+        }
+
+    }
+    object ReRender {
+      case object Propagate extends ReRender
+      case object Force extends ReRender
+      final case class Tag(tag: String) extends ReRender
+    }
 
   }
 

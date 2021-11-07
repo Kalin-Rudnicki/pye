@@ -68,10 +68,15 @@ sealed trait Page { page =>
                 for {
                   _ <- { stateVar.value = update.update(stateVar.value) }.toAsyncIO
                   _ <- PyeLogger.log.debug(s"env: ${stateVar.value}", "env").toAsyncIO
-                  rr <- AsyncIO {
-                    update.reRender ?
-                      RaiseHandler.ReRender(ptr.value._1) |
-                      update.childReRenders
+                  rr <- update.reRender match {
+                    case Raise.UpdateState.ReRender.Propagate =>
+                      update.childReRenders.pure[AsyncIO]
+                    case Raise.UpdateState.ReRender.Force =>
+                      RaiseHandler.ReRender(ptr.value._1).pure[AsyncIO]
+                    case Raise.UpdateState.ReRender.Tag(tag) =>
+                      for {
+                        _ <- PyeLogger.log.warning(s"Uncaught tag re-render: $tag").toAsyncIO
+                      } yield update.childReRenders
                   }
                   _ <- titleF match {
                     case Right(f) => AsyncIO { window.document.title = f(stateVar.value) }

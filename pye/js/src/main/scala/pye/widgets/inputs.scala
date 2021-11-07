@@ -40,7 +40,7 @@ trait inputs {
         def updateStateRaise(): Maybe[Raise.UpdateState[String]] =
           (_input.value != lastRaised).maybe {
             lastRaised = _input.value
-            Raise.UpdateState[String](_ => _input.value, reRender = false)
+            Raise.UpdateState[String](_ => _input.value, reRender = Raise.UpdateState.ReRender.Propagate)
           }
 
         def updateState(): Unit =

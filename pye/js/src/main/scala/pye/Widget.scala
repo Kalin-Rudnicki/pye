@@ -85,7 +85,6 @@ trait Widget[V, S, +A] { thisWidget =>
       override protected final val lens: Lens[S2, S1] = s2Lens
     }
 
-  // TODO (KR) : Change `afterUpdate` to something like `reRendersOther: Widget/AppliedWidget`
   final def captureReRender: Widget[V, S, A] = captureReRender(RaiseHandler.ReRender.Nothing)
   final def captureReRender(reRenders: RaiseHandler.ReRender): Widget[V, S, A] =
     new Widget[V, S, A] {
@@ -94,6 +93,18 @@ trait Widget[V, S, +A] { thisWidget =>
         Pointer
           .withSelf[AppliedWidget[V]] { ptr =>
             val rh: RaiseHandler[S, A] = Widget.rhCaptureReRender(ptr, parentRaiseHandler, reRenders)
+            Pointer(thisWidget.convert(rh, getState))
+          }
+          .value
+    }
+
+  def captureTags(tag0: String, tagN: String*): Widget[V, S, A] =
+    new Widget[V, S, A] {
+      override val widgetName: String = s"${thisWidget.widgetName}-captureTags"
+      override protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
+        Pointer
+          .withSelf[AppliedWidget[V]] { ptr =>
+            val rh: RaiseHandler[S, A] = Widget.rhCaptureTags(ptr, parentRaiseHandler, (tag0 :: tagN.toList).toSet)
             Pointer(thisWidget.convert(rh, getState))
           }
           .value
@@ -264,19 +275,43 @@ object Widget {
         case standard: Raise.Standard =>
           parentRH._handleRaise(standard)
         case update: Raise.UpdateState[S] =>
+          val (usRR, rhRR) = update.reRender.ifForced(w.value, update.childReRenders)
           for {
             rr <- parentRH._handleRaise(
               Raise.UpdateState[S](
                 update.update,
-                false,
+                usRR,
                 RaiseHandler.ReRender.merge(
                   List(
                     reRenders,
-                    update.reRender ?
-                      RaiseHandler.ReRender(w.value) |
-                      update.childReRenders,
+                    rhRR,
                   ),
                 ),
+              ),
+            )
+          } yield rr
+      }
+    case action: Raise.Action[A] =>
+      parentRH._handleRaise(action)
+  }
+
+  def rhCaptureTags[V, S, A](
+      w: Pointer[AppliedWidget[V]],
+      parentRH: RaiseHandler[S, A],
+      tags: Set[String],
+  ): RaiseHandler[S, A] = {
+    case sou: Raise.StandardOrUpdate[S] =>
+      sou match {
+        case standard: Raise.Standard =>
+          parentRH._handleRaise(standard)
+        case update: Raise.UpdateState[S] =>
+          val (usRR, rhRR) = update.reRender.ifTagged(tags, w.value, update.childReRenders)
+          for {
+            rr <- parentRH._handleRaise(
+              Raise.UpdateState[S](
+                update.update,
+                usRR,
+                rhRR,
               ),
             )
           } yield rr

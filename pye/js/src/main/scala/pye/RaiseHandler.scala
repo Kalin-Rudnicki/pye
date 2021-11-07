@@ -115,10 +115,10 @@ object RaiseHandler {
 
   final class RHStateH[S](rh: RaiseHandler[S, _]) {
 
-    def update(update: S => S, reRender: Boolean = true): Unit =
+    def update(update: S => S, reRender: Raise.UpdateState.ReRender = Raise.UpdateState.ReRender.Force): Unit =
       rh.raise(Raise.UpdateState[S](update, reRender))
 
-    def set(newState: S, reRender: Boolean = true): Unit =
+    def set(newState: S, reRender: Raise.UpdateState.ReRender = Raise.UpdateState.ReRender.Force): Unit =
       update(_ => newState, reRender)
 
   }
