@@ -18,13 +18,13 @@ trait multi {
     final case class Or[+A](action: A) extends RemoveOr[A]
   }
 
-  def listW[V, S, A](widget: Widget[V, S, A]): Widget[List[V], List[S], KeyedAction[Int, A]] =
-    new Widget[List[V], List[S], KeyedAction[Int, A]] {
+  def listW[V, S, A](widget: Widget[V, S, A]): Widget[List[V], List[S], KeyedAction[(S, Int), A]] =
+    new Widget[List[V], List[S], KeyedAction[(S, Int), A]] {
 
       override val widgetName: String = s"ListW[${widget.widgetName}]"
 
       override protected def convertImpl(
-          parentRaiseHandler: RaiseHandler[List[S], KeyedAction[Int, A]],
+          parentRaiseHandler: RaiseHandler[List[S], KeyedAction[(S, Int), A]],
           getState: () => List[S],
       ): AppliedWidget[List[V]] =
         new AppliedWidget[List[V]] {
@@ -57,21 +57,21 @@ trait multi {
 
           override protected val getElementsAndUpdateImpl: IO[Widget.ElementT] = {
             def calcForSome(sl: NonEmptyList[S]): IO[(State, Widget.ElementT)] = {
-              def convertRaise(i: Int, r: Raise[S, A]): Raise[List[S], KeyedAction[Int, A]] =
+              def convertRaise(s: S, i: Int, r: Raise[S, A]): Raise[List[S], KeyedAction[(S, Int), A]] =
                 r match {
                   case update: Raise.UpdateState[S] =>
                     update.mapUpdate[List[S]] { updateS => listS =>
                       listS.zipWithIndex.map { case (s2, i2) => (i == i2) ? updateS(s2) | s2 }
                     }
                   case standard: Raise.Standard => standard
-                  case Raise.Action(action)     => Raise.Action(KeyedAction(i, action))
+                  case Raise.Action(action)     => Raise.Action(KeyedAction((s, i), action))
                 }
 
               val aw =
                 sl.zipWithIndex.map {
-                  case (_, i) =>
+                  case (s, i) =>
                     widget.captureReRender.convert(
-                      r => parentRaiseHandler._handleRaise(convertRaise(i, r)),
+                      r => parentRaiseHandler._handleRaise(convertRaise(s, i, r)),
                       // TODO (KR) : Not sure which to use (?)
                       () => getState()(i),
                       // () => s,
@@ -110,15 +110,15 @@ trait multi {
 
     }
 
-  def removableListW[V, S, A](widget: Widget[V, S, RemoveOr[A]]): Widget[List[V], List[S], KeyedAction[Int, A]] =
+  def removableListW[V, S, A](widget: Widget[V, S, RemoveOr[A]]): Widget[List[V], List[S], KeyedAction[(S, Int), A]] =
     listW(widget)
-      .mapAction[KeyedAction[Int, RemoveOr[A]], KeyedAction[Int, A]] {
-        case (_, _, KeyedAction(idx, action)) =>
+      .mapAction[KeyedAction[(S, Int), RemoveOr[A]], KeyedAction[(S, Int), A]] {
+        case (_, _, KeyedAction((s, idx), action)) =>
           action match {
             case RemoveOr.Remove =>
               AsyncIO { Raise.UpdateState[List[S]](_.zipWithIndex.filterNot(_._2 == idx).map(_._1)) :: Nil }
             case RemoveOr.Or(action) =>
-              AsyncIO { Raise.Action(KeyedAction(idx, action)) :: Nil }
+              AsyncIO { Raise.Action(KeyedAction((s, idx), action)) :: Nil }
           }
       }
 
