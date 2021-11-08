@@ -22,7 +22,7 @@ trait Widget[V, S, +A] { thisWidget =>
     new Widget.MapV[V2, S, A] {
       override final type V1 = V
       override final val w: Widget[V1, S, A] = thisWidget
-      override final val f: ?[V1] => ?[V2] = mapF
+      override final val f: (S, ?[V1]) => ?[V2] = (_, v) => mapF(v)
     }
 
   final def mapRaise[A0 >: A, A2](
@@ -124,6 +124,15 @@ trait Widget[V, S, +A] { thisWidget =>
   }
 
   // =====|  |=====
+
+  final def mapValueWithState[V2](
+      mapF: (S, V) => V2,
+  ): Widget[V2, S, A] =
+    new Widget.MapV[V2, S, A] {
+      override final type V1 = V
+      override final val w: Widget[V1, S, A] = thisWidget
+      override final val f: (S, ?[V1]) => ?[V2] = (s, v) => v.map(mapF(s, _))
+    }
 
   final def mapValue[V2](
       mapF: V => V2,
@@ -365,7 +374,7 @@ object Widget {
   sealed trait MapV[V, S, +A] extends Widget[V, S, A] { thisWidget =>
     protected type V1
     protected val w: Widget[V1, S, A]
-    protected val f: ?[V1] => ?[V]
+    protected val f: (S, ?[V1]) => ?[V]
 
     override final val widgetName: String = "MapV"
 
@@ -374,7 +383,7 @@ object Widget {
 
       new AppliedWidget[V] {
         override final val valueImpl: IO[V] =
-          IO.wrapEffect { thisWidget.f(child.value.runSync) }
+          IO.wrapEffect { thisWidget.f(getState(), child.value.runSync) }
         override final val currentImpl: IO[Maybe[Widget.ElementT]] =
           child.current
         override final val getElementsAndUpdateImpl: IO[Widget.ElementT] =
