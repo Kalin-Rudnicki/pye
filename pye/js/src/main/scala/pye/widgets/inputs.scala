@@ -113,7 +113,7 @@ trait inputs {
       decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Maybe[V], String] =
     genInputW[V](
-      inputTag = textarea.asInstanceOf,
+      inputTag = textarea.asInstanceOf[ConcreteHtmlTag[dom.html.Input]],
       filterSubmit = e => e.keyCode == KeyMap.KeyCode.Enter.keyCode && e.ctrlKey,
     )(
       updateOn = updateOn,
