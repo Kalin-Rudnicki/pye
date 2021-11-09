@@ -1,5 +1,6 @@
 package pye
 
+import scala.scalajs.js
 import scala.scalajs.js.URIUtils
 
 import org.scalajs.dom._
@@ -37,6 +38,7 @@ sealed trait Page { page =>
     for {
       env <- getEnv
       stateVar = Var(env)
+      _ = { Page.currentEnv = stateVar }
 
       title = titleF match {
         case Right(f) => f(env)
@@ -156,6 +158,18 @@ object Page {
     val PageCenterBottom = "page-center-bottom"
 
   }
+
+  // =====|  |=====
+
+  private[Page] var currentEnv: Var[Any] = Var.`null`
+
+  @js.annotation.JSExportTopLevel("logEnvState")
+  def logEnvState(): Unit = {
+    for {
+      env <- IO { currentEnv.value }
+      _ <- PyeLogger.log.debug(s"Current state:\n$env")
+    } yield ()
+  }.runSyncOrDump(PyeLogger.some)
 
   // =====|  |=====
 
