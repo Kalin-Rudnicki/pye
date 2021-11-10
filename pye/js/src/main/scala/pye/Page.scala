@@ -3,6 +3,7 @@ package pye
 import scala.scalajs.js
 import scala.scalajs.js.URIUtils
 
+import io.circe._
 import org.scalajs.dom._
 import org.scalajs.dom.{html => H}
 import scalatags.JsDom.all._
@@ -19,6 +20,7 @@ sealed trait Page { page =>
   type A
   val url: String
   val getEnv: AsyncIO[Env]
+  val envEncoder: Encoder[Env]
   val titleF: String \/ (Env => String)
   val widget: Widget[Unit, Env, A]
   val keyMap: KeyMap[Env, A]
@@ -38,7 +40,15 @@ sealed trait Page { page =>
     for {
       env <- getEnv
       stateVar = Var(env)
-      _ = { Page.currentEnv = stateVar }
+      _ <- {
+        Page.currentEnvState.value = Var {
+          new Page.EnvState {
+            override protected type PageEnv = Env
+            override protected val state: Var[PageEnv] = stateVar
+            override protected val encoder: Encoder[PageEnv] = envEncoder
+          }
+        }
+      }.toAsyncIO
 
       title = titleF match {
         case Right(f) => f(env)
@@ -161,15 +171,20 @@ object Page {
 
   // =====|  |=====
 
-  private[Page] var currentEnv: Var[Any] = Var.`null`
+  sealed trait EnvState {
+    protected type PageEnv
+    protected val state: Var[PageEnv]
+    protected val encoder: Encoder[PageEnv]
+
+    final def log(): Unit =
+      console.log(js.JSON.parse(encoder.apply(state.value).toString))
+  }
+
+  private[Page] var currentEnvState: Var[Var[EnvState]] = Var.`null`
 
   @js.annotation.JSExportTopLevel("logEnvState")
-  def logEnvState(): Unit = {
-    for {
-      env <- IO { currentEnv.value }
-      _ <- PyeLogger.log.debug(s"Current state:\n$env")
-    } yield ()
-  }.runSyncOrDump(PyeLogger.some)
+  def logEnvState(): Unit =
+    currentEnvState.value.value.log()
 
   // =====|  |=====
 
@@ -230,13 +245,14 @@ object Page {
         url: String,
     ) {
 
-      def constEnv[Env](envF: => Env): Builder2[Env] =
+      def constEnv[Env](envF: => Env)(implicit envEncoder: Encoder[Env]): Builder2[Env] =
         env(envF.pure[AsyncIO])
 
-      def env[Env](getEnv: AsyncIO[Env]): Builder2[Env] =
+      def env[Env](getEnv: AsyncIO[Env])(implicit envEncoder: Encoder[Env]): Builder2[Env] =
         new Builder2[Env](
           url = url,
           getEnv = getEnv,
+          envEncoder = envEncoder,
         )
 
       def noEnv: Builder2[Unit] =
@@ -247,12 +263,14 @@ object Page {
     final class Builder2[Env] private[builder] (
         url: String,
         getEnv: AsyncIO[Env],
+        envEncoder: Encoder[Env],
     ) {
 
       def constTitle(title: String): Builder3[Env] =
         new Builder3[Env](
           url = url,
           getEnv = getEnv,
+          envEncoder = envEncoder,
           titleF = title.left,
         )
 
@@ -260,6 +278,7 @@ object Page {
         new Builder3[Env](
           url = url,
           getEnv = getEnv,
+          envEncoder = envEncoder,
           titleF = titleF.right,
         )
 
@@ -268,6 +287,7 @@ object Page {
     final class Builder3[Env] private[builder] (
         url: String,
         getEnv: AsyncIO[Env],
+        envEncoder: Encoder[Env],
         titleF: String \/ (Env => String),
     ) {
 
@@ -275,6 +295,7 @@ object Page {
         new Builder4[Env, A](
           url = url,
           getEnv = getEnv,
+          envEncoder = envEncoder,
           titleF = titleF,
           widget = widget,
         )
@@ -287,6 +308,7 @@ object Page {
     final class Builder4[Env, +A] private[builder] (
         url: String,
         getEnv: AsyncIO[Env],
+        envEncoder: Encoder[Env],
         titleF: String \/ (Env => String),
         widget: Widget[Unit, Env, A],
     ) {
@@ -295,6 +317,7 @@ object Page {
         new Builder5[Env, A2](
           url = url,
           getEnv = getEnv,
+          envEncoder = envEncoder,
           titleF = titleF,
           widget = widget,
           keyMap = keyMap,
@@ -308,6 +331,7 @@ object Page {
     final class Builder5[Env, +A] private[builder] (
         url: String,
         getEnv: AsyncIO[Env],
+        envEncoder: Encoder[Env],
         titleF: String \/ (Env => String),
         widget: Widget[Unit, Env, A],
         keyMap: KeyMap[Env, A],
@@ -321,6 +345,7 @@ object Page {
           override type A = A2
           override final val url: String = builder.url
           override final val getEnv: AsyncIO[Env] = builder.getEnv
+          override final val envEncoder: Encoder[Env] = builder.envEncoder
           override final val titleF: \/[String, Env => String] = builder.titleF
           override final val widget: Widget[Unit, Env, A] = builder.widget
           override final val keyMap: KeyMap[Env, A] = builder.keyMap
