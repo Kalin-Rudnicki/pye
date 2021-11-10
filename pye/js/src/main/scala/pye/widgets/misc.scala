@@ -31,7 +31,11 @@ trait misc {
             case sou: Raise.StandardOrUpdate[IS] =>
               sou match {
                 case update: Raise.UpdateState[IS] =>
-                  parentRH._handleRaise(Raise.UpdateState[OS](lens.modify(update.update), update.reRender))
+                  parentRH._handleRaise(
+                    update.mapUpdate { uF =>
+                      lens.modify(uF)
+                    },
+                  )
                 case standard: Raise.Standard =>
                   parentRH._handleRaise(standard)
               }

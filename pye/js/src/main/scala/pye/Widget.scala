@@ -571,7 +571,7 @@ object Widget {
           sou match {
             case update: Raise.UpdateState[S1] =>
               parentRaiseHandler._handleRaise(
-                Raise.UpdateState[S](lens.modify(update.update), update.reRender, update.childReRenders),
+                update.mapUpdate[S] { uF => lens.modify(uF) },
               )
             case standard: Raise.Standard =>
               parentRaiseHandler._handleRaise(standard)
