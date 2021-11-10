@@ -285,20 +285,19 @@ object Widget {
           parentRH._handleRaise(standard)
         case update: Raise.UpdateState[S] =>
           val (usRR, rhRR) = update.reRender.ifForced(w.value, update.childReRenders)
-          for {
-            rr <- parentRH._handleRaise(
-              Raise.UpdateState[S](
-                update.update,
-                usRR,
-                RaiseHandler.ReRender.merge(
-                  List(
-                    reRenders,
-                    rhRR,
-                  ),
+
+          parentRH._handleRaise(
+            Raise.UpdateState[S](
+              update.update,
+              usRR,
+              RaiseHandler.ReRender.merge(
+                List(
+                  reRenders,
+                  rhRR,
                 ),
               ),
-            )
-          } yield rr
+            ),
+          )
       }
     case action: Raise.Action[A] =>
       parentRH._handleRaise(action)
@@ -315,15 +314,16 @@ object Widget {
           parentRH._handleRaise(standard)
         case update: Raise.UpdateState[S] =>
           val (usRR, rhRR) = update.reRender.ifTagged(tags, w.value, update.childReRenders)
-          for {
-            rr <- parentRH._handleRaise(
-              Raise.UpdateState[S](
-                update.update,
-                usRR,
-                rhRR,
-              ),
-            )
-          } yield rr
+
+          PyeLogger.unsafeLog.detailed(s"<Tag>\n${update.childReRenders}\n$rhRR")
+
+          parentRH._handleRaise(
+            Raise.UpdateState[S](
+              update.update,
+              usRR,
+              rhRR,
+            ),
+          )
       }
     case action: Raise.Action[A] =>
       parentRH._handleRaise(action)
