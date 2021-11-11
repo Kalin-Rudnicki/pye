@@ -336,7 +336,7 @@ object Widget {
         case update: Raise.UpdateState[S] =>
           val (usRR, rhRR) = update.reRender.ifTagged(tags, w.value, update.childReRenders)
 
-          PyeLogger.unsafeLog.detailed(s"<Tag>\n${update.childReRenders}\n$rhRR")
+          PyeLogger.unsafeLog.debug(s"<Tag: ${tags.mkString(", ")}>\n${update.childReRenders}\n$rhRR", "raise")
 
           parentRH._handleRaise(
             Raise.UpdateState[S](
