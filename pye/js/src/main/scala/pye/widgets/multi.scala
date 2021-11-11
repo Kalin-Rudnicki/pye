@@ -116,7 +116,7 @@ trait multi {
         case (_, _, KeyedAction((s, idx), action)) =>
           action match {
             case RemoveOr.Remove =>
-              AsyncIO { Raise.UpdateState[List[S]](_.zipWithIndex.filterNot(_._2 == idx).map(_._1)) :: Nil }
+              AsyncIO { Raise.updateState[List[S]](_.zipWithIndex.filterNot(_._2 == idx).map(_._1)) :: Nil }
             case RemoveOr.Or(action) =>
               AsyncIO { Raise.Action(KeyedAction((s, idx), action)) :: Nil }
           }

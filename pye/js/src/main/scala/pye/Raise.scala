@@ -22,8 +22,8 @@ object Raise {
 
   final case class UpdateState[S](
       update: S => S,
-      reRender: UpdateState.ReRender = UpdateState.ReRender.Force,
-      childReRenders: RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
+      reRender: UpdateState.ReRender, // = UpdateState.ReRender.Force,
+      childReRenders: RaiseHandler.ReRender, // = RaiseHandler.ReRender.Nothing,
   ) extends StandardOrUpdate[S] {
 
     def mapUpdate[S2](f: (S => S) => (S2 => S2)): UpdateState[S2] =
@@ -33,12 +33,14 @@ object Raise {
         childReRenders = childReRenders,
       )
 
+    def propagate: UpdateState[S] =
+      withReRender(UpdateState.ReRender.Propagate)
+
     def tagged(tag: String): UpdateState[S] =
-      UpdateState(
-        update,
-        UpdateState.ReRender.Tag(tag),
-        childReRenders,
-      )
+      withReRender(UpdateState.ReRender.Tag(tag))
+
+    def withReRender(reRender: UpdateState.ReRender): UpdateState[S] =
+      UpdateState(update, reRender, childReRenders)
 
   }
   object UpdateState {
@@ -78,6 +80,12 @@ object Raise {
     }
 
   }
+
+  def setState[S](s: => S): UpdateState[S] =
+    updateState[S] { _ => s }
+
+  def updateState[S](f: S => S): UpdateState[S] =
+    UpdateState[S](f, UpdateState.ReRender.Force, RaiseHandler.ReRender.Nothing)
 
   sealed trait Standard extends StandardOrUpdate[Nothing]
   final case class DisplayMessage(

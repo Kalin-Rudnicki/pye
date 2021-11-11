@@ -100,14 +100,35 @@ trait Widget[V, S, +A] { thisWidget =>
 
   def captureTags(tag0: String, tagN: String*): Widget[V, S, A] =
     new Widget[V, S, A] {
-      override val widgetName: String = s"${thisWidget.widgetName}-captureTags"
-      override protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
+      override final val widgetName: String = s"${thisWidget.widgetName}-captureTags"
+      override final protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
         Pointer
           .withSelf[AppliedWidget[V]] { ptr =>
             val rh: RaiseHandler[S, A] = Widget.rhCaptureTags(ptr, parentRaiseHandler, (tag0 :: tagN.toList).toSet)
             Pointer(thisWidget.convert(rh, getState))
           }
           .value
+    }
+
+  def logRaises(label: String): Widget[V, S, A] =
+    new Widget[V, S, A] {
+      override final val widgetName: String = "logRaises"
+      override protected def convertImpl(parentRaiseHandler: RaiseHandler[S, A], getState: () => S): AppliedWidget[V] =
+        new AppliedWidget[V] {
+          private val child: AppliedWidget[V] =
+            thisWidget.convert(
+              r =>
+                for {
+                  _ <- PyeLogger.log.debug(s"logRaises [$label]", "raise").toAsyncIO
+                  res <- parentRaiseHandler._handleRaise(r)
+                } yield res,
+              getState,
+            )
+
+          override final protected val valueImpl: IO[V] = child.value
+          override final protected val currentImpl: IO[Maybe[Widget.ElementT]] = child.current
+          override final protected val getElementsAndUpdateImpl: IO[pye.Widget.ElementT] = child.getElementsAndUpdate
+        }
     }
 
   // =====|  |=====

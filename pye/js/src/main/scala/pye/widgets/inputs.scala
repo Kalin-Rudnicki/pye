@@ -40,7 +40,7 @@ trait inputs {
         def updateStateRaise(): Maybe[Raise.UpdateState[String]] =
           (_input.value != lastRaised).maybe {
             lastRaised = _input.value
-            Raise.UpdateState[String](_ => _input.value, reRender = Raise.UpdateState.ReRender.Propagate)
+            Raise.setState[String](_input.value).propagate
           }
 
         def updateState(): Unit =
@@ -330,9 +330,9 @@ trait inputs {
                 onclick := { (e: MouseEvent) =>
                   if (e.ctrlKey) {
                     if (allowUnset)
-                      rh.raise(Raise.UpdateState[Maybe[T]](_ => None))
+                      rh.raise(Raise.setState[Maybe[T]](None))
                   } else
-                    rh.raise(Raise.UpdateState[Maybe[T]](_ => t.some))
+                    rh.raise(Raise.setState[Maybe[T]](t.some))
                 },
               )(_label)(elementDecorator)
           }

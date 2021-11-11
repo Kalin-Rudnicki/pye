@@ -185,8 +185,10 @@ trait misc {
       AsyncIO {
         List(
           a match {
-            case ModalAction.Close         => Raise.UpdateState[Maybe[S]](_ => None)
-            case ModalAction.Action(raise) => Raise.Action(raise)
+            case ModalAction.Close =>
+              Raise.updateState[Maybe[S]](_ => None)
+            case ModalAction.Action(raise) =>
+              Raise.Action(raise)
           },
         )
       }
