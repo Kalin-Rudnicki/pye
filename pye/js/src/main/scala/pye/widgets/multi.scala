@@ -11,6 +11,10 @@ trait multi {
       key: K,
       action: A,
   )
+  object KeyedAction {
+    type List[S, A] = KeyedAction[(S, Int), A]
+    type ListU[S] = KeyedAction.List[S, Unit]
+  }
 
   sealed trait RemoveOr[+A]
   object RemoveOr {
