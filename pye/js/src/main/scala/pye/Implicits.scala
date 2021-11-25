@@ -57,6 +57,17 @@ trait Implicits {
 
   }
 
+  implicit class KeyedActionWidgetOps[V, S, KA_S, KA_K, KA_A](
+      widget: Widget[V, S, widgets.all.KeyedAction[(KA_S, KA_K), KA_A]],
+  ) {
+
+    def stripKeyedAction: Widget[V, S, KA_A] =
+      widget.mapAction[widgets.all.KeyedAction[(KA_S, KA_K), KA_A], KA_A] { (_, _, a) =>
+        AsyncIO { Raise.Action(a.action) :: Nil }
+      }
+
+  }
+
   implicit class AsyncIOOps[T](asyncIO: AsyncIO[T]) {
 
     def runAndShowErrors(onComplete: T => Unit = (_: T) => ()): Unit =

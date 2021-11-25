@@ -194,5 +194,11 @@ trait misc {
       }
     }
 
+  def autoReloadW[V, S, A](widget: Widget[V, S, A], endpoint: AsyncIO[S]): Widget[V, S, A] = {
+
+    // TODO (KR) :
+    ???
+  }
+
 }
 object misc extends misc
