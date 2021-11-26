@@ -135,7 +135,7 @@ object Raise {
 
     def fromThrowable(throwable: Throwable): DisplayMessage =
       global.error(
-        throwable.toString,
+        Maybe(throwable.getMessage).getOrElse(throwable.toString),
         decorator = Seq(
           oncontextmenu := { (e: Event) =>
             e.preventDefault()
