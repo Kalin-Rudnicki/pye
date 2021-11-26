@@ -33,7 +33,7 @@ trait Implicits {
           widgets.forms.submitButton(submitButtonLabel),
         )
         .mapValue(_._1)
-        .mapAction { (_, v, a: SubmitOr[O]) =>
+        .covariantMapAction { (_, v, a: SubmitOr[O]) =>
           a match {
             case CommonRaise.Submit =>
               for {
@@ -62,7 +62,7 @@ trait Implicits {
   ) {
 
     def stripKeyedAction: Widget[V, S, KA_A] =
-      widget.mapAction[widgets.all.KeyedAction[(KA_S, KA_K), KA_A], KA_A] { (_, _, a) =>
+      widget.covariantMapAction[widgets.all.KeyedAction[(KA_S, KA_K), KA_A], KA_A] { (_, _, a) =>
         AsyncIO { Raise.Action(a.action) :: Nil }
       }
 

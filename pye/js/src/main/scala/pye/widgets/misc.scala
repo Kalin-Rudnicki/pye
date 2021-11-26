@@ -144,7 +144,7 @@ trait misc {
   ): Widget[Maybe[V], Maybe[S], A] =
     maybeW {
       widget
-        .mapAction[A, ModalAction[A]] { (_, _, a) => AsyncIO { List(Raise.Action(ModalAction.Action(a))) } }
+        .covariantMapAction[A, ModalAction[A]] { (_, _, a) => AsyncIO { List(Raise.Action(ModalAction.Action(a))) } }
         .rWrapped[ModalAction[A]] { rh => elems =>
           div(
             PyeS.`pye:modal`,
@@ -181,7 +181,7 @@ trait misc {
             )(containerDecorator),
           )(modalDecorator).render
         }
-    }.mapAction[ModalAction[A], A] { (_, _, a) =>
+    }.covariantMapAction[ModalAction[A], A] { (_, _, a) =>
       AsyncIO {
         List(
           a match {

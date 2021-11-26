@@ -116,7 +116,7 @@ trait multi {
 
   def removableListW[V, S, A](widget: Widget[V, S, RemoveOr[A]]): Widget[List[V], List[S], KeyedAction[(S, Int), A]] =
     listW(widget)
-      .mapAction[KeyedAction[(S, Int), RemoveOr[A]], KeyedAction[(S, Int), A]] {
+      .covariantMapAction[KeyedAction[(S, Int), RemoveOr[A]], KeyedAction[(S, Int), A]] {
         case (_, _, KeyedAction((s, idx), action)) =>
           action match {
             case RemoveOr.Remove =>
