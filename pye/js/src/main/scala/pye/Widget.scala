@@ -126,7 +126,7 @@ trait Widget[V, S, +A] {
   // =====| ReRender |=====
 
   final def captureReRender: Widget[V, S, A] = captureReRender(RaiseHandler.ReRender.Nothing)
-  final def captureReRender(reRenders: RaiseHandler.ReRender): Widget[V, S, A] =
+  final def captureReRender(reRenders: => RaiseHandler.ReRender): Widget[V, S, A] =
     WidgetImpls.widgets.captureReRender(this, reRenders)
 
   final def captureTags(tag0: String, tagN: String*): Widget[V, S, A] =
