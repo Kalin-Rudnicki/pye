@@ -11,6 +11,7 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import klib.fp.utils._
 import klib.utils._
+import pye.CommonRaise.SubmitOr
 import pye.Implicits._
 import pye.widgets.modifiers.PyeS
 
@@ -522,40 +523,56 @@ object Widget {
     //           : Scala is having an un-acceptable level type inference here
     implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
 
-      def toFormMapO[A](
-          endpoint: V => AsyncIO[List[Raise[S, A]]],
-          mapO: O => AsyncIO[List[Raise[S, A]]],
+      def addSubmitButton(
           submitButtonLabel: String = "Submit",
-      ): Widget[V, S, A] =
+          submitButtonDecorator: Modifier = Seq.empty[Modifier],
+      ): Widget[V, S, CommonRaise.SubmitOr[O]] =
         Widget
           .constrainSubmitOr[S, O]
           .join(
             widget,
-            Widget.builder.element(br.render),
-            widgets.forms.submitButton(submitButtonLabel),
+            br.asWidget,
+            widgets.forms.submitButton(submitButtonLabel, submitButtonDecorator),
           )
           .mapValue(_._1)
-          .covariantMapAction { (_, v, a: CommonRaise.SubmitOr[O]) =>
-            a match {
-              case CommonRaise.Submit =>
-                for {
-                  aliveV <- AsyncIO.wrapEffect(v)
-                  endpointRes <- endpoint(aliveV)
-                } yield endpointRes
-              case CommonRaise.SubmitOr.Or(or) =>
-                mapO(or)
-            }
-          }
 
-      def toForm[A >: O](
-          endpoint: V => AsyncIO[List[Raise[S, A]]],
-          submitButtonLabel: String = "Submit",
+      def handleSubmit[A >: O](
+          onSubmit: AsyncIO[List[Raise[S, A]]],
       ): Widget[V, S, A] =
-        toFormMapO(
-          endpoint = endpoint,
-          submitButtonLabel = submitButtonLabel,
-          mapO = o => AsyncIO(Raise.Action(o) :: Nil),
-        )
+        widget.mapAction {
+          case CommonRaise.Submit          => onSubmit
+          case CommonRaise.SubmitOr.Or(or) => AsyncIO { Raise.Action(or) :: Nil }
+        }
+
+      def sHandleSubmit[A >: O](
+          onSubmit: S => AsyncIO[List[Raise[S, A]]],
+      ): Widget[V, S, A] =
+        widget.sMapAction { (s, a) =>
+          a match {
+            case CommonRaise.Submit          => onSubmit(s)
+            case CommonRaise.SubmitOr.Or(or) => AsyncIO { Raise.Action(or) :: Nil }
+          }
+        }
+
+      def vHandleSubmit[A >: O](
+          onSubmit: V => AsyncIO[List[Raise[S, A]]],
+      ): Widget[V, S, A] =
+        widget.vMapAction { (v, a) =>
+          a match {
+            case CommonRaise.Submit          => onSubmit(v)
+            case CommonRaise.SubmitOr.Or(or) => AsyncIO { Raise.Action(or) :: Nil }
+          }
+        }
+
+      def svHandleSubmit[A >: O](
+          onSubmit: (S, V) => AsyncIO[List[Raise[S, A]]],
+      ): Widget[V, S, A] =
+        widget.svMapAction { (s, v, a) =>
+          a match {
+            case CommonRaise.Submit          => onSubmit(s, v)
+            case CommonRaise.SubmitOr.Or(or) => AsyncIO { Raise.Action(or) :: Nil }
+          }
+        }
 
     }
 
