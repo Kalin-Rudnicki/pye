@@ -7,14 +7,11 @@ import pye._
 
 trait multi {
 
-  final case class KeyedAction[+K, +A](
+  final case class KeyedAction[+S, +K, +A](
+      state: S,
       key: K,
       action: A,
   )
-  object KeyedAction {
-    type List[S, A] = KeyedAction[(S, Int), A]
-    type ListU[S] = KeyedAction.List[S, Unit]
-  }
 
   sealed trait RemoveOr[+A]
   object RemoveOr {
@@ -22,13 +19,16 @@ trait multi {
     final case class Or[+A](action: A) extends RemoveOr[A]
   }
 
-  def listW[V, S, A](widget: Widget[V, S, A]): Widget[List[V], List[S], KeyedAction[(S, Int), A]] =
-    new Widget[List[V], List[S], KeyedAction[(S, Int), A]] {
+  private def genListW[WA, V, S, A](
+      widget: Widget[V, S, WA],
+      convertRaise: (S, Int, WA) => A,
+  ): Widget[List[V], List[S], A] =
+    new Widget[List[V], List[S], A] {
 
       override val widgetName: String = s"ListW[${widget.widgetName}]"
 
       override protected def convertImpl(
-          parentRaiseHandler: RaiseHandler[List[S], KeyedAction[(S, Int), A]],
+          parentRaiseHandler: RaiseHandler[List[S], A],
           getState: () => List[S],
       ): AppliedWidget[List[V]] =
         new AppliedWidget[List[V]] {
@@ -61,21 +61,21 @@ trait multi {
 
           override protected val getElementsAndUpdateImpl: IO[Widget.ElementT] = {
             def calcForSome(sl: NonEmptyList[S]): IO[(State, Widget.ElementT)] = {
-              def convertRaise(s: S, i: Int, r: Raise[S, A]): Raise[List[S], KeyedAction[(S, Int), A]] =
+              def callConvertRaise(s: S, i: Int, r: Raise[S, WA]): Raise[List[S], A] =
                 r match {
                   case update: Raise.UpdateState[S] =>
                     update.mapUpdate[List[S]] { updateS => listS =>
                       listS.zipWithIndex.map { case (s2, i2) => (i == i2) ? updateS(s2) | s2 }
                     }
                   case standard: Raise.Standard => standard
-                  case Raise.Action(action)     => Raise.Action(KeyedAction((s, i), action))
+                  case Raise.Action(action)     => Raise.Action(convertRaise(s, i, action))
                 }
 
               val aw =
                 sl.zipWithIndex.map {
                   case (s, i) =>
                     widget.captureReRender.convert(
-                      r => parentRaiseHandler._handleRaise(convertRaise(s, i, r)),
+                      r => parentRaiseHandler._handleRaise(callConvertRaise(s, i, r)),
                       // TODO (KR) : Not sure which to use (?)
                       () => getState()(i),
                       // () => s,
@@ -111,18 +111,29 @@ trait multi {
           }
 
         }
-
     }
 
-  def removableListW[V, S, A](widget: Widget[V, S, RemoveOr[A]]): Widget[List[V], List[S], KeyedAction[(S, Int), A]] =
-    listW(widget)
-      .covariantMapAction[KeyedAction[(S, Int), RemoveOr[A]], KeyedAction[(S, Int), A]] {
-        case (_, _, KeyedAction((s, idx), action)) =>
+  def listW[V, S, A](widget: Widget[V, S, A]): Widget[List[V], List[S], A] =
+    genListW[A, V, S, A](
+      widget,
+      (_, _, a) => a,
+    )
+
+  def keyedListW[V, S, A](widget: Widget[V, S, A]): Widget[List[V], List[S], KeyedAction[S, Int, A]] =
+    genListW[A, V, S, KeyedAction[S, Int, A]](
+      widget,
+      (s, i, a) => KeyedAction(s, i, a),
+    )
+
+  def keyedRemovableListW[V, S, A](widget: Widget[V, S, RemoveOr[A]]): Widget[List[V], List[S], KeyedAction[S, Int, A]] =
+    keyedListW(widget)
+      .covariantMapAction[KeyedAction[S, Int, RemoveOr[A]], KeyedAction[S, Int, A]] {
+        case (_, _, KeyedAction(s, idx, action)) =>
           action match {
             case RemoveOr.Remove =>
               AsyncIO { Raise.updateState[List[S]](_.zipWithIndex.filterNot(_._2 == idx).map(_._1)) :: Nil }
             case RemoveOr.Or(action) =>
-              AsyncIO { Raise.Action(KeyedAction((s, idx), action)) :: Nil }
+              AsyncIO { Raise.Action(KeyedAction(s, idx, action)) :: Nil }
           }
       }
 

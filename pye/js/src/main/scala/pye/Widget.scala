@@ -517,6 +517,11 @@ object Widget {
       def svHandleAction_?(mapF: (S, ?[V], A) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
         svMapAction_?[Nothing](mapF)
 
+      // --- simpleMapAction ---
+
+      def simpleMapAction[A2](mapF: A => A2): Widget[V, S, A2] =
+        mapAction { a => AsyncIO { Raise.Action(mapF(a)) :: Nil } }
+
     }
 
     // TODO (KR) : Make builder.
@@ -572,17 +577,6 @@ object Widget {
             case CommonRaise.Submit          => onSubmit(s, v)
             case CommonRaise.SubmitOr.Or(or) => AsyncIO { Raise.Action(or) :: Nil }
           }
-        }
-
-    }
-
-    implicit class KeyedActionWidgetOps[V, S, KA_S, KA_K, KA_A](
-        widget: Widget[V, S, widgets.all.KeyedAction[(KA_S, KA_K), KA_A]],
-    ) {
-
-      def stripKeyedAction: Widget[V, S, KA_A] =
-        widget.covariantMapAction[widgets.all.KeyedAction[(KA_S, KA_K), KA_A], KA_A] { (_, _, a) =>
-          AsyncIO { Raise.Action(a.action) :: Nil }
         }
 
     }
