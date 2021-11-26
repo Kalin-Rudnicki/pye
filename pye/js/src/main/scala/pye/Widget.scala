@@ -14,7 +14,7 @@ import klib.utils._
 import pye.Implicits._
 import pye.widgets.modifiers.PyeS
 
-trait Widget[V, S, +A] { thisWidget =>
+trait Widget[V, S, +A] {
 
   // =====| Implement |=====
 
@@ -47,8 +47,6 @@ trait Widget[V, S, +A] { thisWidget =>
 
   final def flatMapBefore[V2, A0 >: A](mapF: V => Widget[V2, S, A0]): Widget[V2, S, A0] =
     WidgetImpls.widgets.flatMap(this, mapF, false)
-
-  // --- Helpers ---
 
   // =====| Mapping |=====
 
@@ -133,6 +131,108 @@ trait Widget[V, S, +A] { thisWidget =>
   final def captureTags(tag0: String, tagN: String*): Widget[V, S, A] =
     WidgetImpls.widgets.captureTags(this, (tag0 :: tagN.toList).toSet)
 
+  // --- myUpdatesReRenderYou ---
+
+  def myUpdatesReRenderYou[A0 >: A, V2](
+      w: Widget[V2, S, A0],
+      youAppearAfterMe: Boolean,
+  ): Widget[Unit, S, A0] =
+    vMyUpdatesReRenderYou[A0, V2, Unit](w, (_, _) => (), youAppearAfterMe)
+
+  def tMyUpdatesReRenderYou[A0 >: A, V2](
+      w: Widget[V2, S, A0],
+      youAppearAfterMe: Boolean,
+  ): Widget[(V, V2), S, A0] =
+    vMyUpdatesReRenderYou[A0, V2, (V, V2)](w, (_, _), youAppearAfterMe)
+
+  def vMyUpdatesReRenderYou[A0 >: A, V2, V3](
+      w: Widget[V2, S, A0],
+      mapV: (V, V2) => V3,
+      youAppearAfterMe: Boolean,
+  ): Widget[V3, S, A0] =
+    WidgetImpls.widgets.joinWithReRenderLogic[V, V2, V3, S, A0](
+      w1 = this,
+      w2 = w,
+      w1ReRendersW2 = true,
+      w2ReRendersW1 = false,
+      w1BeforeW2 = youAppearAfterMe,
+      mapV = mapV,
+    )
+
+  def >+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    myUpdatesReRenderYou(w, true)
+
+  def >+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    myUpdatesReRenderYou(w, false)
+
+  // --- yourUpdatesReRenderMe ---
+
+  def yourUpdatesReRenderMe[A0 >: A, V2](
+      w: Widget[V2, S, A0],
+      youAppearAfterMe: Boolean,
+  ): Widget[Unit, S, A0] =
+    vMyUpdatesReRenderYou[A0, V2, Unit](w, (_, _) => (), youAppearAfterMe)
+
+  def tYourUpdatesReRenderMe[A0 >: A, V2](
+      w: Widget[V2, S, A0],
+      youAppearAfterMe: Boolean,
+  ): Widget[(V, V2), S, A0] =
+    vYourUpdatesReRenderMe[A0, V2, (V, V2)](w, (_, _), youAppearAfterMe)
+
+  def vYourUpdatesReRenderMe[A0 >: A, V2, V3](
+      w: Widget[V2, S, A0],
+      mapV: (V, V2) => V3,
+      youAppearAfterMe: Boolean,
+  ): Widget[V3, S, A0] =
+    WidgetImpls.widgets.joinWithReRenderLogic[V, V2, V3, S, A0](
+      w1 = this,
+      w2 = w,
+      w1ReRendersW2 = false,
+      w2ReRendersW1 = true,
+      w1BeforeW2 = youAppearAfterMe,
+      mapV = mapV,
+    )
+
+  def <+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    yourUpdatesReRenderMe(w, true)
+
+  def <+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    yourUpdatesReRenderMe(w, false)
+
+  // --- ourUpdatesReRenderEachOther ---
+
+  def ourUpdatesReRenderEachOther[A0 >: A, V2](
+      w: Widget[V2, S, A0],
+      youAppearAfterMe: Boolean,
+  ): Widget[Unit, S, A0] =
+    vOurUpdatesReRenderEachOther[A0, V2, Unit](w, (_, _) => (), youAppearAfterMe)
+
+  def tOurUpdatesReRenderEachOther[A0 >: A, V2](
+      w: Widget[V2, S, A0],
+      youAppearAfterMe: Boolean,
+  ): Widget[(V, V2), S, A0] =
+    vOurUpdatesReRenderEachOther[A0, V2, (V, V2)](w, (_, _), youAppearAfterMe)
+
+  def vOurUpdatesReRenderEachOther[A0 >: A, V2, V3](
+      w: Widget[V2, S, A0],
+      mapV: (V, V2) => V3,
+      youAppearAfterMe: Boolean,
+  ): Widget[V3, S, A0] =
+    WidgetImpls.widgets.joinWithReRenderLogic[V, V2, V3, S, A0](
+      w1 = this,
+      w2 = w,
+      w1ReRendersW2 = true,
+      w2ReRendersW1 = true,
+      w1BeforeW2 = youAppearAfterMe,
+      mapV = mapV,
+    )
+
+  def <>+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    ourUpdatesReRenderEachOther(w, true)
+
+  def <>+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    ourUpdatesReRenderEachOther(w, false)
+
   // =====| Misc |=====
 
   final def logRaises(label: String): Widget[V, S, A] =
@@ -142,7 +242,8 @@ trait Widget[V, S, +A] { thisWidget =>
       labelText: String,
       decorator: Modifier = Seq.empty[Modifier],
   ): Widget[V, S, A] =
-    ado[Widget.Projection[S, A]#P]
+    Widget
+      .constrainA[S, A]
       .join(
         Widget.builder.element[S, A] {
           label(PyeS.`pye:label`)(labelText)(decorator).render
@@ -177,6 +278,20 @@ object Widget {
 
   type Projection[S, A] = { type P[V] = Widget[V, S, A] }
   type ProjectionA[S] = Projection[S, Nothing]
+
+  // =====| Type Constraints |=====
+
+  def constrain[S]: ado[Widget.Projection[S, Nothing]#P] =
+    ado[Widget.Projection[S, Nothing]#P]
+
+  def constrainA[S, A]: ado[Widget.Projection[S, A]#P] =
+    ado[Widget.Projection[S, A]#P]
+
+  def constrainSubmit[S]: ado[Widget.Projection[S, CommonRaise.Submit.type]#P] =
+    constrainA[S, CommonRaise.Submit.type]
+
+  def constrainSubmitOr[S, O]: ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P] =
+    constrainA[S, CommonRaise.SubmitOr[O]]
 
   // =====| Builder |=====
 
@@ -412,7 +527,8 @@ object Widget {
           mapO: O => AsyncIO[List[Raise[S, A]]],
           submitButtonLabel: String = "Submit",
       ): Widget[V, S, A] =
-        ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P]
+        Widget
+          .constrainSubmitOr[S, O]
           .join(
             widget,
             Widget.builder.element(br.render),
@@ -446,46 +562,6 @@ object Widget {
     implicit class KeyedActionWidgetOps[V, S, KA_S, KA_K, KA_A](
         widget: Widget[V, S, widgets.all.KeyedAction[(KA_S, KA_K), KA_A]],
     ) {
-
-      // TODO (KR) : Make builder.
-      //           : Scala is having an un-acceptable level type inference here
-      implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
-
-        def toFormMapO[A](
-            endpoint: V => AsyncIO[List[Raise[S, A]]],
-            mapO: O => AsyncIO[List[Raise[S, A]]],
-            submitButtonLabel: String = "Submit",
-        ): Widget[V, S, A] =
-          ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P]
-            .join(
-              widget,
-              Widget.builder.element(br.render),
-              widgets.forms.submitButton(submitButtonLabel),
-            )
-            .mapValue(_._1)
-            .covariantMapAction { (_, v, a: CommonRaise.SubmitOr[O]) =>
-              a match {
-                case CommonRaise.Submit =>
-                  for {
-                    aliveV <- AsyncIO.wrapEffect(v)
-                    endpointRes <- endpoint(aliveV)
-                  } yield endpointRes
-                case CommonRaise.SubmitOr.Or(or) =>
-                  mapO(or)
-              }
-            }
-
-        def toForm[A >: O](
-            endpoint: V => AsyncIO[List[Raise[S, A]]],
-            submitButtonLabel: String = "Submit",
-        ): Widget[V, S, A] =
-          toFormMapO(
-            endpoint = endpoint,
-            submitButtonLabel = submitButtonLabel,
-            mapO = o => AsyncIO(Raise.Action(o) :: Nil),
-          )
-
-      }
 
       def stripKeyedAction: Widget[V, S, KA_A] =
         widget.covariantMapAction[widgets.all.KeyedAction[(KA_S, KA_K), KA_A], KA_A] { (_, _, a) =>

@@ -411,6 +411,56 @@ private[pye] object WidgetImpls {
             .value
       }
 
+    def joinWithReRenderLogic[V1, V2, V, S, A](
+        w1: Widget[V1, S, A],
+        w2: Widget[V2, S, A],
+        w1ReRendersW2: Boolean,
+        w2ReRendersW1: Boolean,
+        w1BeforeW2: Boolean,
+        mapV: (V1, V2) => V,
+    ): Widget[V, S, A] =
+      new Widget[V, S, A] {
+
+        override final val widgetName: String = "JoinWithReRenderLogic"
+
+        override protected def convertImpl(
+            parentRaiseHandler: RaiseHandler[S, A],
+            getState: () => S,
+        ): AppliedWidget[V] = {
+          def buildAppliedWidget[WV, AWV](
+              w: Widget[WV, S, A],
+              aw: AppliedWidget[AWV],
+              wReRendersAW: Boolean,
+          ): AppliedWidget[WV] =
+            w.captureReRender(wReRendersAW ? RaiseHandler.ReRender(aw) | RaiseHandler.ReRender.Nothing)
+              .convert(parentRaiseHandler, getState)
+
+          lazy val aW1: AppliedWidget[V1] = buildAppliedWidget(w1, aW2, w1ReRendersW2)
+          lazy val aW2: AppliedWidget[V2] = buildAppliedWidget(w2, aW1, w2ReRendersW1)
+
+          new AppliedWidget[V] {
+            override protected val valueImpl: IO[V] =
+              ado[IO].join(aW1.value, aW2.value).map(mapV.tupled)
+
+            override protected val currentImpl: IO[Maybe[Widget.ElementT]] =
+              ado[IO]
+                .join(aW1.current, aW2.current)
+                .flatMap {
+                  case (Some(mE1), Some(mE2)) => (w1BeforeW2 ? (mE1 ::: mE2) | (mE2 ::: mE1)).some.pure[IO]
+                  case (None, None)           => None.pure[IO]
+                  case _                      => IO.error(Message("Current in bad state"))
+                }
+
+            override protected val getElementsAndUpdateImpl: IO[Widget.ElementT] =
+              ado[IO]
+                .join(aW1.getElementsAndUpdate, aW2.getElementsAndUpdate)
+                .flatMap { case (e1, e2) => (w1BeforeW2 ? (e1 ::: e2) | (e2 ::: e1)).pure[IO] }
+
+          }
+        }
+
+      }
+
     // =====| Misc |=====
 
     def logRaises[V, S, A](
