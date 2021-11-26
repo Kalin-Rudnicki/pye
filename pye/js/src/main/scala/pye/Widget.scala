@@ -293,7 +293,213 @@ object Widget {
     }
   }
 
+  // =====| Implicits |=====
+
+  trait Implicits {
+
+    implicit class InvariantWidgetOps[V, S, A](widget: Widget[V, S, A]) {
+
+      // =====| Mapping Actions |=====
+
+      // --- mapRaise ---
+
+      def mapRaise[A2](mapF: Raise[S, A] => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapRaise[A, A2]((_, _, a) => mapF(a))
+
+      def sMapRaise[A2](mapF: (S, Raise[S, A]) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapRaise[A, A2]((s, _, a) => mapF(s, a))
+
+      def vMapRaise[A2](mapF: (V, Raise[S, A]) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapRaise[A, A2] { (_, v, a) =>
+          for {
+            v <- v.toAsyncIO
+            r <- mapF(v, a)
+          } yield r
+        }
+
+      def svMapRaise[A2](mapF: (S, V, Raise[S, A]) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapRaise[A, A2] { (s, v, a) =>
+          for {
+            v <- v.toAsyncIO
+            r <- mapF(s, v, a)
+          } yield r
+        }
+
+      def vMapRaise_?[A2](mapF: (?[V], Raise[S, A]) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapRaise[A, A2]((_, v, a) => mapF(v, a))
+
+      def svMapRaise_?[A2](mapF: (S, ?[V], Raise[S, A]) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapRaise[A, A2](mapF)
+
+      // --- handleRaise ---
+
+      def handleRaise(mapF: Raise[S, A] => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        mapRaise[Nothing](mapF)
+
+      def sHandleRaise(mapF: (S, Raise[S, A]) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        sMapRaise[Nothing](mapF)
+
+      def vHandleRaise(mapF: (V, Raise[S, A]) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        vMapRaise[Nothing](mapF)
+
+      def svHandleRaise(mapF: (S, V, Raise[S, A]) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        svMapRaise[Nothing](mapF)
+
+      def vHandleRaise_?(mapF: (?[V], Raise[S, A]) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        vMapRaise_?[Nothing](mapF)
+
+      def svHandleRaise_?(mapF: (S, ?[V], Raise[S, A]) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        svMapRaise_?[Nothing](mapF)
+
+      // --- mapAction ---
+
+      def mapAction[A2](mapF: A => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapAction[A, A2]((_, _, a) => mapF(a))
+
+      def sMapAction[A2](mapF: (S, A) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapAction[A, A2]((s, _, a) => mapF(s, a))
+
+      def vMapAction[A2](mapF: (V, A) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapAction[A, A2] { (_, v, a) =>
+          for {
+            v <- v.toAsyncIO
+            r <- mapF(v, a)
+          } yield r
+        }
+
+      def svMapAction[A2](mapF: (S, V, A) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapAction[A, A2] { (s, v, a) =>
+          for {
+            v <- v.toAsyncIO
+            r <- mapF(s, v, a)
+          } yield r
+        }
+
+      def vMapAction_?[A2](mapF: (?[V], A) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapAction[A, A2]((_, v, a) => mapF(v, a))
+
+      def svMapAction_?[A2](mapF: (S, ?[V], A) => AsyncIO[List[Raise[S, A2]]]): Widget[V, S, A2] =
+        widget.covariantMapAction[A, A2](mapF)
+
+      // --- handleAction ---
+
+      def handleAction(mapF: A => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        mapAction[Nothing](mapF)
+
+      def sHandleAction(mapF: (S, A) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        sMapAction[Nothing](mapF)
+
+      def vHandleAction(mapF: (V, A) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        vMapAction[Nothing](mapF)
+
+      def svHandleAction(mapF: (S, V, A) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        svMapAction[Nothing](mapF)
+
+      def vHandleAction_?(mapF: (?[V], A) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        vMapAction_?[Nothing](mapF)
+
+      def svHandleAction_?(mapF: (S, ?[V], A) => AsyncIO[List[Raise[S, Nothing]]]): Widget[V, S, Nothing] =
+        svMapAction_?[Nothing](mapF)
+
+    }
+
+    // TODO (KR) : Make builder.
+    //           : Scala is having an un-acceptable level type inference here
+    implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
+
+      def toFormMapO[A](
+          endpoint: V => AsyncIO[List[Raise[S, A]]],
+          mapO: O => AsyncIO[List[Raise[S, A]]],
+          submitButtonLabel: String = "Submit",
+      ): Widget[V, S, A] =
+        ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P]
+          .join(
+            widget,
+            Widget.builder.element(br.render),
+            widgets.forms.submitButton(submitButtonLabel),
+          )
+          .mapValue(_._1)
+          .covariantMapAction { (_, v, a: CommonRaise.SubmitOr[O]) =>
+            a match {
+              case CommonRaise.Submit =>
+                for {
+                  aliveV <- AsyncIO.wrapEffect(v)
+                  endpointRes <- endpoint(aliveV)
+                } yield endpointRes
+              case CommonRaise.SubmitOr.Or(or) =>
+                mapO(or)
+            }
+          }
+
+      def toForm[A >: O](
+          endpoint: V => AsyncIO[List[Raise[S, A]]],
+          submitButtonLabel: String = "Submit",
+      ): Widget[V, S, A] =
+        toFormMapO(
+          endpoint = endpoint,
+          submitButtonLabel = submitButtonLabel,
+          mapO = o => AsyncIO(Raise.Action(o) :: Nil),
+        )
+
+    }
+
+    implicit class KeyedActionWidgetOps[V, S, KA_S, KA_K, KA_A](
+        widget: Widget[V, S, widgets.all.KeyedAction[(KA_S, KA_K), KA_A]],
+    ) {
+
+      // TODO (KR) : Make builder.
+      //           : Scala is having an un-acceptable level type inference here
+      implicit class WidgetFormOps[V, S, O](widget: Widget[V, S, CommonRaise.SubmitOr[O]]) {
+
+        def toFormMapO[A](
+            endpoint: V => AsyncIO[List[Raise[S, A]]],
+            mapO: O => AsyncIO[List[Raise[S, A]]],
+            submitButtonLabel: String = "Submit",
+        ): Widget[V, S, A] =
+          ado[Widget.Projection[S, CommonRaise.SubmitOr[O]]#P]
+            .join(
+              widget,
+              Widget.builder.element(br.render),
+              widgets.forms.submitButton(submitButtonLabel),
+            )
+            .mapValue(_._1)
+            .covariantMapAction { (_, v, a: CommonRaise.SubmitOr[O]) =>
+              a match {
+                case CommonRaise.Submit =>
+                  for {
+                    aliveV <- AsyncIO.wrapEffect(v)
+                    endpointRes <- endpoint(aliveV)
+                  } yield endpointRes
+                case CommonRaise.SubmitOr.Or(or) =>
+                  mapO(or)
+              }
+            }
+
+        def toForm[A >: O](
+            endpoint: V => AsyncIO[List[Raise[S, A]]],
+            submitButtonLabel: String = "Submit",
+        ): Widget[V, S, A] =
+          toFormMapO(
+            endpoint = endpoint,
+            submitButtonLabel = submitButtonLabel,
+            mapO = o => AsyncIO(Raise.Action(o) :: Nil),
+          )
+
+      }
+
+      def stripKeyedAction: Widget[V, S, KA_A] =
+        widget.covariantMapAction[widgets.all.KeyedAction[(KA_S, KA_K), KA_A], KA_A] { (_, _, a) =>
+          AsyncIO { Raise.Action(a.action) :: Nil }
+        }
+
+    }
+
+  }
+  object Implicits extends Implicits
+
 }
+
+// =====| AppliedWidget |=====
 
 trait AppliedWidget[+V] {
 
