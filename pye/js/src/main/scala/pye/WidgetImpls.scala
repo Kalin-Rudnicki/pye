@@ -431,9 +431,14 @@ private[pye] object WidgetImpls {
               w: Widget[WV, S, A],
               aw: AppliedWidget[AWV],
               wReRendersAW: Boolean,
-          ): AppliedWidget[WV] =
-            w.captureReRender(wReRendersAW ? RaiseHandler.ReRender(aw) | RaiseHandler.ReRender.Nothing)
-              .convert(parentRaiseHandler, getState)
+          ): AppliedWidget[WV] = {
+            console.log(4)
+            val tmp =
+              w.captureReRender(wReRendersAW ? RaiseHandler.ReRender(aw) | RaiseHandler.ReRender.Nothing)
+                .convert(parentRaiseHandler, getState)
+            console.log(5)
+            tmp
+          }
 
           console.log(1)
           lazy val aW1: AppliedWidget[V1] = buildAppliedWidget(w1, aW2, w1ReRendersW2)
