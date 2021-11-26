@@ -355,6 +355,12 @@ object Widget {
 
   }
 
+  // =====| Stateless |=====
+
+  trait StatelessWidget[+A] {
+    def withState[S]: Widget[Unit, S, A]
+  }
+
   // =====| TypeClass |=====
 
   implicit def widgetMonad[S, A]: Monad[Widget.Projection[S, A]#P] =
