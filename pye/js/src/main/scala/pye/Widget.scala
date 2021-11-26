@@ -160,19 +160,13 @@ trait Widget[V, S, +A] {
       mapV = mapV,
     )
 
-  def >+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
-    myUpdatesReRenderYou(w, true)
-
-  def >+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
-    myUpdatesReRenderYou(w, false)
-
   // --- yourUpdatesReRenderMe ---
 
   def yourUpdatesReRenderMe[A0 >: A, V2](
       w: Widget[V2, S, A0],
       youAppearAfterMe: Boolean,
   ): Widget[Unit, S, A0] =
-    vMyUpdatesReRenderYou[A0, V2, Unit](w, (_, _) => (), youAppearAfterMe)
+    vYourUpdatesReRenderMe[A0, V2, Unit](w, (_, _) => (), youAppearAfterMe)
 
   def tYourUpdatesReRenderMe[A0 >: A, V2](
       w: Widget[V2, S, A0],
@@ -193,12 +187,6 @@ trait Widget[V, S, +A] {
       w1BeforeW2 = youAppearAfterMe,
       mapV = mapV,
     )
-
-  def <+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
-    yourUpdatesReRenderMe(w, true)
-
-  def <+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
-    yourUpdatesReRenderMe(w, false)
 
   // --- ourUpdatesReRenderEachOther ---
 
@@ -227,6 +215,20 @@ trait Widget[V, S, +A] {
       w1BeforeW2 = youAppearAfterMe,
       mapV = mapV,
     )
+
+  // --- operators ---
+
+  def >+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    myUpdatesReRenderYou(w, true)
+
+  def >+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    myUpdatesReRenderYou(w, false)
+
+  def <+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    yourUpdatesReRenderMe(w, true)
+
+  def <+<[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
+    yourUpdatesReRenderMe(w, false)
 
   def <>+>[A0 >: A, V2](w: Widget[V2, S, A0]): Widget[Unit, S, A0] =
     ourUpdatesReRenderEachOther(w, true)
