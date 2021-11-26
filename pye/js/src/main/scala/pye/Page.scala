@@ -57,65 +57,64 @@ sealed trait Page { page =>
 
       (appliedWidget, rh) =
         Pointer
-          .withSelf[(AppliedWidget[Unit], RaiseHandler[Env, A])] {
-            case Pointer((appliedWidget, raiseHandler)) =>
-              val handleSOU: Raise.StandardOrUpdate[Env] => AsyncIO[RaiseHandler.ReRender] = {
-                case standard: Raise.Standard =>
-                  standard match {
-                    case msg: Raise.DisplayMessage =>
-                      AsyncIO { displayMessage(msg); RaiseHandler.ReRender() }
-                    case history: Raise.History =>
-                      {
-                        history match {
-                          case Raise.History.Push(page)    => page().push
-                          case Raise.History.Replace(page) => page().replace
-                          case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
-                        }
-                      }.map { _ => RaiseHandler.ReRender.PageChange }
-                    case Raise.RefreshPage =>
-                      AsyncIO { RaiseHandler.ReRender(appliedWidget) }
-                    case raw: Raise.Raw =>
-                      raw.action.map { _ => RaiseHandler.ReRender() }
-                  }
-                case update: Raise.UpdateState[Env] =>
-                  for {
-                    _ <- { stateVar.value = update.update(stateVar.value) }.toAsyncIO
-                    _ <- PyeLogger.log.debug(s"env: ${stateVar.value}", "env").toAsyncIO
-                    rr <- update.reRender match {
-                      case Raise.UpdateState.ReRender.Propagate =>
-                        update.childReRenders.pure[AsyncIO]
-                      case Raise.UpdateState.ReRender.Force =>
-                        RaiseHandler.ReRender(appliedWidget).pure[AsyncIO]
-                      case Raise.UpdateState.ReRender.Tag(tag) =>
-                        for {
-                          _ <- PyeLogger.log.warning(s"Uncaught tag re-render: $tag").toAsyncIO
-                        } yield update.childReRenders
-                    }
-                    _ <- titleF match {
-                      case Right(f) => AsyncIO { window.document.title = f(stateVar.value) }
-                      case Left(_)  => AsyncIO {}
-                    }
-                  } yield rr
-              }
-
-              // NOTE : If there is a new issue with handling raises, bring `rh` back out
-              //      : val rh: RaiseHandler[Env, A] = ???
-              Pointer {
-                (
-                  widget
-                    .wrapped { elems => body(elems).render }
-                    .convert(raiseHandler, () => stateVar.value), // NOTE : and use `rh` here
-                  {
-                    case sou: Raise.StandardOrUpdate[Env] =>
-                      handleSOU(sou)
-                    case action: Raise.Action[A] =>
+          .withSelf[(AppliedWidget[Unit], RaiseHandler[Env, A])] { ptr =>
+            val handleSOU: Raise.StandardOrUpdate[Env] => AsyncIO[RaiseHandler.ReRender] = {
+              case standard: Raise.Standard =>
+                standard match {
+                  case msg: Raise.DisplayMessage =>
+                    AsyncIO { displayMessage(msg); RaiseHandler.ReRender() }
+                  case history: Raise.History =>
+                    {
+                      history match {
+                        case Raise.History.Push(page)    => page().push
+                        case Raise.History.Replace(page) => page().replace
+                        case Raise.History.Go(delta)     => AsyncIO { window.history.go(delta) }
+                      }
+                    }.map { _ => RaiseHandler.ReRender.PageChange }
+                  case Raise.RefreshPage =>
+                    AsyncIO { RaiseHandler.ReRender(ptr.value._1) }
+                  case raw: Raise.Raw =>
+                    raw.action.map { _ => RaiseHandler.ReRender() }
+                }
+              case update: Raise.UpdateState[Env] =>
+                for {
+                  _ <- { stateVar.value = update.update(stateVar.value) }.toAsyncIO
+                  _ <- PyeLogger.log.debug(s"env: ${stateVar.value}", "env").toAsyncIO
+                  rr <- update.reRender match {
+                    case Raise.UpdateState.ReRender.Propagate =>
+                      update.childReRenders.pure[AsyncIO]
+                    case Raise.UpdateState.ReRender.Force =>
+                      RaiseHandler.ReRender(ptr.value._1).pure[AsyncIO]
+                    case Raise.UpdateState.ReRender.Tag(tag) =>
                       for {
-                        raises <- handleA(action.action)
-                        rrs <- AsyncIO.runSequentially(raises.map(handleSOU))
-                      } yield RaiseHandler.ReRender.merge(rrs)
-                  },
-                )
-              }
+                        _ <- PyeLogger.log.warning(s"Uncaught tag re-render: $tag").toAsyncIO
+                      } yield update.childReRenders
+                  }
+                  _ <- titleF match {
+                    case Right(f) => AsyncIO { window.document.title = f(stateVar.value) }
+                    case Left(_)  => AsyncIO {}
+                  }
+                } yield rr
+            }
+
+            val rh: RaiseHandler[Env, A] = {
+              case sou: Raise.StandardOrUpdate[Env] =>
+                handleSOU(sou)
+              case action: Raise.Action[A] =>
+                for {
+                  raises <- handleA(action.action)
+                  rrs <- AsyncIO.runSequentially(raises.map(handleSOU))
+                } yield RaiseHandler.ReRender.merge(rrs)
+            }
+
+            Pointer {
+              (
+                widget
+                  .wrapped { elems => body(elems).render }
+                  .convert(rh, () => stateVar.value), // NOTE : and use `rh` here
+                rh,
+              )
+            }
           }
           .value
 
