@@ -15,6 +15,8 @@ import pye.widgets.modifiers._
 
 trait inputs {
 
+  // =====| Text |=====
+
   sealed trait UpdateOn
   object UpdateOn {
     final case class KeyPress(timeout: Maybe[Int]) extends UpdateOn
@@ -123,7 +125,172 @@ trait inputs {
       ),
     )
 
-  // ---  ---
+  // =====| File |=====
+
+  private def ensureFileType(
+      fileType: String,
+      file: File,
+  ): ?[File] =
+    if (fileType.startsWith("."))
+      file
+        .ensure(_.name.endsWith(fileType))
+        .toEA(Message(s"Invalid file-type: ${file.name}"))
+    else {
+      // TODO (KR) :
+      file.pure[?]
+    }
+
+  private def convertFileList[VS[_]](
+      fileList: List[File],
+      fromFileList: List[File] => ?[Maybe[VS[File]]],
+      fileType: Maybe[String],
+  )(implicit
+      vsFunctor: Functor[VS],
+      vsTraverseList: Traverse[VS, ?],
+  ): ?[Maybe[VS[File]]] =
+    for {
+      fromList <- fromFileList(fileList)
+      ensured <- fileType match {
+        case Some(fileType) =>
+          fromList.map(_.map(ensureFileType(fileType, _)).traverse).traverse
+        case None =>
+          fromList.pure[?]
+      }
+    } yield ensured
+
+  private def makeFileInput[S](
+      fileType: Maybe[String],
+      allowMulti: Boolean,
+  )(
+      onSelectedFromWindowF: List[File] => Unit,
+      onDropF: (Boolean, S, List[File]) => Unit,
+      buttonModF: S => Modifier,
+  )(s: S): Widget.ElemT = {
+    def fileListToList(files: FileList): List[File] =
+      0.until(files.length)
+        .toList
+        .map(files(_))
+
+    val hiddenFileInput =
+      input(
+        `type` := "file",
+        fileType.map(accept := _).toOption,
+        allowMulti.maybe(multiple).toOption,
+        display := "none",
+      ).render
+
+    hiddenFileInput.onchange = { e =>
+      val files: FileList =
+        e.target
+          .asInstanceOf[js.Dynamic]
+          .files
+          .asInstanceOf[FileList]
+
+      onSelectedFromWindowF(fileListToList(files))
+    }
+
+    val fileInput =
+      div(
+        hiddenFileInput,
+        PyeS.`pye:file-input`,
+      )(buttonModF(s)).render
+
+    fileInput.onclick = { _ =>
+      // TODO (KR) : Ctrl + click to add
+      hiddenFileInput.click()
+    }
+    fileInput.ondragover = { e =>
+      e.preventDefault()
+      fileInput.classList.add(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
+    }
+    fileInput.ondragleave = { _ =>
+      fileInput.classList.remove(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
+    }
+    fileInput.ondragend = { _ =>
+      fileInput.classList.remove(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
+    }
+    fileInput.ondrop = { e =>
+      e.preventDefault()
+      onDropF(e.ctrlKey, s, fileListToList(e.dataTransfer.files))
+    }
+
+    fileInput
+  }
+
+  private def fileListToFile(fileList: List[File]): ?[Maybe[File]] =
+    fileList match {
+      case Nil =>
+        None.pure[?]
+      case head :: Nil =>
+        head.some.pure[?]
+      case _ =>
+        ?.dead(Message("This input does not support multiple files"))
+    }
+
+  // --- Drop Submits ---
+
+  private def genFileDropW[VS[_]](
+      fromFileList: List[File] => ?[Maybe[VS[File]]],
+      allowMulti: Boolean,
+  )(
+      fileType: Maybe[String],
+      decorator: Modifier,
+  )(implicit
+      vsFunctor: Functor[VS],
+      vsTraverseList: Traverse[VS, ?],
+  ): Widget.StatelessWidget[VS[File]] =
+    new Widget.StatelessWidget[VS[File]] {
+      override final def withState[S]: Widget[Unit, S, VS[File]] =
+        Widget.builder
+          .withState[S]
+          .withAction[VS[File]]
+          .rsElement { rh => s =>
+            def raiseFiles(fileList: List[File]): Unit =
+              convertFileList[VS](fileList, fromFileList, fileType)
+                .flatMap(_.toEA(Message("Can not drop 0 files"))) match {
+                case Alive(res) =>
+                  rh.raiseAction(res)
+                case Dead(errors) =>
+                  rh.raises(errors.map(Raise.DisplayMessage.fromThrowable))
+              }
+
+            makeFileInput[S](
+              fileType,
+              allowMulti,
+            )(
+              raiseFiles,
+              (_, _, files) => raiseFiles(files),
+              _ => decorator,
+            )(s)
+          }
+          .noValue
+    }
+
+  def fileDropW(
+      fileType: Maybe[String] = None,
+      decorator: Modifier = defaultOnEmpty,
+  ): Widget.StatelessWidget[File] =
+    genFileDropW[Identity](
+      fromFileList = fileListToFile,
+      allowMulti = false,
+    )(
+      fileType = fileType,
+      decorator = decorator,
+    )
+
+  def multiFileDropW(
+      fileType: Maybe[String] = None,
+      decorator: Modifier = defaultOnEmpty,
+  ): Widget.StatelessWidget[NonEmptyList[File]] =
+    genFileDropW[NonEmptyList](
+      fromFileList = _.toNel.pure[?],
+      allowMulti = true,
+    )(
+      fileType = fileType,
+      decorator = decorator,
+    )
+
+  // --- Drop Updates State ---
 
   private def genFileInputW[VS[_]](
       fromFileList: List[File] => ?[Maybe[VS[File]]],
@@ -135,112 +302,34 @@ trait inputs {
   )(implicit
       vsFunctor: Functor[VS],
       vsTraverseList: Traverse[VS, ?],
-  ): Widget[Maybe[VS[File]], Maybe[VS[File]], Nothing] = {
-    def ensureFileType(
-        fileType: String,
-        file: File,
-    ): ?[File] =
-      if (fileType.startsWith("."))
-        file
-          .ensure(_.name.endsWith(fileType))
-          .toEA(Message(s"Invalid file-type: ${file.name}"))
-      else {
-        // TODO (KR) :
-        file.pure[?]
-      }
-
+  ): Widget[Maybe[VS[File]], Maybe[VS[File]], Nothing] =
     Widget.builder
       .withState[Maybe[VS[File]]]
       .withAction[Nothing]
       .rsElement { rh => s =>
-        def setState(fileList: List[File]): Unit = {
-          val res =
-            for {
-              fromList <- fromFileList(fileList)
-              ensured <- fileType match {
-                case Some(fileType) =>
-                  fromList.map(_.map(ensureFileType(fileType, _)).traverse).traverse
-                case None =>
-                  fromList.pure[?]
-              }
-            } yield ensured
-
-          res match {
+        def setState(fileList: List[File]): Unit =
+          convertFileList[VS](fileList, fromFileList, fileType) match {
             case Alive(res) =>
               rh.state.set(res)
             case Dead(errors) =>
               rh.raises(errors.map(Raise.DisplayMessage.fromThrowable))
           }
-        }
 
-        def fileListToList(files: FileList): List[File] =
-          0.until(files.length)
-            .toList
-            .map(files(_))
-
-        val hiddenFileInput =
-          input(
-            `type` := "file",
-            fileType.map(accept := _).toOption,
-            allowMulti.maybe(multiple).toOption,
-            display := "none",
-          ).render
-
-        hiddenFileInput.onchange = { e =>
-          val files: FileList =
-            e.target
-              .asInstanceOf[js.Dynamic]
-              .files
-              .asInstanceOf[FileList]
-
-          setState(fileListToList(files))
-        }
-
-        val fileInput =
-          div(
-            hiddenFileInput,
-            PyeS.`pye:file-input`,
-            oncontextmenu := { (e: Event) =>
-              e.preventDefault()
-              setState(Nil)
+        makeFileInput[Maybe[VS[File]]](
+          fileType,
+          allowMulti,
+        )(
+          setState,
+          (ctrlKey, s, files) => setState(ctrlKey.maybe(s).flatten.cata(vsToList, Nil) ++ files),
+          _.cata(
+            vsToList(_).map { file =>
+              span(PyeS.`pye:file-input`.file)(file.name)
             },
-          )(
-            s.cata(
-              vsToList(_).map { file =>
-                span(PyeS.`pye:file-input`.file)(file.name)
-              },
-              onEmpty.toOption,
-            ),
-          ).render
-
-        fileInput.onclick = { _ =>
-          // TODO (KR) : Ctrl + click to add
-          hiddenFileInput.click()
-        }
-        fileInput.ondragover = { e =>
-          e.preventDefault()
-          fileInput.classList.add(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
-        }
-        fileInput.ondragleave = { _ =>
-          fileInput.classList.remove(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
-        }
-        fileInput.ondragend = { _ =>
-          fileInput.classList.remove(PyeS.`pye:file-input`.!.m(_.`dragged-into`).classes)
-        }
-        fileInput.ondrop = { e =>
-          e.preventDefault()
-          setState(
-            e.ctrlKey.maybe(s).flatten.cata(vsToList, Nil) ++
-              fileListToList(e.dataTransfer.files),
-          )
-        }
-
-        fileInput
+            onEmpty.toOption,
+          ),
+        )(s)
       }
-      .withValue { s =>
-        s.pure[?]
-      }
-  }
+      .withValue { _.pure[?] }
 
   private def defaultOnEmpty: Element =
     span("Click or drag to select file").render
@@ -250,14 +339,7 @@ trait inputs {
       onEmpty: Maybe[Element] = defaultOnEmpty.some,
   ): Widget[Maybe[File], Maybe[File], Nothing] =
     genFileInputW[Identity](
-      fromFileList = {
-        case Nil =>
-          None.pure[?]
-        case head :: Nil =>
-          head.some.pure[?]
-        case _ =>
-          ?.dead(Message("This input does not support multiple files"))
-      },
+      fromFileList = fileListToFile,
       vsToList = _ :: Nil,
       allowMulti = false,
     )(
@@ -278,7 +360,7 @@ trait inputs {
       onEmpty = onEmpty,
     )
 
-  // ---  ---
+  // =====| Buttons |=====
 
   def toggleButtonW(
       buttonLabel: String,
@@ -299,8 +381,6 @@ trait inputs {
         )(buttonLabel)(buttonDecorator).render
       }
       .withValue(_.pure[?])
-
-  // ---  ---
 
   def radioGroupW[T](
       options: Array[(String, T)],
