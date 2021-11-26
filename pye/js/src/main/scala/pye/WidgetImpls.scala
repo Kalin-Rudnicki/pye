@@ -380,7 +380,7 @@ private[pye] object WidgetImpls {
 
     def captureReRender[V, S, A](
         w: Widget[V, S, A],
-        reRenders: RaiseHandler.ReRender,
+        reRenders: => RaiseHandler.ReRender,
     ): Widget[V, S, A] =
       new Widget[V, S, A] {
         override val widgetName: String = s"${w.widgetName}-captureReRender"
@@ -429,7 +429,7 @@ private[pye] object WidgetImpls {
         ): AppliedWidget[V] = {
           def buildAppliedWidget[WV, AWV](
               w: Widget[WV, S, A],
-              aw: AppliedWidget[AWV],
+              aw: => AppliedWidget[AWV],
               wReRendersAW: Boolean,
           ): AppliedWidget[WV] = {
             console.log(4)
@@ -512,7 +512,7 @@ private[pye] object WidgetImpls {
     def rhCaptureReRender[V, S, A](
         w: Pointer[AppliedWidget[V]],
         parentRH: RaiseHandler[S, A],
-        reRenders: RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
+        reRenders: => RaiseHandler.ReRender = RaiseHandler.ReRender.Nothing,
     ): RaiseHandler[S, A] = {
       case sou: Raise.StandardOrUpdate[S] =>
         sou match {
