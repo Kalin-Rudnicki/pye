@@ -435,8 +435,11 @@ private[pye] object WidgetImpls {
             w.captureReRender(wReRendersAW ? RaiseHandler.ReRender(aw) | RaiseHandler.ReRender.Nothing)
               .convert(parentRaiseHandler, getState)
 
+          console.log(1)
           lazy val aW1: AppliedWidget[V1] = buildAppliedWidget(w1, aW2, w1ReRendersW2)
+          console.log(2)
           lazy val aW2: AppliedWidget[V2] = buildAppliedWidget(w2, aW1, w2ReRendersW1)
+          console.log(3)
 
           new AppliedWidget[V] {
             override protected val valueImpl: IO[V] =
