@@ -362,6 +362,23 @@ trait inputs {
 
   // =====| Buttons |=====
 
+  def toggleButtonElement(
+      buttonLabel: String,
+      buttonDecorator: Modifier = Seq.empty[Modifier],
+  )(
+      s: Boolean,
+      onClick: () => Unit,
+  ): dom.html.Button =
+    button(
+      PyeS.`pye:toggle-button`.--?(
+        s -> PyeS.`pye:toggle-button`.`true`,
+        !s -> PyeS.`pye:toggle-button`.`false`,
+      ),
+      onclick := { (_: Event) =>
+        onClick()
+      },
+    )(buttonLabel)(buttonDecorator).render
+
   def toggleButtonW(
       buttonLabel: String,
       buttonDecorator: Modifier = Seq.empty[Modifier],
@@ -370,15 +387,13 @@ trait inputs {
       .withState[Boolean]
       .noAction
       .rsElement { rh => s =>
-        button(
-          PyeS.`pye:toggle-button`.--?(
-            s -> PyeS.`pye:toggle-button`.`true`,
-            !s -> PyeS.`pye:toggle-button`.`false`,
-          ),
-          onclick := { (_: Event) =>
-            rh.state.set(!s)
-          },
-        )(buttonLabel)(buttonDecorator).render
+        toggleButtonElement(
+          buttonLabel,
+          buttonDecorator,
+        )(
+          s,
+          () => rh.state.update(!_),
+        )
       }
       .withValue(_.pure[?])
 
