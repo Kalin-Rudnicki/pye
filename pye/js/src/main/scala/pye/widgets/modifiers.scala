@@ -47,7 +47,16 @@ trait modifiers {
 
     }
 
-    object message extends Block {
+    object `key-map-modal` extends Block {
+
+      object section extends Element
+      object table extends Element
+      object header extends Element
+      object text extends Element
+
+    }
+
+    object `pye:message` extends Block {
       object info extends Modifier
       object error extends Modifier
     }

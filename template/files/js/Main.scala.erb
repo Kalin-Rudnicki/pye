@@ -1,0 +1,71 @@
+package <%= @base_package %>.js
+
+import scala.annotation.tailrec
+import scala.scalajs.js.JSON
+
+import io.circe.Json
+import org.scalajs.dom._
+
+import klib.Implicits._
+import klib.fp.types._
+import klib.utils._
+import pye._
+
+import <%= @base_package %>.js.helpers.all._
+import <%= @base_package %>.js.pages._
+import <%= @base_package %>.shared.constants._
+
+object Main {
+
+  def main(args: Array[String]): Unit = {
+
+    val cookieReg = s"""${UserSessionToken}=([A-Za-z0-9\\-]*)""".r
+    @tailrec
+    def findSessionCookie(cookies: List[String]): Maybe[String] =
+      cookies match {
+        case head :: tail =>
+          head match {
+            case cookieReg(token) =>
+              token.some
+            case _ =>
+              findSessionCookie(tail)
+          }
+        case Nil =>
+          None
+      }
+
+    makeWebPage(
+      findSessionCookie(document.cookie.split(";").map(_.trim).toList) match {
+        case Some(token) =>
+          for {
+            mus <- Api.user.fromSessionToken(token).unLift
+            raises <- mus match {
+              case Alive(us) =>
+                for {
+                  _ <- AsyncIO { mUserSession = us.some }
+                } yield Nil
+              case Dead(errors) =>
+                AsyncIO { Raise.History.push(Index()) :: errors.map(Raise.DisplayMessage.fromThrowable) }
+            }
+          } yield raises
+        case None =>
+          AsyncIO { Nil }
+      },
+      RouteMatcher.oneOf(
+        AlgosAndConfigs.matcher,
+        Home.matcher,
+        Index.matcher,
+        Login.matcher,
+        SignUp.matcher,
+        ThoughtInspectorSelect.matcher,
+        HsdRepos.matcher,
+        HsdRepo.matcher,
+        BarViewer.matcher,
+        ThoughtInspectorSelect.matcher,
+        ThoughtInspector.matcher,
+      ),
+      logger = Logger(Logger.LogLevel.Debug)
+        .withDefaultFlags(),
+    )
+  }
+}

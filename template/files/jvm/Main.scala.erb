@@ -1,0 +1,20 @@
+package <%= @base_package %>.jvm
+
+import java.io.File
+
+import klib.fp.types._
+import pye._
+import pye.RouteMatcher._
+
+object Main {
+  def main(args: Array[String]): Unit =
+    standardServer(
+      schema = <%= @base_package %>.jvm.db.Schema,
+      defaultPort = 2451,
+      resourcesRoot = new File("resources"),
+      api = _ =>
+        oneOf(
+          routes.User.matcher,
+        ),
+    )(args).runSyncOrExit(None)
+}

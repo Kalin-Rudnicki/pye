@@ -1,0 +1,26 @@
+package <%= @base_package %>.jvm.db
+
+import org.squeryl.PrimitiveTypeMode._
+import org.squeryl.{Schema => SquerylSchema}
+import org.squeryl.Table
+
+import <%= @base_package %>.jvm.db.models._
+
+object Schema extends SquerylSchema {
+
+  // =====| Tables |=====
+
+  // format: off
+  val users:        Table[User] =         table("Users")
+  val userSessions: Table[User.Session] = table("UserSessions")
+  // format: on
+
+  // =====| Modifiers |=====
+
+  on(users) { s =>
+    declare(
+      s.username.is(unique),
+    )
+  }
+
+}

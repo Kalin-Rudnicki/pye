@@ -1,0 +1,12 @@
+
+if [ $1 ]; then
+  LOG_LEVEL=$1
+else
+  LOG_LEVEL="INFO"
+fi
+
+if [[ $2 == "--here" ]]; then
+  sbt "project <%= @project_name %>JVM" "run -c -l $LOG_LEVEL --"
+else
+  gnome-terminal --tab -- sbt "project <%= @project_name %>JVM" "run -c -l $LOG_LEVEL --"
+fi

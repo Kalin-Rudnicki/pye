@@ -1,0 +1,62 @@
+package <%= @base_package %>.js.helpers
+
+import io.circe.generic.auto._
+
+import klib.Implicits._
+import klib.fp.types._
+import pye._
+
+import <%= @base_package %>.shared.constants._
+import <%= @base_package %>.shared.{data => D}
+
+trait service {
+
+  object Api {
+
+    private def apiRequest(
+        method: String,
+        afterApiUrl: String,
+        autoAddUserSession: Boolean = true,
+        requestErrorsAsJson: Boolean = true,
+    ): HttpRequest.Stage1 = {
+      val req =
+        HttpRequest(
+          method,
+          s"/api/$afterApiUrl",
+          requestErrorsAsJson = requestErrorsAsJson,
+        )
+
+      if (autoAddUserSession && all.userSession != null)
+        req.header(UserSessionToken, all.userSession.token)
+      else
+        req
+    }
+
+    object user {
+
+      def signUp(d: D.SignUp): AsyncIO[D.UserSession] =
+        apiRequest("POST", "user/sign-up")
+          .jsonBody(d)
+          .jsonResponse[D.UserSession]
+
+      def login(d: D.Login): AsyncIO[D.UserSession] =
+        apiRequest("POST", "user/login")
+          .jsonBody(d)
+          .jsonResponse[D.UserSession]
+
+      def logout: AsyncIO[D.UserSession] =
+        apiRequest("POST", "user/logout").noBody.raw
+          .map(_ => null.asInstanceOf[D.UserSession])
+
+      def fromSessionToken(token: String): AsyncIO[D.UserSession] =
+        apiRequest("GET", "user/from-session-token", autoAddUserSession = false)
+          .header(UserSessionToken, token)
+          .noBody
+          .jsonResponse[D.UserSession]
+
+    }
+
+  }
+
+}
+object service extends service

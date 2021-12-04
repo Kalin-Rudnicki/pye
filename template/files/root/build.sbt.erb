@@ -1,0 +1,55 @@
+//
+
+ThisBuild / watchBeforeCommand := Watch.clearScreen
+
+Global / excludeLintKeys += webCompDir
+
+// =====|  |=====
+
+val MyOrg = "io.github.kalin-rudnicki"
+val PyeVersion = "4.4.4"
+
+val SharedSettings =
+  Seq(
+    scalaVersion := "2.13.5",
+    resolvers ++= Seq(
+      Resolver.mavenLocal,
+      Resolver.sonatypeRepo("public"),
+    ),
+    organization := MyOrg,
+    version := "0.0.1",
+  )
+
+// =====|  |=====
+
+lazy val `<%= @project_name %>` =
+  crossProject(JSPlatform, JVMPlatform)
+    .in(file("<%= @project_name %>"))
+    .settings(
+      SharedSettings,
+      libraryDependencies ++= Seq(
+        MyOrg %%% "pye" % PyeVersion, // pye
+      ),
+    )
+    .jvmSettings(
+      libraryDependencies ++= Seq(
+        "org.mindrot" % "jbcrypt" % "0.4",
+      ),
+    )
+    .jsSettings(
+      scalaJSUseMainModuleInitializer := true,
+      webCompDir := file("resources"),
+      libraryDependencies ++= Seq(
+        "io.github.cquiroz" %%% "scala-java-time-tzdb" % "2.3.0",
+      ),
+    )
+
+lazy val `<%= @project_name %>-root` =
+  project
+    .in(file("."))
+    .settings(
+    )
+    .aggregate(
+      `<%= @project_name %>`.js,
+      `<%= @project_name %>`.jvm,
+    )

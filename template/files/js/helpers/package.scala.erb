@@ -1,0 +1,114 @@
+package <%= @base_package %>.js
+
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+
+import org.scalajs.dom
+import org.scalajs.dom._
+import scalatags.JsDom.all._
+
+import klib.Implicits._
+import klib.fp.types._
+import pye._
+
+import <%= @base_package %>.js.pages._
+import <%= @base_package %>.shared.{data => D}
+
+package object helpers {
+
+  private var _userSession: D.UserSession = _
+
+  trait all extends modifiers with service {
+
+    def userSession: D.UserSession = _userSession
+
+    def mUserSession: Maybe[D.UserSession] = Maybe(_userSession)
+    def mUserSession_=(userSession: Maybe[D.UserSession]): Unit = _userSession = userSession.getOrElse(null)
+
+    val dateFormatter: DateTimeFormatter =
+      DateTimeFormatter.ofPattern("MM/dd/yyyy")
+
+    val dateTimeFormatter: DateTimeFormatter =
+      DateTimeFormatter.ofPattern("MM/dd/yyyy @ hh:mm a")
+
+    implicit class StandBuilder2Ops[Env, A](builder: Page.builder.StandardBuilder2[Env, A]) {
+
+      def <%= @project_name.gsub(/-(\w)/){$1.upcase} %>NavBar: Page.builder.StandardBuilder2[Env, A] =
+        builder.navBarTop(
+          30.px,
+          List(
+            Page.NavBarItem.Button.build(
+              Page.NavBarAction.pushPage(Index()),
+              "<%= @project_name.split('-').map(&:capitalize).join('-') %>",
+            ),
+          ),
+          mUserSession match {
+            case Some(_) =>
+              List(
+                Page.NavBarItem.Button.build(
+                  Page.NavBarAction.pushPage(Home()),
+                  "Home",
+                ),
+                Page.NavBarItem.Button.build(
+                  Page.NavBarAction.Custom { _ =>
+                    List(
+                      Raise.Raw { AsyncIO { mUserSession = None } },
+                      Raise.History.push(Login()),
+                      Raise.DisplayMessage.global.info("Goodbye! For now :)", 2500.some),
+                    )
+                  },
+                  "Log Out",
+                ),
+              )
+            case None =>
+              List(
+                Page.NavBarItem.Button.build(
+                  Page.NavBarAction.pushPage(SignUp()),
+                  "Sign Up",
+                ),
+                Page.NavBarItem.Button.build(
+                  Page.NavBarAction.pushPage(Login()),
+                  "Login",
+                ),
+              )
+          },
+        )
+
+    }
+
+    implicit class Builder4Ops[Env, A](builder: Page.builder.Builder4[Env, A]) {
+
+      def <%= @project_name.gsub(/-(\w)/){$1.upcase} %>KeyMap: Page.builder.Builder5[Env, A] =
+        builder.keyMap {
+          KeyMap
+            .empty[Env]
+            .onDown { _ =>
+              Raise.Raw {
+                AsyncIO {
+                  val styles = document.getElementById("styles").asInstanceOf[dom.html.Link]
+                  styles.setAttribute(
+                    "href",
+                    s"${styles.getAttribute("href").split('?')(0)}?uuid=${UUID.randomUUID}",
+                  )
+                }
+              } :: Nil
+            }("Reload CSS", ctrl = true.some, shift = true.some)(KeyMap.KeyCode.A)
+            .onDown { _ =>
+              Raise.Raw {
+                AsyncIO {
+                  val scripts = document.getElementById("scripts").asInstanceOf[dom.html.Script]
+                  scripts.setAttribute(
+                    "src",
+                    s"${scripts.getAttribute("src").split('?')(0)}?uuid=${UUID.randomUUID}",
+                  )
+                }
+              } :: Nil
+            }("Reload Javascript (Broken)", ctrl = true.some, shift = true.some)(KeyMap.KeyCode.S)
+        }
+
+    }
+
+  }
+  object all extends all
+
+}

@@ -1,0 +1,10 @@
+
+.bsp/
+.idea/
+
+target/
+project/target/
+
+resources/js/
+.sass-cache/
+test-database.db

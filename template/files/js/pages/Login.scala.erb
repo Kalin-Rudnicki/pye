@@ -1,0 +1,87 @@
+package <%= @base_package %>.js.pages
+
+import io.circe.generic.auto._
+import monocle.macros.GenLens
+import scalatags.JsDom.all._
+
+import klib.Implicits._
+import klib.fp.types._
+import klib.fp.utils.ado
+import pye._
+import pye.Implicits._
+import pye.RouteMatcher._
+import pye.widgets.all._
+
+import <%= @base_package %>.js.helpers.all._
+import <%= @base_package %>.shared.{data => D}
+
+object Login {
+
+  final case class Env(
+      username: String,
+      password: String,
+  )
+
+  val matcher: RouteMatcher =
+    "login" /:
+      complete { _ =>
+        Login().pure[?]
+      }
+
+  def apply(): Page =
+    Page
+      .builder("login")()
+      .constEnv(
+        Env(
+          username = "",
+          password = "",
+        ),
+      )
+      .constTitle("Login")
+      .standardBody {
+        _.pageCenterMiddle {
+          val loginW: Widget.NoAction[D.Login, Env] =
+            ado[Widget.Projection[Env, CommonRaise.Submit.type]#P]
+              .join(
+                inputW[String]()
+                  .required()
+                  .labelled("Username:")
+                  .zoomOut(GenLens[Env](_.username)),
+                br.asWidget,
+                inputW[String](decorator = Seq(`type` := "password"))
+                  .required()
+                  .labelled("Password:")
+                  .zoomOut(GenLens[Env](_.password)),
+              )
+              .mapValue {
+                case (username, _, password) =>
+                  D.Login(
+                    username = username,
+                    password = password,
+                  )
+              }
+              .addSubmitButton("Login")
+              .vHandleSubmit { v =>
+                for {
+                  us <- Api.user.login(v)
+                } yield List(
+                  Raise.Raw { AsyncIO { mUserSession = us.some } },
+                  Raise.History.replace(Home()),
+                  Raise.DisplayMessage.global.info(s"Welcome back, ${us.firstName}", timeout = 2500.some),
+                )
+              }
+
+          ado[Widget.Projection[Env, Nothing]#P]
+            .join(
+              Widget.builder.element {
+                h1(S.centered)("Login").render
+              },
+              loginW,
+            )
+            .asUnit
+        }.<%= @project_name.gsub(/-(\w)/){$1.upcase} %>NavBar
+      }
+      .<%= @project_name.gsub(/-(\w)/){$1.upcase} %>KeyMap
+      .ignoreA
+
+}
