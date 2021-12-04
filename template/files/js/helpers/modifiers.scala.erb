@@ -1,0 +1,18 @@
+package <%= @base_package %>.js.helpers
+
+import pye.CSS.StyleSheet
+
+trait modifiers {
+
+  object S extends StyleSheet {
+
+    object `primary-button` extends Block
+
+    object centered extends Block
+
+    object `std-table` extends Block
+
+  }
+
+}
+object modifiers extends modifiers

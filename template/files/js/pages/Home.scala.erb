@@ -1,0 +1,48 @@
+package <%= @base_package %>.js.pages
+
+import java.time.LocalDateTime
+
+import io.circe.generic.auto._
+import monocle.Lens
+import monocle.macros.GenLens
+import org.scalajs.dom.Event
+import scalatags.JsDom.all._
+
+import klib.Implicits._
+import klib.fp.types._
+import klib.fp.utils._
+import pye._
+import pye.Implicits._
+import pye.RouteMatcher._
+import pye.widgets.all._
+
+import <%= @base_package %>.js.helpers.all._
+
+object Home {
+
+  val matcher: RouteMatcher =
+    "home" /:
+      complete { _ =>
+        Home().pure[?]
+      }
+
+  def apply(): Page =
+    Page
+      .builder("home")()
+      .noEnv
+      .constTitle("Home")
+      .standardBody {
+        _.pageCenterMiddle {
+          Widget
+            .constrain[Unit]
+            .join(
+              h1(S.centered)("Home").asWidget,
+              h3(S.centered)(s"[${userSession.firstName} ${userSession.lastName}]").asWidget,
+            )
+            .asUnit
+        }.<%= @project_name.gsub(/-(\w)/){$1.upcase} %>NavBar
+      }
+      .<%= @project_name.gsub(/-(\w)/){$1.upcase} %>KeyMap
+      .ignoreA
+
+}

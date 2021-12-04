@@ -117,7 +117,7 @@ object Raise {
         apply(
           message = message,
           timeout = timeout,
-          modifier = Seq[Modifier](PyeS.message.m(_.info), decorator),
+          modifier = Seq[Modifier](PyeS.`pye:message`.m(_.info), decorator),
         )
 
       def error(
@@ -128,7 +128,7 @@ object Raise {
         apply(
           message = message,
           timeout = timeout,
-          modifier = Seq[Modifier](PyeS.message.m(_.error), decorator),
+          modifier = Seq[Modifier](PyeS.`pye:message`.m(_.error), decorator),
         )
 
     }

@@ -1,0 +1,22 @@
+package <%= @base_package %>.jvm.db.models
+
+import pye.db.{helpers => H}
+
+class User private[db] (
+    // Credentials
+    val username: String,
+    val encryptedPassword: String,
+    // Info
+    val firstName: String,
+    val lastName: String,
+    val email: String,
+) extends H.DbObject
+
+object User {
+
+  class Session private[db] (
+      val userId: Long,
+      val token: String,
+  ) extends H.DbObject
+
+}

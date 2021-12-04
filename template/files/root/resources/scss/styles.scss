@@ -1,0 +1,33 @@
+
+@import "pye";
+
+body {
+  font-family: monospace;
+}
+
+.primary-button {
+  @extend %pb;
+}
+
+.centered {
+  text-align: center;
+}
+
+.std-table {
+  width: 100%;
+  border: 2px solid black;
+  border-collapse: collapse;
+
+  tr {
+    border: 2px solid black;
+
+    th {
+      border: 2px solid black;
+    }
+
+    td {
+      padding: 2px 10px;
+      text-align: center;
+    }
+  }
+}

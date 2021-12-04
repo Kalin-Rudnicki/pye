@@ -1,0 +1,10 @@
+package <%= @base_package %>.shared.data
+
+final case class UserSession(
+    userId: Long,
+    username: String,
+    firstName: String,
+    lastName: String,
+    email: String,
+    token: String,
+)

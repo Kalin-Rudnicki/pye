@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><%= @project_name %></title>
+    <link rel='shortcut icon' type='image/x-icon' href='/resources/favicon.ico' />
+    <link id="styles" rel="stylesheet" href="/resources/styles.css">
+    <script id="scripts" src="/resources/js/main.js"></script>
+
+    <!-- This enables source-map de-referencing -->
+    <script src="https://unpkg.com/source-map@0.7.3/dist/source-map.js"></script>
+    <script>
+        sourceMap.SourceMapConsumer.initialize({
+            "lib/mappings.wasm": "https://unpkg.com/source-map@0.7.3/lib/mappings.wasm"
+        });
+
+        // REMOVE : ...
+        sourceMap.SourceMapConsumer.callNew = arg => new sourceMap.SourceMapConsumer(arg);
+
+        async function loadSourceMap() {
+            async function responseText200(url) {
+                const response = await fetch(url);
+                if (response.status !== 200) {
+                    throw new Error("non-200 response");
+                }
+                return await response.text();
+            }
+
+            const jsSrcMapText = await responseText200("/resources/js/main.js.map");
+            const jsSrcMapConsumer = await new sourceMap.SourceMapConsumer(JSON.parse(jsSrcMapText));
+
+            const jsSrcText = await responseText200("/resources/js/main.js");
+
+            window.SourceMapData =
+                {
+                    srcMap: jsSrcMapConsumer,
+                    srcText: jsSrcText,
+                    srcLines: jsSrcText.split("\n"),
+                };
+        }
+
+        loadSourceMap()
+    </script>
+</head>
+<body id="tmp-body">
+</body>
+</html>

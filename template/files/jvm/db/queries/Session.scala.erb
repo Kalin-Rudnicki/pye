@@ -1,0 +1,29 @@
+package <%= @base_package %>.jvm.db.queries
+
+import java.util.UUID
+
+import org.squeryl.PrimitiveTypeMode._
+
+import klib.Implicits._
+import klib.fp.types._
+import pye.db.{helpers => H, _}
+
+import <%= @base_package %>.jvm.{db => Database}
+import <%= @base_package %>.shared.{data => D}
+
+object Session {
+
+  val byToken = Database.Schema.userSessions.query1(_.token)
+
+  def create(user: Database.models.User): Query[Database.models.User.Session] =
+    H.insert(Database.Schema.userSessions)(
+      new Database.models.User.Session(
+        user.id,
+        UUID.randomUUID.toString,
+      ),
+    )
+
+  def delete(session: Database.models.User.Session): Query[Boolean] =
+    H.delete(Database.Schema.userSessions)(session)
+
+}

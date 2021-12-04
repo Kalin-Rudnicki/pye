@@ -1,0 +1,65 @@
+package <%= @base_package %>.jvm.db.queries
+
+import org.squeryl.PrimitiveTypeMode._
+import org.mindrot.jbcrypt.BCrypt
+
+import klib.Implicits._
+import klib.fp.types._
+import pye.RouteMatcher.MatchData
+import pye.db.{helpers => H, _}
+
+import <%= @base_package %>.jvm.{db => Database}
+import <%= @base_package %>.shared.constants._
+import <%= @base_package %>.shared.{data => D}
+
+object User {
+
+  val byId = Database.Schema.users.query1(_.id)
+  val byUsername = Database.Schema.users.query1(_.username)
+
+  def create(signUp: D.SignUp): Query[Database.models.User] =
+    H.insert(Database.Schema.users)(
+      new Database.models.User(
+        username = signUp.username,
+        encryptedPassword = BCrypt.hashpw(signUp.password, BCrypt.gensalt),
+        firstName = signUp.firstName,
+        lastName = signUp.lastName,
+        email = signUp.email,
+        verified = false,
+      ),
+    )
+
+  def attemptLogin(login: D.Login): Query[D.UserSession] =
+    for {
+      mUser <- byUsername.findM(login.username)
+      user <- mUser.cata(_.pure[Query], Query(IO.error(Message("Invalid username"))))
+      _ <- user.verified ? ().pure[Query] | Query(IO.error(Message("User is not verified")))
+      session <-
+        BCrypt.checkpw(login.password, user.encryptedPassword) ?
+          Session.create(user) |
+          Query(IO.error(Message("Invalid password")))
+    } yield D.UserSession(
+      userId = user.id,
+      username = user.username,
+      firstName = user.firstName,
+      lastName = user.lastName,
+      email = user.email,
+      token = session.token,
+    )
+
+  def getUserAndSession(md: MatchData): Query[(Database.models.User, Database.models.User.Session)] =
+    for {
+      mSessionToken <- Query(IO.wrapEffect(md.mHeader[String](UserSessionToken)))
+      sessionToken <- mSessionToken.cata(_.pure[Query], Query(IO.error(Message("Missing session token"))))
+      mSession <- Session.byToken.findM(sessionToken)
+      session <- mSession.cata(_.pure[Query], Query(IO.error(Message("Invalid session token"))))
+      mUser <- byId.findM(session.userId)
+      user <- mUser.cata(_.pure[Query], Query(IO.error(Message(s"User does not exist? [${session.userId}]"))))
+      _ <- user.verified ? ().pure[Query] | Query(IO.error(Message("User is not verified")))
+    } yield (user, session)
+
+  def getUser(md: MatchData): Query[Database.models.User] =
+    getUserAndSession(md)
+      .map(_._1)
+
+}
