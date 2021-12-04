@@ -240,4 +240,14 @@ package object helpers {
     ): Query[List[T]]
   }
 
+  implicit class MQueryOps[T](query: Query[Maybe[T]]) {
+
+    def orError(message: String): Query[T] =
+      query.flatMap {
+        case Some(a) => a.pure[Query]
+        case None    => Query(IO.error(Message(message)))
+      }
+
+  }
+
 }
