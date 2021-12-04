@@ -98,6 +98,10 @@ def new_project(config)
     migrate(config, template_dir('js'), src_dir(config, 'js'), verbose)
     migrate(config, template_dir('jvm'), src_dir(config, 'jvm'), verbose)
     migrate(config, template_dir('shared'), src_dir(config, 'shared'), verbose)
+
+    (Dir.children(config.project_dir('scripts')).filter { |f| !['.', '..'].include?(f) }).each do |f|
+      system('chmod', '+x', config.project_dir('scripts', f))
+    end
   end
 
   puts("--- Generating Project ---")
