@@ -2,6 +2,16 @@
 require 'erb'
 require 'fileutils'
 
+class String
+
+  def capitalize
+    self.empty? ?
+      self :
+      self[0].upcase + self[1..-1]
+  end
+
+end
+
 class ProjectConfig
 
   attr_reader :project_name, :base_package
