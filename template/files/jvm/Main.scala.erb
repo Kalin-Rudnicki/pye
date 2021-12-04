@@ -10,7 +10,7 @@ object Main {
   def main(args: Array[String]): Unit =
     standardServer(
       schema = <%= @base_package %>.jvm.db.Schema,
-      defaultPort = 2451,
+      defaultPort = 3000,
       resourcesRoot = new File("resources"),
       api = _ =>
         oneOf(
