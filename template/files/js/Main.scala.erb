@@ -52,17 +52,10 @@ object Main {
           AsyncIO { Nil }
       },
       RouteMatcher.oneOf(
-        AlgosAndConfigs.matcher,
         Home.matcher,
         Index.matcher,
         Login.matcher,
         SignUp.matcher,
-        ThoughtInspectorSelect.matcher,
-        HsdRepos.matcher,
-        HsdRepo.matcher,
-        BarViewer.matcher,
-        ThoughtInspectorSelect.matcher,
-        ThoughtInspector.matcher,
       ),
       logger = Logger(Logger.LogLevel.Debug)
         .withDefaultFlags(),

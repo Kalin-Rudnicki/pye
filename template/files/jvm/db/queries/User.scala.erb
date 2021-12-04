@@ -25,7 +25,6 @@ object User {
         firstName = signUp.firstName,
         lastName = signUp.lastName,
         email = signUp.email,
-        verified = false,
       ),
     )
 
@@ -33,7 +32,6 @@ object User {
     for {
       mUser <- byUsername.findM(login.username)
       user <- mUser.cata(_.pure[Query], Query(IO.error(Message("Invalid username"))))
-      _ <- user.verified ? ().pure[Query] | Query(IO.error(Message("User is not verified")))
       session <-
         BCrypt.checkpw(login.password, user.encryptedPassword) ?
           Session.create(user) |
@@ -55,7 +53,6 @@ object User {
       session <- mSession.cata(_.pure[Query], Query(IO.error(Message("Invalid session token"))))
       mUser <- byId.findM(session.userId)
       user <- mUser.cata(_.pure[Query], Query(IO.error(Message(s"User does not exist? [${session.userId}]"))))
-      _ <- user.verified ? ().pure[Query] | Query(IO.error(Message("User is not verified")))
     } yield (user, session)
 
   def getUser(md: MatchData): Query[Database.models.User] =
