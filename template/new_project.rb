@@ -65,7 +65,7 @@ def new_project(config)
       File.join(__dir__, 'files', dir)
     end
     def src_dir(config, sub_project)
-      config.project_dir(config.project_name, sub_project, 'src', 'main', 'scala', config.base_package.gsub(/\./, "/"))
+      config.project_dir(config.project_name, sub_project, 'src', 'main', 'scala', config.base_package.gsub(/\./, "/"), sub_project)
     end
 
     def replace_erb(str, config)
