@@ -19,6 +19,11 @@ package object helpers {
   def insert[T](table: Table[T])(t: T): Query[T] =
     table.insert(t).pure[Query]
 
+  def update[T <: DbObject](table: Table[T])(t: T)(implicit ked: KeyedEntityDef[T, Long]): Query[T] =
+    for {
+      _ <- table.update(t).pure[Query]
+    } yield t
+
   def delete[T <: DbObject](table: Table[T])(t: T): Query[Boolean] =
     (table.deleteWhere(_.id === t.id) > 0).pure[Query]
 
