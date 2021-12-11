@@ -1,5 +1,9 @@
 package pye.widgets
 
+import java.time._
+import java.time.format.DateTimeFormatter
+
+import scala.annotation.tailrec
 import scala.scalajs.js
 
 import org.scalajs.dom
@@ -11,6 +15,7 @@ import klib.fp.typeclass._
 import klib.fp.types._
 import pye._
 import pye.Implicits._
+import pye.KeyMap.KeyCode
 import pye.widgets.modifiers._
 
 trait inputs {
@@ -123,6 +128,139 @@ trait inputs {
         PyeS.`pye:text-area`,
         decorator,
       ),
+    )
+
+  // =====| Editable Text |=====
+
+  final case class EditableText(
+      current: String,
+      edit: Maybe[String],
+  )
+
+  private def genEditableInputW[V: DecodeString](
+      inputTag: ConcreteHtmlTag[dom.html.Input],
+      filterSubmit: KeyboardEvent => Boolean,
+  )(
+      updateOn: UpdateOn,
+      inputDecorator: Modifier = Seq.empty[Modifier],
+      currentDecorator: Modifier = Seq.empty[Modifier],
+  ): Widget.Submit[Maybe[V], EditableText] =
+    Widget.builder
+      .withState[EditableText]
+      .submitAction
+      .rsElement { rh => s =>
+        s.edit match {
+          case Some(edit) =>
+            var savedTimeout: Maybe[Int] = None
+            val _input = inputTag(inputDecorator).render
+
+            var lastRaised = edit
+
+            def updateStateRaise(): Maybe[Raise.UpdateState[EditableText]] =
+              (_input.value != lastRaised).maybe {
+                lastRaised = _input.value
+                Raise.updateState[EditableText](_.copy(edit = _input.value.some)).propagate
+              }
+
+            def updateState(): Unit =
+              updateStateRaise().foreach(rh.raise(_))
+
+            _input.value = edit
+            _input.onkeyup = { e =>
+              if (filterSubmit(e)) {
+                e.preventDefault()
+                rh.raises(
+                  List(
+                    updateStateRaise(),
+                    Raise.Action(CommonRaise.Submit).some,
+                  ).flatMap(_.toOption),
+                )
+              } else if (e.keyCode == KeyCode.Escape.keyCode)
+                rh.raise(
+                  Raise.Raw { AsyncIO { savedTimeout.foreach(window.clearTimeout) } },
+                  Raise.updateState[EditableText](_.copy(edit = None)),
+                )
+              else
+                updateOn match {
+                  case UpdateOn.KeyPress(timeout) => // TODO (KR) : Doesnt seem to be picking up on backspaces...
+                    timeout match {
+                      case Some(timeout) =>
+                        savedTimeout.foreach(window.clearTimeout)
+                        savedTimeout = window
+                          .setTimeout(
+                            { () =>
+                              savedTimeout = None
+                              updateState()
+                            },
+                            timeout,
+                          )
+                          .some
+                      case None =>
+                        updateState()
+                    }
+                  case UpdateOn.Blur =>
+                  // Do Nothing
+                }
+            }
+            updateOn match {
+              case UpdateOn.Blur =>
+                _input.onblur = _ => updateState()
+              case UpdateOn.KeyPress(_) =>
+              // Do Nothing
+            }
+
+            _input
+          case None =>
+            span(
+              onclick := { (_: Event) =>
+                rh.state.update(s => s.copy(edit = s.current.some))
+              },
+              currentDecorator,
+            )(s.current).render
+        }
+      }
+      .withValue { s =>
+        def toV(str: String): ?[Maybe[V]] =
+          str
+            .ensure(_.nonEmpty)
+            .map(implicitly[DecodeString[V]].decode)
+            .traverse
+
+        s.edit.cata(toV, toV(s.current))
+      }
+
+  def editableInputW[V: DecodeString](
+      updateOn: UpdateOn = UpdateOn.Blur,
+      inputDecorator: Modifier = Seq.empty[Modifier],
+      currentDecorator: Modifier = Seq.empty[Modifier],
+  ): Widget.Submit[Maybe[V], EditableText] =
+    genEditableInputW[V](
+      inputTag = input,
+      filterSubmit = e => e.keyCode == KeyMap.KeyCode.Enter.keyCode,
+    )(
+      updateOn = updateOn,
+      inputDecorator = Seq[Modifier](
+        PyeS.`pye:input`,
+        inputDecorator,
+      ),
+      currentDecorator = currentDecorator,
+    )
+
+  def editableTextAreaW[V: DecodeString](
+      updateOn: UpdateOn = UpdateOn.Blur,
+      inputDecorator: Modifier = Seq.empty[Modifier],
+      currentDecorator: Modifier = Seq.empty[Modifier],
+  ): Widget.Submit[Maybe[V], EditableText] =
+    genEditableInputW[V](
+      inputTag = textarea.asInstanceOf[ConcreteHtmlTag[dom.html.Input]],
+      filterSubmit = e => e.keyCode == KeyMap.KeyCode.Enter.keyCode && e.ctrlKey,
+    )(
+      updateOn = updateOn,
+      inputDecorator = Seq[Modifier](
+        PyeS.`pye:text-area`,
+        inputDecorator,
+      ),
+      currentDecorator = currentDecorator,
     )
 
   // =====| File |=====
@@ -436,6 +574,143 @@ trait inputs {
       }
       .withValue(_.pure[?])
   }
+
+  // =====| Date Picker |=====
+
+  final case class DatePicker(
+      selected: Maybe[LocalDate],
+      yearMonth: YearMonth,
+      editing: Boolean,
+  )
+
+  def datePickerW(
+      dateFormatter: DateTimeFormatter,
+  ): Widget[Maybe[LocalDate], DatePicker, Maybe[LocalDate]] =
+    Widget.builder
+      .withState[DatePicker]
+      .withAction[Maybe[LocalDate]]
+      .rsElement { rh => s =>
+        val selected: Frag =
+          span(
+            PyeS.`pye:date-picker`.selected,
+            onclick := { (e: MouseEvent) =>
+              if (e.ctrlKey) rh.state.update(_.copy(yearMonth = YearMonth.now, editing = true))
+              else rh.state.update(s => s.copy(editing = !s.editing))
+            },
+            oncontextmenu := { (e: Event) =>
+              e.preventDefault()
+              rh.raise(
+                Raise.updateState[DatePicker](_.copy(selected = None)),
+                Raise.Action(None),
+              )
+            },
+          )(
+            s.selected.map(dateFormatter.format).toOption,
+          ).render
+        def editing: Frag = {
+          val firstDayOfMonth = s.yearMonth.atDay(1)
+          val firstDayOffset = firstDayOfMonth.getDayOfWeek.getValue % 7
+
+          def arrowButton(label: String)(ymF: YearMonth => YearMonth): Frag =
+            span(
+              PyeS.`pye:date-picker`.`arrow-button`,
+              onclick := { (_: Event) =>
+                rh.state.update(s => s.copy(yearMonth = ymF(s.yearMonth)))
+              },
+            )(label)
+
+          def dayOfWeekLabel(label: String): Frag =
+            span(
+              PyeS.`pye:date-picker`.`day-of-week`,
+            )(label)
+
+          def dayButton(
+              date: LocalDate,
+          ): Frag = {
+            span(
+              PyeS.`pye:date-picker`
+                .e(_.`day-button`)
+                .--?(
+                  s.selected.cata(_ == date, false) ->
+                    PyeS.`pye:date-picker`.`day-button`.selected,
+                  (YearMonth.of(date.getYear, date.getMonthValue) == s.yearMonth) ->
+                    PyeS.`pye:date-picker`.`day-button`.`in-month`,
+                ),
+              onclick := { (_: Event) =>
+                rh.raise(
+                  Raise.setState[DatePicker](
+                    DatePicker(
+                      date.some,
+                      YearMonth.of(date.getYear, date.getMonthValue),
+                      false,
+                    ),
+                  ),
+                  Raise.Action(date.some),
+                )
+              },
+            )(date.getDayOfMonth)
+          }
+
+          @tailrec
+          def makeButtons(
+              start: Int,
+              stack: List[Frag],
+          ): Frag =
+            if (start <= s.yearMonth.lengthOfMonth)
+              makeButtons(
+                start + 7,
+                div(
+                  0.until(7).map { dayInWeek =>
+                    dayButton(firstDayOfMonth.plusDays(start + dayInWeek))
+                  },
+                ) :: stack,
+              )
+            else
+              stack.reverse
+
+          div(
+            PyeS.`pye:date-picker`.editing,
+          )(
+            div(
+              PyeS.`pye:date-picker`.`editing-header`,
+            )(
+              arrowButton("<<")(_.minusYears(1)),
+              arrowButton("<")(_.minusMonths(1)),
+              span(
+                PyeS.`pye:date-picker`.`year-month`,
+              )(
+                s"${s.yearMonth.getMonth.name().toLowerCase.capitalize} ${s.yearMonth.getYear}",
+              ),
+              arrowButton(">")(_.plusMonths(1)),
+              arrowButton(">>")(_.plusYears(1)),
+            ),
+            div(
+              div(
+                dayOfWeekLabel("Sun"),
+                dayOfWeekLabel("Mon"),
+                dayOfWeekLabel("Tues"),
+                dayOfWeekLabel("Wed"),
+                dayOfWeekLabel("Thurs"),
+                dayOfWeekLabel("Fri"),
+                dayOfWeekLabel("Sat"),
+              ),
+              div(
+                PyeS.`pye:date-picker`.`editing-under-header`,
+              )(
+                makeButtons(-firstDayOffset, Nil),
+              ),
+            ),
+          )
+        }
+
+        div(
+          PyeS.`pye:date-picker`,
+        )(
+          selected,
+          s.editing.maybe(editing).toOption,
+        ).render
+      }
+      .withValue(_.selected.pure[?])
 
 }
 object inputs extends inputs
