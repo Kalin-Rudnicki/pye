@@ -30,10 +30,8 @@ final class TableQueries[T <: DbObject] private[db] (
 
   // =====| Select |=====
 
-  def select(filter: T => LogicalBoolean): TableQueries.WrappedSquerylQuery[T] =
-    new TableQueries.WrappedSquerylQuery[T](
-      from(table) { t => where(filter(t)).select(t) },
-    )
+  def select(filter: T => LogicalBoolean): WrappedSquerylQuery[T] =
+    from(table) { t => where(filter(t)).select(t) }.wrapSquerylQuery
 
   // =====| Update |=====
 
@@ -108,7 +106,7 @@ final class TableQueries[T <: DbObject] private[db] (
     new TableQueries.Query1[T, P1, P1T] {
       override def apply(
           p1: TypedExpression[P1, P1T],
-      ): TableQueries.WrappedSquerylQuery[T] =
+      ): WrappedSquerylQuery[T] =
         select { t =>
           p1F(t) === p1
         }
@@ -125,7 +123,7 @@ final class TableQueries[T <: DbObject] private[db] (
       override def apply(
           p1: TypedExpression[P1, P1T],
           p2: TypedExpression[P2, P2T],
-      ): TableQueries.WrappedSquerylQuery[T] =
+      ): WrappedSquerylQuery[T] =
         select { t =>
           p1F(t) === p1 and
             p2F(t) === p2
@@ -146,7 +144,7 @@ final class TableQueries[T <: DbObject] private[db] (
           p1: TypedExpression[P1, P1T],
           p2: TypedExpression[P2, P2T],
           p3: TypedExpression[P3, P3T],
-      ): TableQueries.WrappedSquerylQuery[T] =
+      ): WrappedSquerylQuery[T] =
         select { t =>
           p1F(t) === p1 and
             p2F(t) === p2 and
@@ -156,14 +154,6 @@ final class TableQueries[T <: DbObject] private[db] (
 
 }
 object TableQueries {
-
-  final class WrappedSquerylQuery[T] private[db] (
-      query: SquerylQuery[T],
-  ) {
-    def single: Query[T] = query.single.pure[Query]
-    def maybe: Query[Maybe[T]] = query.singleOption.toMaybe.pure[Query]
-    def list: Query[List[T]] = query.toList.pure[Query]
-  }
 
   sealed trait Query1[T, P1, P1T] {
     def apply(
