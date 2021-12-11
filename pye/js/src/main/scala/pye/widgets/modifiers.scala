@@ -26,6 +26,20 @@ trait modifiers {
       object `dragged-into` extends Modifier
     }
 
+    object `pye:date-picker` extends Block {
+      object selected extends Element
+      object editing extends Element
+      object `editing-header` extends Element
+      object `editing-under-header` extends Element
+      object `year-month` extends Element
+      object `arrow-button` extends Element
+      object `day-of-week` extends Element
+      object `day-button` extends Element {
+        object `in-month` extends Modifier
+        object selected extends Modifier
+      }
+    }
+
     object `pye:toggle-button` extends Block {
       object `true` extends Modifier
       object `false` extends Modifier
