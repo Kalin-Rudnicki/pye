@@ -60,11 +60,8 @@ final class ServerHandler(
         .traverse
         .map(_.toMap)
 
-    val bodyBytes: IO[Array[Byte]] =
-      request.getInputStream.readAllBytes.pure[IO]
-
-    val body: IO[String] =
-      bodyBytes.map(new String(_))
+    val body: RouteMatcher.MatchData.Body =
+      new RouteMatcher.MatchData.Body(request.getInputStream)
 
     def rec(
         params: Map[String, String],
@@ -108,7 +105,6 @@ final class ServerHandler(
               logger = logger,
               connectionFactory = connectionFactory,
               body = body,
-              bodyBytes = bodyBytes,
               headers = headers,
               params = params,
               cookies = cookies,
@@ -122,7 +118,6 @@ final class ServerHandler(
                   logger = logger,
                   connectionFactory = connectionFactory,
                   body = body,
-                  bodyBytes = bodyBytes,
                   headers = headers,
                   params = params,
                   cookies = cookies,

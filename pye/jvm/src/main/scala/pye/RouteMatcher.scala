@@ -1,6 +1,10 @@
 package pye
 
-import io.circe._, parser._
+import java.io.File
+import java.io.FileOutputStream
+
+import io.circe._
+import parser._
 
 import klib.Implicits._
 import klib.fp.typeclass.DecodeString
@@ -22,23 +26,11 @@ object RouteMatcher {
   final class MatchData(
       val logger: Logger,
       val connectionFactory: ConnectionFactory,
-      val body: IO[String],
-      val bodyBytes: IO[Array[Byte]],
+      val body: MatchData.Body,
       val headers: Map[String, String],
       val params: Map[String, String],
       val cookies: Map[String, String],
   ) {
-
-    def bodyAs[B: Decoder]: IO[B] =
-      for {
-        _body <- body
-        res <- {
-          for {
-            json <- parse(_body).toErrorAccumulator: ?[Json]
-            b <- implicitly[Decoder[B]].decodeJson(json).toErrorAccumulator
-          } yield b
-        }.toIO
-      } yield res
 
     implicit private def decodeStringFromCirceDecoder[T](implicit decoder: Decoder[T]): DecodeString[T] =
       s =>
@@ -98,6 +90,48 @@ object RouteMatcher {
 
     def mCookieJson[C: Decoder](c: String): ?[Maybe[C]] =
       mFromMap[C](cookies, c)
+
+  }
+
+  object MatchData {
+
+    final class Body private[pye] (inputStream: => jakarta.servlet.ServletInputStream) {
+
+      // NOTE : This method assumes you arent receiving some sort of massive input
+      def raw: IO[String] =
+        asBytes.map(new String(_))
+
+      // NOTE : This method assumes you arent receiving some sort of massive input
+      def asBytes: IO[Array[Byte]] =
+        inputStream.readAllBytes.pure[IO]
+
+      // NOTE : This method assumes you arent receiving some sort of massive input
+      def decodeJson[J: Decoder]: IO[J] =
+        for {
+          _body <- raw
+          res <- {
+            for {
+              json <- parse(_body).toErrorAccumulator: ?[Json]
+              b <- implicitly[Decoder[J]].decodeJson(json).toErrorAccumulator
+            } yield b
+          }.toIO
+        } yield res
+
+      // NOTE : This method assumes you arent receiving some sort of massive input
+      def decodeString[J: DecodeString]: IO[J] =
+        for {
+          _body <- raw
+          res <- implicitly[DecodeString[J]].decode(_body).toIO
+        } yield res
+
+      // NOTE : This method does not care if you receive some sort of massive input
+      def transferToFile(file: File): IO[Long] =
+        for {
+          outputStream <- IO { new FileOutputStream(file) }
+          transferred <- inputStream.transferTo(outputStream).pure[IO]
+        } yield transferred
+
+    }
 
   }
 
