@@ -582,6 +582,24 @@ trait inputs {
       yearMonth: YearMonth,
       editing: Boolean,
   )
+  object DatePicker {
+
+    private def now(f: LocalDate => Maybe[LocalDate]): DatePicker = {
+      val currentDate = LocalDate.now
+      DatePicker(
+        selected = f(currentDate),
+        yearMonth = YearMonth.of(currentDate.getYear, currentDate.getMonthValue),
+        editing = false,
+      )
+    }
+
+    def nowNone: DatePicker =
+      now(_ => None)
+
+    def nowSome: DatePicker =
+      now(_.some)
+
+  }
 
   def datePickerW(
       dateFormatter: DateTimeFormatter,
