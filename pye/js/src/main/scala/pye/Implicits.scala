@@ -1,8 +1,13 @@
 package pye
 
-import org.scalajs.dom.Element
+import scala.scalajs.js._
+
+import io.circe._
+import io.circe.syntax._
+import org.scalajs.dom._
 import scalatags.JsDom.all._
 
+import klib.Implicits._
 import klib.fp.types._
 
 trait Implicits {
@@ -30,6 +35,13 @@ trait Implicits {
 
     def asWidget[Env, A]: Widget[Unit, Env, A] =
       Widget.builder.element(tag.render)
+
+  }
+
+  implicit class LogIdOps[T: Encoder](t: T) {
+
+    def logToConsole: IO[Unit] =
+      console.log(JSON.parse(t.asJson.noSpaces)).pure[IO]
 
   }
 
