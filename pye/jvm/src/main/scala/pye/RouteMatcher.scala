@@ -10,7 +10,7 @@ import klib.Implicits._
 import klib.fp.typeclass.DecodeString
 import klib.fp.types._
 import klib.utils._
-import pye.db.ConnectionFactory
+import pye.db.{ConnectionFactory, Connection}
 
 sealed trait RouteMatcher {
 
@@ -159,6 +159,13 @@ object RouteMatcher {
 
   def complete(toResult: MatchData => IO[Maybe[Response]]): RouteMatcher =
     new Complete(toResult)
+
+  def completeWithConnection(toResult: MatchData => Connection => IO[Maybe[Response]]): RouteMatcher =
+    complete { md =>
+      md.connectionFactory.withConnection { c =>
+        toResult(md)(c)
+      }
+    }
 
   def const(const: String)(child: RouteMatcher): RouteMatcher =
     new Const(const, child)
