@@ -8,7 +8,7 @@ import klib.fp.types._
 import pye._
 import pye.RouteMatcher._
 
-import <%= @base_package %>.jvm.{db => Database}
+import <%= @base_package %>.jvm.db.{models => M, queries => Q}
 import <%= @base_package %>.shared.constants._
 import <%= @base_package %>.shared.{data => D}
 
@@ -32,75 +32,64 @@ object User {
   val matcher: RouteMatcher =
     "user" /: oneOf(
       "sign-up" /: method("POST")(
-        complete { md =>
-          md.connectionFactory.withConnection {
-            implicit c =>
-              for {
-                body <- md.bodyAs[D.SignUp]
-
-                userSession <- {
-                  for {
-                    user <- Database.queries.User.create(body)
-                    session <- Database.queries.Session.create(user)
-                  } yield D.UserSession(
-                    userId = user.id,
-                    username = user.username,
-                    firstName = user.firstName,
-                    lastName = user.lastName,
-                    email = user.email,
-                    token = session.token,
-                  )
-                }.run
-              } yield Response
-                .json(userSession)
-                .withCookies(userCookie(userSession.token.some))
-                .some
-          }
-        },
-      ),
-      "login" /: method("POST")(
-        complete { md =>
-          md.connectionFactory.withConnection { implicit c =>
+        completeWithConnection { md => implicit c =>
             for {
-              body <- md.bodyAs[D.Login]
-              userSession <- Database.queries.User.attemptLogin(body).run
+              body <- md.body.decodeJson[D.user.SignUp]
+
+              (user, session) <- Q.User.public.create(body).run
+              userSession = D.user.UserSession(
+                  userId = user.id,
+                  username = user.username,
+                  firstName = user.firstName,
+                  lastName = user.lastName,
+                  email = user.email,
+                  token = session.token,
+                )
             } yield Response
               .json(userSession)
               .withCookies(userCookie(userSession.token.some))
               .some
-          }
+        },
+      ),
+      "login" /: method("POST")(
+        completeWithConnection { md => implicit c =>
+          for {
+            body <- md.body.decodeJson[D.user.Login]
+            userSession <- Q.User.public.auth.attemptLogin(body).run
+          } yield Response
+            .json(userSession)
+            .withCookies(userCookie(userSession.token.some))
+            .some
         },
       ),
       "logout" /: method("POST")(
-        complete { md =>
-          md.connectionFactory.withConnection { implicit c =>
-            for {
-              tmp1 <- Database.queries.User.getUserAndSession(md).run
-              (_, session) = tmp1
-              _ <- Database.queries.Session.delete(session).run
-            } yield Response
-              .text("")
-              .withCookies(userCookie(None))
-              .some
-          }
+        completeWithConnection { md => implicit c =>
+          for {
+            _ <- {
+              for {
+                sessionToken <- Q.Session.public.auth.getSessionToken(md)
+                _ <- Q.Session.public.delete(sessionToken)
+              } yield ()
+            }.run
+          } yield Response
+            .text("")
+            .withCookies(userCookie(None))
+            .some
         },
       ),
       "from-session-token" /: method("GET")(
-        complete { md =>
-          md.connectionFactory.withConnection { implicit c =>
-            for {
-              tmp1 <- Database.queries.User.getUserAndSession(md).run
-              (user, session) = tmp1
-              userSession = D.UserSession(
-                userId = user.id,
-                username = user.username,
-                firstName = user.firstName,
-                lastName = user.lastName,
-                email = user.email,
-                token = session.token,
-              )
-            } yield Response.json(userSession).some
-          }
+        completeWithConnection { md => implicit c =>
+          for {
+            (user, session) <- Q.User.public.auth.getUserAndSession(md).run
+            userSession = D.user.UserSession(
+              userId = user.id,
+              username = user.username,
+              firstName = user.firstName,
+              lastName = user.lastName,
+              email = user.email,
+              token = session.token,
+            )
+          } yield Response.json(userSession).some
         },
       ),
     )

@@ -1,22 +1,22 @@
 package <%= @base_package %>.jvm.db.models
 
-import pye.db.{helpers => H}
+import pye.db._
 
-class User private[db] (
+case class User private[db] (
     // Credentials
-    val username: String,
-    val encryptedPassword: String,
+    username: String,
+    encryptedPassword: String,
     // Info
-    val firstName: String,
-    val lastName: String,
-    val email: String,
-) extends H.DbObject
+    firstName: String,
+    lastName: String,
+    email: String,
+) extends DbObject
 
 object User {
 
-  class Session private[db] (
-      val userId: Long,
-      val token: String,
-  ) extends H.DbObject
+  case class Session private[db] (
+      userId: Long,
+      token: String,
+  ) extends DbObject
 
 }

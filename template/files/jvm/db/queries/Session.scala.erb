@@ -6,24 +6,63 @@ import org.squeryl.PrimitiveTypeMode._
 
 import klib.Implicits._
 import klib.fp.types._
-import pye.db.{helpers => H, _}
+import pye.RouteMatcher.MatchData
+import pye.db._
 
-import <%= @base_package %>.jvm.{db => Database}
+import <%= @base_package %>.jvm.db.{models => M, Schema => S}
+import <%= @base_package %>.shared.constants._
 import <%= @base_package %>.shared.{data => D}
 
 object Session {
 
-  val byToken = Database.Schema.userSessions.query1(_.token)
+  val Q = S.userSessions.queries
 
-  def create(user: Database.models.User): Query[Database.models.User.Session] =
-    H.insert(Database.Schema.userSessions)(
-      new Database.models.User.Session(
-        user.id,
-        UUID.randomUUID.toString,
-      ),
-    )
+  private object `private` {
+    object auth {}
+    object create {}
+    object read {}
+    object update {}
+    object delete {}
+  }
 
-  def delete(session: Database.models.User.Session): Query[Boolean] =
-    H.delete(Database.Schema.userSessions)(session)
+  private[db] object db {
+    object auth {}
+    object create {
+
+      def apply(user: M.User): Query[M.User.Session] =
+        Q.insert(
+          M.User.Session(
+            user.id,
+            UUID.randomUUID.toString,
+          ),
+        )
+
+    }
+    object read {
+
+      val byToken = Q.query1(_.token)
+
+    }
+    object update {}
+    object delete {}
+  }
+
+  object public {
+    object auth {
+
+      def getSessionToken(md: MatchData): Query[String] =
+        Query(md.mHeader[String](UserSessionToken).toIO).orError("Missing session token")
+
+    }
+    object create {}
+    object read {}
+    object update {}
+    object delete {
+
+      def apply(token: String): Query[Unit] =
+        Q.delete.where.single(_.token === token)
+
+    }
+  }
 
 }
