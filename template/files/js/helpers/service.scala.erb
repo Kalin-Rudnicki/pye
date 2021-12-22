@@ -34,25 +34,25 @@ trait service {
 
     object user {
 
-      def signUp(d: D.SignUp): AsyncIO[D.UserSession] =
+      def signUp(d: D.user.SignUp): AsyncIO[D.user.UserSession] =
         apiRequest("POST", "user/sign-up")
           .jsonBody(d)
-          .jsonResponse[D.UserSession]
+          .jsonResponse[D.user.UserSession]
 
-      def login(d: D.Login): AsyncIO[D.UserSession] =
+      def login(d: D.user.Login): AsyncIO[D.user.UserSession] =
         apiRequest("POST", "user/login")
           .jsonBody(d)
-          .jsonResponse[D.UserSession]
+          .jsonResponse[D.user.UserSession]
 
-      def logout: AsyncIO[D.UserSession] =
+      def logout: AsyncIO[D.user.UserSession] =
         apiRequest("POST", "user/logout").noBody.raw
-          .map(_ => null.asInstanceOf[D.UserSession])
+          .map(_ => null.asInstanceOf[D.user.UserSession])
 
-      def fromSessionToken(token: String): AsyncIO[D.UserSession] =
+      def fromSessionToken(token: String): AsyncIO[D.user.UserSession] =
         apiRequest("GET", "user/from-session-token", autoAddUserSession = false)
           .header(UserSessionToken, token)
           .noBody
-          .jsonResponse[D.UserSession]
+          .jsonResponse[D.user.UserSession]
 
     }
 

@@ -6,57 +6,86 @@ import org.mindrot.jbcrypt.BCrypt
 import klib.Implicits._
 import klib.fp.types._
 import pye.RouteMatcher.MatchData
-import pye.db.{helpers => H, _}
+import pye.db._
 
-import <%= @base_package %>.jvm.{db => Database}
-import <%= @base_package %>.shared.constants._
+import <%= @base_package %>.jvm.db.{models => M, Schema => S}
 import <%= @base_package %>.shared.{data => D}
 
 object User {
 
-  val byId = Database.Schema.users.query1(_.id)
-  val byUsername = Database.Schema.users.query1(_.username)
+  val Q = S.users.queries
 
-  def create(signUp: D.SignUp): Query[Database.models.User] =
-    H.insert(Database.Schema.users)(
-      new Database.models.User(
-        username = signUp.username,
-        encryptedPassword = BCrypt.hashpw(signUp.password, BCrypt.gensalt),
-        firstName = signUp.firstName,
-        lastName = signUp.lastName,
-        email = signUp.email,
-      ),
-    )
+  private object `private` {
+    object auth {}
+    object create {}
+    object read {}
+    object update {}
+    object delete {}
+  }
 
-  def attemptLogin(login: D.Login): Query[D.UserSession] =
-    for {
-      mUser <- byUsername.findM(login.username)
-      user <- mUser.cata(_.pure[Query], Query(IO.error(Message("Invalid username"))))
-      session <-
-        BCrypt.checkpw(login.password, user.encryptedPassword) ?
-          Session.create(user) |
-          Query(IO.error(Message("Invalid password")))
-    } yield D.UserSession(
-      userId = user.id,
-      username = user.username,
-      firstName = user.firstName,
-      lastName = user.lastName,
-      email = user.email,
-      token = session.token,
-    )
+  private[db] object db {
+    object auth {}
+    object create {}
+    object read {}
+    object update {}
+    object delete {}
+  }
 
-  def getUserAndSession(md: MatchData): Query[(Database.models.User, Database.models.User.Session)] =
-    for {
-      mSessionToken <- Query(IO.wrapEffect(md.mHeader[String](UserSessionToken)))
-      sessionToken <- mSessionToken.cata(_.pure[Query], Query(IO.error(Message("Missing session token"))))
-      mSession <- Session.byToken.findM(sessionToken)
-      session <- mSession.cata(_.pure[Query], Query(IO.error(Message("Invalid session token"))))
-      mUser <- byId.findM(session.userId)
-      user <- mUser.cata(_.pure[Query], Query(IO.error(Message(s"User does not exist? [${session.userId}]"))))
-    } yield (user, session)
+  object public {
+    object auth {
 
-  def getUser(md: MatchData): Query[Database.models.User] =
-    getUserAndSession(md)
-      .map(_._1)
+      def attemptLogin(login: D.user.Login): Query[D.user.UserSession] =
+        for {
+          user <- read.byUsername(login.username).maybe.orError("Invalid username")
+          session <-
+            BCrypt.checkpw(login.password, user.encryptedPassword) ?
+              Session.db.create(user) |
+              Query(IO.error(Message("Invalid password")))
+        } yield D.user.UserSession(
+          userId = user.id,
+          username = user.username,
+          firstName = user.firstName,
+          lastName = user.lastName,
+          email = user.email,
+          token = session.token,
+        )
+
+      def getUserAndSession(md: MatchData): Query[(M.User, M.User.Session)] =
+        for {
+          sessionToken <- Session.public.auth.getSessionToken(md)
+          session <- Session.db.read.byToken(sessionToken).maybe.orError("Invalid session token")
+          user <- read.byId(session.userId).maybe.orError(s"User does not exist? [${session.userId}]")
+        } yield (user, session)
+
+      def getUser(md: MatchData): Query[M.User] =
+        getUserAndSession(md).map(_._1)
+
+    }
+    object create {
+
+      def apply(signUp: D.user.SignUp): Query[(M.User, M.User.Session)] =
+        for {
+          user <- Q.insert(
+            M.User(
+              username = signUp.username,
+              encryptedPassword = BCrypt.hashpw(signUp.password, BCrypt.gensalt),
+              firstName = signUp.firstName,
+              lastName = signUp.lastName,
+              email = signUp.email,
+            ),
+          )
+          session <- Session.db.create(user)
+        } yield (user, session)
+
+    }
+    object read {
+
+      val byId = Q.query1(_.id)
+      val byUsername = Q.query1(_.username)
+
+    }
+    object update {}
+    object delete {}
+  }
 
 }

@@ -40,7 +40,7 @@ object Login {
       .constTitle("Login")
       .standardBody {
         _.pageCenterMiddle {
-          val loginW: Widget.NoAction[D.Login, Env] =
+          val loginW: Widget.NoAction[D.user.Login, Env] =
             ado[Widget.Projection[Env, CommonRaise.Submit.type]#P]
               .join(
                 inputW[String]()
@@ -55,7 +55,7 @@ object Login {
               )
               .mapValue {
                 case (username, _, password) =>
-                  D.Login(
+                  D.user.Login(
                     username = username,
                     password = password,
                   )

@@ -48,7 +48,7 @@ object SignUp {
       .constTitle("Sign Up")
       .standardBody {
         _.pageCenterMiddle {
-          val signUpW: Widget.NoAction[D.SignUp, Env] =
+          val signUpW: Widget.NoAction[D.user.SignUp, Env] =
             ado[Widget.Projection[Env, CommonRaise.Submit.type]#P]
               .join(
                 inputW[String]()
@@ -84,7 +84,7 @@ object SignUp {
               .flatMapValue {
                 case (firstName, _, lastName, _, username, _, password, _, confirmPassword, _, email) =>
                   if (password == confirmPassword)
-                    D.SignUp(
+                    D.user.SignUp(
                         firstName = firstName,
                         lastName = lastName,
                         username = username,

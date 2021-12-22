@@ -7,7 +7,7 @@ Global / excludeLintKeys += webCompDir
 // =====|  |=====
 
 val MyOrg = "io.github.kalin-rudnicki"
-val PyeVersion = "4.4.6"
+val PyeVersion = "4.5.3"
 
 val SharedSettings =
   Seq(
@@ -18,6 +18,7 @@ val SharedSettings =
     ),
     organization := MyOrg,
     version := "0.0.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
   )
 
 // =====|  |=====

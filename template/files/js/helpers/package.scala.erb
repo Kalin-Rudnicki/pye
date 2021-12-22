@@ -16,14 +16,14 @@ import <%= @base_package %>.shared.{data => D}
 
 package object helpers {
 
-  private var _userSession: D.UserSession = _
+  private var _userSession: D.user.UserSession = _
 
   trait all extends modifiers with service {
 
-    def userSession: D.UserSession = _userSession
+    def userSession: D.user.UserSession = _userSession
 
-    def mUserSession: Maybe[D.UserSession] = Maybe(_userSession)
-    def mUserSession_=(userSession: Maybe[D.UserSession]): Unit = _userSession = userSession.getOrElse(null)
+    def mUserSession: Maybe[D.user.UserSession] = Maybe(_userSession)
+    def mUserSession_=(userSession: Maybe[D.user.UserSession]): Unit = _userSession = userSession.getOrElse(null)
 
     val dateFormatter: DateTimeFormatter =
       DateTimeFormatter.ofPattern("MM/dd/yyyy")
