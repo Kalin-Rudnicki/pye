@@ -50,7 +50,7 @@ object User {
           token = session.token,
         )
 
-      def getUserAndSession(md: MatchData): Query[(M.User, M.User.Session)] =
+      def getUserAndSession(md: MatchData): Query[(M.User, M.Session)] =
         for {
           sessionToken <- Session.public.auth.getSessionToken(md)
           session <- Session.db.read.byToken(sessionToken).maybe.orError("Invalid session token")
@@ -63,7 +63,7 @@ object User {
     }
     object create {
 
-      def apply(signUp: D.user.SignUp): Query[(M.User, M.User.Session)] =
+      def apply(signUp: D.user.SignUp): Query[(M.User, M.Session)] =
         for {
           user <- Q.insert(
             M.User(
