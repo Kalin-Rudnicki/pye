@@ -1,6 +1,7 @@
 
 require 'erb'
 require 'fileutils'
+require 'json'
 
 class String
 
@@ -98,6 +99,38 @@ def new_project(config)
     migrate(config, template_dir('js'), src_dir(config, 'js'), verbose)
     migrate(config, template_dir('jvm'), src_dir(config, 'jvm'), verbose)
     migrate(config, template_dir('shared'), src_dir(config, 'shared'), verbose)
+
+    pye_config =
+      {
+        projectName: config.project_name,
+        basePackage: config.base_package.split("."),
+        scaffolds: {
+          User: {
+            model: {
+              fileName: "User",
+              tableName: "users",
+            },
+            query: {
+              fileName: "User",
+            },
+            route: {
+              fileName: "User",
+              pathName: "user",
+            },
+          },
+          Session: {
+            model: {
+              fileName: "Session",
+              tableName: "userSessions",
+            },
+            query: {
+              fileName: "Session",
+            },
+            route: nil,
+          },
+        },
+      }
+    File.write(config.project_dir('pye-config.json'), JSON.pretty_generate(pye_config))
 
     (Dir.children(config.project_dir('scripts')).filter { |f| !['.', '..'].include?(f) }).each do |f|
       system('chmod', '+x', config.project_dir('scripts', f))

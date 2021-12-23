@@ -11,8 +11,8 @@ object Schema extends SquerylSchema {
   // =====| Tables |=====
 
   // format: off
-  val users:        Table[User] =         table("Users")
-  val userSessions: Table[User.Session] = table("UserSessions")
+  val users:        Table[User] =    table("Users")
+  val userSessions: Table[Session] = table("UserSessions")
   // format: on
 
   // =====| Modifiers |=====

@@ -1,0 +1,8 @@
+package <%= @base_package %>.jvm.db.models
+
+import pye.db._
+
+case class Session private[db] (
+  userId: Long,
+  token: String,
+) extends DbObject

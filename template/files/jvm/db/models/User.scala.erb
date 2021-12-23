@@ -11,12 +11,3 @@ case class User private[db] (
     lastName: String,
     email: String,
 ) extends DbObject
-
-object User {
-
-  case class Session private[db] (
-      userId: Long,
-      token: String,
-  ) extends DbObject
-
-}

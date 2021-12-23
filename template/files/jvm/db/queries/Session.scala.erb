@@ -29,9 +29,9 @@ object Session {
     object auth {}
     object create {
 
-      def apply(user: M.User): Query[M.User.Session] =
+      def apply(user: M.User): Query[M.Session] =
         Q.insert(
-          M.User.Session(
+          M.Session(
             user.id,
             UUID.randomUUID.toString,
           ),
