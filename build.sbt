@@ -4,7 +4,7 @@ val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
 val CirceVersion = "0.15.0-M1"
 val MonocleVersion = "3.0.0-M6"
-val KlibVersion = "1.5.8"
+val KlibVersion = "2.0.1"
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
@@ -39,6 +39,7 @@ inThisBuild(
       ),
     ),
     sonatypeCredentialHost := "s01.oss.sonatype.org",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
   ),
 )
 
@@ -55,9 +56,6 @@ lazy val pye =
         MyOrg %%% "klib-core" % KlibVersion,
         "io.github.cquiroz" %%% "scala-java-time" % "2.3.0",
         "com.lihaoyi" %%% "scalatags" % "0.9.2",
-        "io.circe" %%% "circe-core" % CirceVersion,
-        "io.circe" %%% "circe-generic" % CirceVersion,
-        "io.circe" %%% "circe-parser" % CirceVersion,
         "com.github.julien-truffaut" %%% "monocle-core" % MonocleVersion,
         "com.github.julien-truffaut" %%% "monocle-macro" % MonocleVersion,
       ),
@@ -93,6 +91,22 @@ lazy val `pye-plugin` =
       publish / skip := true,
     )
 
+lazy val `pye-commands` =
+  project
+    .in(file("pye-commands"))
+    .settings(
+      name := "pye-commands",
+      scalaVersion := Scala_2_13,
+      version := "0.0.1",
+      libraryDependencies ++= Seq(
+        MyOrg %% "klib-core" % KlibVersion,
+      ) ++ Seq(
+        "org.scalatest" %% "scalatest" % "3.2.3",
+      ).map(_ % Test),
+      sonatypeCredentialHost := "s01.oss.sonatype.org",
+      publish / skip := true,
+    )
+
 lazy val `pye-root` =
   project
     .in(file("."))
@@ -104,4 +118,5 @@ lazy val `pye-root` =
       pye.js,
       pye.jvm,
       `pye-plugin`,
+      `pye-commands`,
     )
