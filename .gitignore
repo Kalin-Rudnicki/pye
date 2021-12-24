@@ -5,6 +5,8 @@
 target/
 project/target/
 
-klib-webServer/shared/target/
-klib-webServer/jvm/target/
-klib-webServer/js/target/
+pye/shared/target/
+pye/jvm/target/
+pye/js/target/
+
+pye-commands.jar

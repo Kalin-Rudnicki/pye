@@ -105,6 +105,9 @@ lazy val `pye-commands` =
       ).map(_ % Test),
       sonatypeCredentialHost := "s01.oss.sonatype.org",
       publish / skip := true,
+      assembly / assemblyJarName := "pye-commands.jar",
+      assembly / mainClass := Some("pye.commands.Main"),
+      assembly / assemblyOutputPath := file("pye-commands.jar"),
     )
 
 lazy val `pye-root` =
