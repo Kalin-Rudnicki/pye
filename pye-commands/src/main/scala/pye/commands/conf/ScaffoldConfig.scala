@@ -12,7 +12,8 @@ object ScaffoldConfig {
 
   final case class Model(
       fileName: String,
-      tableName: String,
+      schemaTableName: String,
+      dbTableName: String,
   )
 
   final case class Query(
@@ -36,8 +37,11 @@ object ScaffoldConfig {
       if (s == null || s.length == 0 || !s.charAt(0).isUpper) s
       else s.updated(0, s.charAt(0).toLower)
 
-    def defaultTableName: String =
+    def defaultSchemaTableName: String =
       s"${deCapitalize(name)}s"
+
+    def defaultDbTableName: String =
+      s"${name}s"
 
     def defaultRouteName: String = {
       val reg = "[a-z](?=[A-Z])|[0-9](?=[a-zA-Z])|[A-Z](?=[A-Z][a-z])|[a-zA-Z](?=[0-9])".r
@@ -47,7 +51,8 @@ object ScaffoldConfig {
     ScaffoldConfig(
       model = Model(
         fileName = modelFileName.getOrElse(name),
-        tableName = modelTableName.getOrElse(defaultTableName),
+        schemaTableName = modelTableName.getOrElse(defaultSchemaTableName),
+        dbTableName = modelTableName.getOrElse(defaultDbTableName),
       ),
       query = Query(
         fileName = queryFileName.getOrElse(name),

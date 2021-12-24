@@ -79,7 +79,8 @@ object Scaffold {
           .join(
             verify("name", _._1),
             verify("model-file-name", _._2.model.fileName),
-            verify("model-table-name", _._2.model.tableName),
+            verify("model-schema-table-name", _._2.model.schemaTableName),
+            verify("model-db-table-name", _._2.model.dbTableName),
             verify("query-file-name", _._2.query.fileName),
             verifyM("route-file-name", _._2.route.map(_.fileName)),
             verifyM("route-path-name", _._2.route.map(_.pathName)),
@@ -112,7 +113,7 @@ object Scaffold {
           _ <- IO.writeFile(
             schemaFile(pyeConfig),
             splitBlock.insert.beforeSplit
-              .string(s"val ${model.tableName}: Table[${model.fileName}] = table(${model.tableName.unesc})")
+              .string(s"val ${model.schemaTableName}: Table[${model.fileName}] = table(${model.dbTableName.unesc})")
               .build,
           )
         } yield ()
@@ -150,7 +151,7 @@ object Scaffold {
             s"object ${query.fileName} {",
             indented(
               Break,
-              s"val Q = S.${model.tableName}.queries",
+              s"val Q = S.${model.schemaTableName}.queries",
               Break,
               section("private object `private`"),
               Break,
