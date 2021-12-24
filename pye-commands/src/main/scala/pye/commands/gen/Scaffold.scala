@@ -212,7 +212,7 @@ object Scaffold {
           _ <- IO.writeFile(
             mainFile(pyeConfig),
             nestedBlock.insert.beforeBlockEnd
-              .string(s"  ${route.fileName}.matcher,")
+              .string(s"  routes.${route.fileName}.matcher,")
               .build,
           )
         } yield ()
