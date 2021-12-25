@@ -4,7 +4,7 @@ val Scala_2_12 = "2.12.10"
 val Scala_2_13 = "2.13.4"
 val CirceVersion = "0.15.0-M1"
 val MonocleVersion = "3.0.0-M6"
-val KlibVersion = "2.0.1"
+val KlibVersion = "2.0.4"
 
 val MyOrg = "io.github.kalin-rudnicki"
 val githubUsername = "Kalin-Rudnicki"
