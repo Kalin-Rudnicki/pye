@@ -108,7 +108,8 @@ def new_project(config)
           User: {
             model: {
               fileName: "User",
-              tableName: "users",
+              schemaTableName: "users",
+              dbTableName: "Users",
             },
             query: {
               fileName: "User",
@@ -121,7 +122,8 @@ def new_project(config)
           Session: {
             model: {
               fileName: "Session",
-              tableName: "userSessions",
+              schemaTableName: "userSessions",
+              dbTableName: "UserSessions",
             },
             query: {
               fileName: "Session",
