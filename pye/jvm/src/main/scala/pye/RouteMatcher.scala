@@ -7,7 +7,7 @@ import io.circe._
 import parser._
 
 import klib.Implicits._
-import klib.fp.typeclass.DecodeString
+import klib.fp.typeclass.DecodeFromString
 import klib.fp.types._
 import klib.utils._
 import pye.db.{ConnectionFactory, Connection}
@@ -32,7 +32,7 @@ object RouteMatcher {
       val cookies: Map[String, String],
   ) {
 
-    implicit private def decodeStringFromCirceDecoder[T](implicit decoder: Decoder[T]): DecodeString[T] =
+    implicit private def decodeStringFromCirceDecoder[T](implicit decoder: Decoder[T]): DecodeFromString[T] =
       s =>
         (
           for {
@@ -41,36 +41,36 @@ object RouteMatcher {
           } yield decoded
         ).toErrorAccumulator
 
-    private def fromMap[R: DecodeString](label: String, map: Map[String, String], k: String): ?[R] =
+    private def fromMap[R: DecodeFromString](label: String, map: Map[String, String], k: String): ?[R] =
       map
         .get(k)
         .toMaybe match {
         case Some(value) =>
-          implicitly[DecodeString[R]].decode(value)
+          implicitly[DecodeFromString[R]].decode(value)
         case None =>
           ?.dead(Message(s"Missing required $label '$k'"))
       }
 
-    private def mFromMap[R: DecodeString](map: Map[String, String], k: String): ?[Maybe[R]] =
+    private def mFromMap[R: DecodeFromString](map: Map[String, String], k: String): ?[Maybe[R]] =
       map
         .get(k)
         .toMaybe match {
         case Some(value) =>
-          implicitly[DecodeString[R]].decode(value).map(_.some)
+          implicitly[DecodeFromString[R]].decode(value).map(_.some)
         case None =>
           None.pure[?]
       }
 
-    def param[P: DecodeString](p: String): ?[P] =
+    def param[P: DecodeFromString](p: String): ?[P] =
       fromMap[P]("param", params, p)
 
-    def mParam[P: DecodeString](p: String): ?[Maybe[P]] =
+    def mParam[P: DecodeFromString](p: String): ?[Maybe[P]] =
       mFromMap[P](params, p)
 
-    def header[H: DecodeString](h: String): ?[H] =
+    def header[H: DecodeFromString](h: String): ?[H] =
       fromMap[H]("header", headers, h)
 
-    def mHeader[H: DecodeString](h: String): ?[Maybe[H]] =
+    def mHeader[H: DecodeFromString](h: String): ?[Maybe[H]] =
       mFromMap[H](headers, h)
 
     def headerJson[H: Decoder](h: String): ?[H] =
@@ -79,10 +79,10 @@ object RouteMatcher {
     def mHeaderJson[H: Decoder](h: String): ?[Maybe[H]] =
       mFromMap[H](headers, h)
 
-    def cookie[C: DecodeString](c: String): ?[C] =
+    def cookie[C: DecodeFromString](c: String): ?[C] =
       fromMap[C]("cookie", cookies, c)
 
-    def mCookie[C: DecodeString](c: String): ?[Maybe[C]] =
+    def mCookie[C: DecodeFromString](c: String): ?[Maybe[C]] =
       mFromMap[C](cookies, c)
 
     def cookieJson[C: Decoder](c: String): ?[C] =
@@ -118,10 +118,10 @@ object RouteMatcher {
         } yield res
 
       // NOTE : This method assumes you arent receiving some sort of massive input
-      def decodeString[J: DecodeString]: IO[J] =
+      def decodeString[J: DecodeFromString]: IO[J] =
         for {
           _body <- raw
-          res <- implicitly[DecodeString[J]].decode(_body).toIO
+          res <- implicitly[DecodeFromString[J]].decode(_body).toIO
         } yield res
 
       // NOTE : This method does not care if you receive some sort of massive input
@@ -149,7 +149,7 @@ object RouteMatcher {
 
   final class Method private[RouteMatcher] (val method: String, val child: RouteMatcher) extends RouteMatcher
 
-  final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeString[A], val child: A => RouteMatcher)
+  final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeFromString[A], val child: A => RouteMatcher)
       extends RouteMatcher {
     type Type = A
   }
@@ -176,7 +176,7 @@ object RouteMatcher {
   def method(method: String)(child: RouteMatcher): RouteMatcher =
     new Method(method, child)
 
-  def pathArg[A: DecodeString](child: A => RouteMatcher): RouteMatcher =
-    new PathArg(implicitly[DecodeString[A]], child)
+  def pathArg[A: DecodeFromString](child: A => RouteMatcher): RouteMatcher =
+    new PathArg(implicitly[DecodeFromString[A]], child)
 
 }

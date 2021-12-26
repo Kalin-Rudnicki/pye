@@ -6,7 +6,7 @@ import org.scalajs.dom._
 import org.scalajs.dom.experimental.URLSearchParams
 
 import klib.Implicits._
-import klib.fp.typeclass.DecodeString
+import klib.fp.typeclass.DecodeFromString
 import klib.fp.types._
 import klib.utils._
 import pye.Implicits._
@@ -92,7 +92,7 @@ sealed trait RouteMatcher {
             case _: RouteMatcher.Complete =>
               None
             case pathArg: RouteMatcher.PathArg[_] =>
-              val decoder: DecodeString[pathArg.Type] = pathArg.decodeString
+              val decoder: DecodeFromString[pathArg.Type] = pathArg.decodeString
               decoder.decode(pHead) match {
                 case Alive(arg) =>
                   attemptMatch(pTail, pathArg.child(arg))
@@ -137,13 +137,13 @@ object RouteMatcher {
 
   final case class Params(paramMap: Map[String, String]) {
 
-    def param[P: DecodeString](name: String): ?[P] =
+    def param[P: DecodeFromString](name: String): ?[P] =
       for {
         mValue <- mParam[P](name)
         value <- mValue.toEA(Message(s"Missing param: $name"))
       } yield value
-    def mParam[P: DecodeString](name: String): ?[Maybe[P]] =
-      paramMap.get(name).toMaybe.map(implicitly[DecodeString[P]].decode).traverse
+    def mParam[P: DecodeFromString](name: String): ?[Maybe[P]] =
+      paramMap.get(name).toMaybe.map(implicitly[DecodeFromString[P]].decode).traverse
 
     def withParams(params: (String, String)*): Params =
       Params(paramMap ++ params)
@@ -164,7 +164,7 @@ object RouteMatcher {
   final class OneOf private[RouteMatcher] (val children: List[RouteMatcher]) extends RouteMatcher
   final class Const private[RouteMatcher] (val const: String, val child: RouteMatcher) extends RouteMatcher
   final class Complete private[RouteMatcher] (val paramMatch: Params => ?[Page]) extends RouteMatcher
-  final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeString[A], val child: A => RouteMatcher)
+  final class PathArg[A] private[RouteMatcher] (val decodeString: DecodeFromString[A], val child: A => RouteMatcher)
       extends RouteMatcher {
     type Type = A
   }
@@ -180,7 +180,7 @@ object RouteMatcher {
   def complete(paramMatch: Params => ?[Page]): RouteMatcher =
     new Complete(paramMatch)
 
-  def pathArg[A: DecodeString](child: A => RouteMatcher): RouteMatcher =
-    new PathArg[A](implicitly[DecodeString[A]], child)
+  def pathArg[A: DecodeFromString](child: A => RouteMatcher): RouteMatcher =
+    new PathArg[A](implicitly[DecodeFromString[A]], child)
 
 }
