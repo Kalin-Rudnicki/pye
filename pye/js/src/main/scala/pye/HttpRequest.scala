@@ -113,7 +113,10 @@ object HttpRequest {
       headers: List[(String, String)],
   ) {
 
-    private def build[Response](f: (Int, String) => ?[Response]): AsyncIO[Response] = {
+    private def buildResponse[Response](
+        getResponse: XMLHttpRequest => ?[Response],
+        responseType: Maybe[String] = None,
+    ): AsyncIO[Response] = {
       val promise: Promise[?[Response]] = Promise()
 
       def encodeParam(p: (String, String)): String =
@@ -126,10 +129,12 @@ object HttpRequest {
         async = true,
       )
       headers.foreach(h => xhr.setRequestHeader(h._1, h._2))
+
       xhr.onload = { (_: Event) =>
-        promise.success(f(xhr.status, xhr.responseText))
+        promise.success(getResponse(xhr))
       }
 
+      responseType.foreach(xhr.responseType = _)
       body match {
         case Some(body) =>
           xhr.send(body)
@@ -140,56 +145,41 @@ object HttpRequest {
       AsyncIO.wrapWrappedEffect(_ => promise.future)
     }
 
-    def raw: AsyncIO[(Int, String)] =
-      build[(Int, String)] { (status, responseText) =>
-        (status, responseText).pure[?]
-      }
+    private def require200Response[Response](
+        decodeResponse: XMLHttpRequest => ?[Response],
+    )(xhr: XMLHttpRequest): ?[Response] =
+      if (xhr.status == 200)
+        decodeResponse(xhr)
+      else
+        decode[ErrorResponse](xhr.responseText).to_\/ match {
+          case Right(errorResponse) => errorResponse.to_?
+          case Left(_)              => ?.error(Message("Unable to decode intended response or server errors"))
+        }
+
+    def statusAndResponseText: AsyncIO[(Int, String)] =
+      buildResponse[(Int, String)](xhr => (xhr.status, xhr.responseText).pure[?])
 
     def raw200: AsyncIO[String] =
-      build[String] { (status, responseText) =>
-        if (status == 200)
-          responseText.pure[?]
-        else
-          decode[ErrorResponse](responseText).to_\/ match {
-            case Right(b) =>
-              b.to_?
-            case Left(_) =>
-              ?.dead(Message(s"Non-200 response with invalid error:\n$responseText"))
-          }
-      }
+      decodeResponse[String]
 
-    def decodeResponse[Response](implicit decoder: DecodeString[Response]): AsyncIO[Response] =
-      build[Response] { (_, responseText) =>
-        decoder.decode(responseText) match {
-          case alive: Alive[Response] =>
-            alive
-          case Dead(errors) =>
-            decode[ErrorResponse](responseText).to_\/ match {
-              case Right(r) =>
-                r.to_?
-              case Left(error) =>
-                Dead(errors.appended(error))
-            }
-        }
-      }
+    def decodeResponse[Response: DecodeFromString]: AsyncIO[Response] =
+      buildResponse[Response](
+        require200Response[Response](xhr => DecodeFromString[Response].decode(xhr.responseText)),
+      )
 
-    def jsonResponse[Response](implicit decoder: Decoder[Response]): AsyncIO[Response] =
-      build[Response] { (_, responseText) =>
-        for {
-          json <- parse(responseText).toErrorAccumulator: ?[Json]
-          response <- decoder.decodeJson(json).toErrorAccumulator match {
-            case alive @ Alive(_) =>
-              alive
-            case Dead(errors) =>
-              implicitly[Decoder[ErrorResponse]].decodeJson(json).to_\/ match {
-                case Right(b) =>
-                  b.to_?
-                case Left(error) =>
-                  Dead(errors.appended(error))
-              }
+    def jsonResponse[Response: Decoder]: AsyncIO[Response] =
+      decodeResponse[Response](DecodeFromString.fromCirceDecoder)
+
+    def blobResponse: AsyncIO[Blob] =
+      buildResponse[Blob](
+        require200Response[Blob] { xhr =>
+          xhr.response match {
+            case blob: Blob => blob.pure[?]
+            case _          => ?.dead(Message("Did not receive a blob"))
           }
-        } yield response
-      }
+        },
+        "blob".some,
+      )
 
   }
 

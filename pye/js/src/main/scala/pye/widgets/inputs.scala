@@ -28,7 +28,7 @@ trait inputs {
     case object Blur extends UpdateOn
   }
 
-  private def genInputW[V: DecodeString](
+  private def genInputW[V: DecodeFromString](
       inputTag: ConcreteHtmlTag[dom.html.Input],
       filterSubmit: KeyboardEvent => Boolean,
   )(
@@ -96,11 +96,11 @@ trait inputs {
       }
       .withValue {
         _.ensure(_.nonEmpty)
-          .map(implicitly[DecodeString[V]].decode)
+          .map(implicitly[DecodeFromString[V]].decode)
           .traverse
       }
 
-  def inputW[V: DecodeString](
+  def inputW[V: DecodeFromString](
       updateOn: UpdateOn = UpdateOn.Blur,
       decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Maybe[V], String] =
@@ -115,7 +115,7 @@ trait inputs {
       ),
     )
 
-  def textAreaW[V: DecodeString](
+  def textAreaW[V: DecodeFromString](
       updateOn: UpdateOn = UpdateOn.Blur,
       decorator: Modifier = Seq.empty[Modifier],
   ): Widget.Submit[Maybe[V], String] =
@@ -137,7 +137,7 @@ trait inputs {
       edit: Maybe[String],
   )
 
-  private def genEditableInputW[V: DecodeString](
+  private def genEditableInputW[V: DecodeFromString](
       inputTag: ConcreteHtmlTag[dom.html.Input],
       filterSubmit: KeyboardEvent => Boolean,
   )(
@@ -223,13 +223,13 @@ trait inputs {
         def toV(str: String): ?[Maybe[V]] =
           str
             .ensure(_.nonEmpty)
-            .map(implicitly[DecodeString[V]].decode)
+            .map(implicitly[DecodeFromString[V]].decode)
             .traverse
 
         s.edit.cata(toV, toV(s.current))
       }
 
-  def editableInputW[V: DecodeString](
+  def editableInputW[V: DecodeFromString](
       updateOn: UpdateOn = UpdateOn.Blur,
       inputDecorator: Modifier = Seq.empty[Modifier],
       currentDecorator: Modifier = Seq.empty[Modifier],
@@ -246,7 +246,7 @@ trait inputs {
       currentDecorator = currentDecorator,
     )
 
-  def editableTextAreaW[V: DecodeString](
+  def editableTextAreaW[V: DecodeFromString](
       updateOn: UpdateOn = UpdateOn.Blur,
       inputDecorator: Modifier = Seq.empty[Modifier],
       currentDecorator: Modifier = Seq.empty[Modifier],
