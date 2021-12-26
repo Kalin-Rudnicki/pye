@@ -45,7 +45,7 @@ trait service {
           .jsonResponse[D.user.UserSession]
 
       def logout: AsyncIO[D.user.UserSession] =
-        apiRequest("POST", "user/logout").noBody.raw
+        apiRequest("POST", "user/logout").noBody.raw200
           .map(_ => null.asInstanceOf[D.user.UserSession])
 
       def fromSessionToken(token: String): AsyncIO[D.user.UserSession] =
