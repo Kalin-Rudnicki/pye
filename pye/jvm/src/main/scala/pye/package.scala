@@ -51,12 +51,11 @@ package object pye {
                   else {
                     new File(resourcesRoot, remainingJoined).pure[IO]
                   }
-                r <- Response.file(f)
-              } yield r.some
+              } yield Response.file(f).some
             },
           ),
           "pages" /: any { _ => _ =>
-            Response.file(new File(resourcesRoot, "index.html")).map(_.some)
+            Response.file(new File(resourcesRoot, "index.html")).some.pure[IO]
           },
           "api" /: api(serverRes),
           routeMatcherExtra(serverRes),
