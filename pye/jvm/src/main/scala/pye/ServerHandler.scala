@@ -1,5 +1,7 @@
 package pye
 
+import java.io.FileInputStream
+
 import scala.jdk.CollectionConverters._
 
 import jakarta.servlet.http.HttpServletRequest
@@ -149,7 +151,11 @@ final class ServerHandler(
           case Response.Data(body, code, contentType, headers, cookies) =>
             response.setStatus(code.code)
             contentType.foreach(response.setContentType)
-            response.getOutputStream.write(body)
+            val out = response.getOutputStream
+            body match {
+              case Response.Body.Bytes(bytes) => out.write(bytes)
+              case Response.Body.File(file)   => new FileInputStream(file).transferTo(out)
+            }
             headers.foreach { case (key, value) => response.setHeader(key, value) }
             cookies.foreach(response.addCookie)
         }

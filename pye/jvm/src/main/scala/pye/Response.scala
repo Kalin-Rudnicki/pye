@@ -15,8 +15,14 @@ object Response {
 
   final case class Redirect(to: String) extends Response
 
+  sealed trait Body
+  object Body {
+    final case class Bytes(bytes: Array[Byte]) extends Body
+    final case class File(file: java.io.File) extends Body
+  }
+
   final case class Data(
-      body: Array[Byte],
+      body: Body,
       code: Response.Code,
       contentType: Maybe[String] = None,
       headers: Map[String, String],
@@ -39,17 +45,14 @@ object Response {
       file: File,
       contentType: Maybe[String] = None,
       code: Response.Code = Response.Code.OK,
-  ): IO[Data] =
-    for {
-      exists <- file.exists.pure[IO]
-      result <-
-        if (exists)
-          for {
-            content <- IO.readFileBytes(file)
-          } yield raw(content, contentType, code)
-        else
-          IO.error(Message(s"File does not exist: $file"))
-    } yield result
+  ): Data =
+    Data(
+      body = Body.File(file),
+      code = code,
+      contentType = contentType,
+      headers = Map.empty,
+      cookies = Nil,
+    )
 
   def raw(
       body: Array[Byte],
@@ -57,7 +60,7 @@ object Response {
       code: Response.Code = Response.Code.OK,
   ): Data =
     Data(
-      body = body,
+      body = Body.Bytes(body),
       code = code,
       contentType = contentType,
       headers = Map.empty,
@@ -81,7 +84,7 @@ object Response {
       jsonToString: Json => String = _.noSpaces,
   ): Data =
     text(
-      jsonToString(implicitly[Encoder[J]].apply(json)),
+      jsonToString(Encoder[J].apply(json)),
       "application/json".some,
       code,
     )
@@ -91,7 +94,7 @@ object Response {
       code: Response.Code = Response.Code.OK,
   ): Data =
     text(
-      body = frag.render, // TODO (KR) : correct?
+      body = frag.render,
       code = code,
       contentType = "text/html".some,
     )
