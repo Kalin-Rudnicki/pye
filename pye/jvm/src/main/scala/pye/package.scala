@@ -120,7 +120,7 @@ package object pye {
                   .pure[IO]
                   .bracket { rbFile =>
                     for {
-                      _ <- IO.writeFileBytes(rbFile, rbFileBytes)
+                      _ <- FileUtils.writeFileBytes(rbFile, rbFileBytes)
                       _ <- ("ruby" :: rbFile.toString :: dbFile.toString :: list).!.pure[IO]
                     } yield ()
                   } { rbFile => IO(rbFile.delete()) }
