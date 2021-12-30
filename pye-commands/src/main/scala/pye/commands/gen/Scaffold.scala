@@ -54,7 +54,7 @@ object Scaffold {
 
       def readPyeConfig: IO[PyeConfig] =
         for {
-          pyeConfigFC <- IO.readFile(pyeConfigFile)
+          pyeConfigFC <- FileUtils.readFile(pyeConfigFile)
           pyeConfig <- decode[PyeConfig](pyeConfigFC).toErrorAccumulator.toIO
         } yield pyeConfig
 
@@ -107,10 +107,10 @@ object Scaffold {
           )
 
         for {
-          _ <- IO.writeFile(file, idtStr.toString("  "))
-          schemaFC <- IO.readFile(schemaFile(pyeConfig))
+          _ <- FileUtils.writeFile(file, idtStr.toString("  "))
+          schemaFC <- FileUtils.readFile(schemaFile(pyeConfig))
           splitBlock <- SplitBlock.find(SplitBlock.Config("// format: on"), schemaFC).toIO
-          _ <- IO.writeFile(
+          _ <- FileUtils.writeFile(
             schemaFile(pyeConfig),
             splitBlock.insert.beforeSplit
               .string(s"val ${model.schemaTableName}: Table[${model.fileName}] = table(${model.dbTableName.unesc})")
@@ -165,7 +165,7 @@ object Scaffold {
           )
         }
 
-        IO.writeFile(file, idtStr.toString("  "))
+        FileUtils.writeFile(file, idtStr.toString("  "))
       }
 
       def writeRoute(pyeConfig: PyeConfig, route: ScaffoldConfig.Route): IO[Unit] = {
@@ -201,8 +201,8 @@ object Scaffold {
           )
 
         for {
-          _ <- IO.writeFile(file, idtStr.toString("  "))
-          mainFC <- IO.readFile(mainFile(pyeConfig))
+          _ <- FileUtils.writeFile(file, idtStr.toString("  "))
+          mainFC <- FileUtils.readFile(mainFile(pyeConfig))
           nestedBlock <-
             NestedBlock
               .find(
@@ -210,7 +210,7 @@ object Scaffold {
                 mainFC,
               )
               .toIO
-          _ <- IO.writeFile(
+          _ <- FileUtils.writeFile(
             mainFile(pyeConfig),
             nestedBlock.insert.beforeBlockEnd
               .string(s"  routes.${route.fileName}.matcher,")
@@ -220,7 +220,7 @@ object Scaffold {
       }
 
       def writePyeConfig(pyeConfig: PyeConfig): IO[Unit] =
-        IO.writeFile(pyeConfigFile, pyeConfig.asJson.spaces2)
+        FileUtils.writeFile(pyeConfigFile, pyeConfig.asJson.spaces2)
 
       for {
         pyeConfig <- readPyeConfig
