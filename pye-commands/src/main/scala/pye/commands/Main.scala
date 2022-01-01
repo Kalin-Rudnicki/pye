@@ -8,6 +8,7 @@ object Main {
     Executable
       .fromSubCommands(
         "gen" -> gen.executable,
+        "scripts" -> scripts.executable,
       )(args)
       .runSyncOrExit(None)
 }
