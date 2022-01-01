@@ -650,28 +650,37 @@ object Page {
               )(elems)(_pageCenterModifier).render
             }
 
-        val pageMiddle: PageWidget[Unit] =
-          NonEmptyList
-            .nelJoin[PageWidget[Unit]](pageLeft)(pageCenter)(pageRight)
-            .traverse
-            .mapValue { _ => }
-            .wrapped { elems =>
-              div(
-                id := Page.names.PageMiddle,
-                display.flex,
-                height := {
-                  List(
-                    _pageTop.map(_._1),
-                    _pageBottom.map(_._1),
-                  ).flatMap(_.toOption).toNel match {
-                    case Some(edges) =>
-                      ("100vh" :: edges.toList).mkString("calc(", " - ", ")")
-                    case None =>
-                      "100vh"
-                  }
-                },
-              )(elems)(_pageMiddleModifier).render
+        val pageMiddle: PageWidget[Unit] = {
+          val leftAndCenter: PageWidget[Unit] =
+            pageLeft match {
+              case Some(pageLeft) => pageLeft <>+> pageCenter
+              case None           => pageCenter
             }
+
+          val all: PageWidget[Unit] =
+            pageRight match {
+              case Some(pageRight) => leftAndCenter <>+> pageRight
+              case None            => leftAndCenter
+            }
+
+          all.wrapped { elems =>
+            div(
+              id := Page.names.PageMiddle,
+              display.flex,
+              height := {
+                List(
+                  _pageTop.map(_._1),
+                  _pageBottom.map(_._1),
+                ).flatMap(_.toOption).toNel match {
+                  case Some(edges) =>
+                    ("100vh" :: edges.toList).mkString("calc(", " - ", ")")
+                  case None =>
+                    "100vh"
+                }
+              },
+            )(elems)(_pageMiddleModifier).render
+          }
+        }
 
         val page: PageWidget[Unit] =
           NonEmptyList
