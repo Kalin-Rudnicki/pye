@@ -52,12 +52,6 @@ object Scaffold {
       def schemaFile(pyeConfig: PyeConfig): File = projectFile.list(pyeConfig.srcPath("jvm", "db", "Schema.scala"))
       def mainFile(pyeConfig: PyeConfig): File = projectFile.list(pyeConfig.srcPath("jvm", "Main.scala"))
 
-      def readPyeConfig: IO[PyeConfig] =
-        for {
-          pyeConfigFC <- FileUtils.readFile(pyeConfigFile)
-          pyeConfig <- decode[PyeConfig](pyeConfigFC).toErrorAccumulator.toIO
-        } yield pyeConfig
-
       def verifyNames(pyeConfig: PyeConfig, scaffoldName: String, scaffold: ScaffoldConfig): IO[PyeConfig] = {
         val allScaffolds = pyeConfig.scaffolds.toSet
         def allBy(f: ((String, ScaffoldConfig)) => String): Set[String] =
@@ -223,7 +217,7 @@ object Scaffold {
         FileUtils.writeFile(pyeConfigFile, pyeConfig.asJson.spaces2)
 
       for {
-        pyeConfig <- readPyeConfig
+        pyeConfig <- PyeConfig.fromFile(pyeConfigFile)
         scaffoldName = conf.name()
         scaffold = ScaffoldConfig.defaults(
           name = scaffoldName,

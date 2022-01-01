@@ -1,6 +1,13 @@
 package pye.commands.conf
 
+import java.io.File
+
+import io.circe.generic.auto._
+import io.circe.parser._
+
+import klib.Implicits._
 import klib.fp.types._
+import klib.utils._
 
 final case class PyeConfig(
     projectName: String,
@@ -21,5 +28,16 @@ final case class PyeConfig(
       basePackage.toList,
       extras,
     ).flatten.mkString(".")
+
+}
+object PyeConfig {
+
+  val DefaultFile: File = new File("pye-config.json")
+
+  def fromFile(file: File): IO[PyeConfig] =
+    for {
+      pyeConfigFC <- FileUtils.readFile(file)
+      pyeConfig <- decode[PyeConfig](pyeConfigFC).toErrorAccumulator.toIO
+    } yield pyeConfig
 
 }
